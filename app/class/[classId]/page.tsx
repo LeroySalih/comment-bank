@@ -28,7 +28,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
 
   // Sort groups: WP, TH, PS, OA
   const order = ['WP', 'TH', 'PS', 'OA'];
-  const groups = cls.course.commentGroups.sort((a, b) => {
+  const groups = cls.course.commentGroups.sort((a: any, b: any) => {
       const indexA = order.indexOf(a.name);
       const indexB = order.indexOf(b.name);
       if (indexA !== -1 && indexB !== -1) return indexA - indexB;
