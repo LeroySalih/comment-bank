@@ -62,7 +62,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                   <tr>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Name</th>
                     <th scope="col" className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
-                    {groups.map(g => (
+                    {groups.map((g: any) => (
                         <th key={g.id} scope="col" className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider w-24">
                             {g.name}
                         </th>
@@ -81,7 +81,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                         {student.gender}
                       </td>
-                      {groups.map(g => {
+                      {groups.map((g: any) => {
                           // Get current code for this group on this student
                           let currentCode = null;
                           if (g.name === 'WP') currentCode = student.wpCode;
