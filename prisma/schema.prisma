@@ -1,0 +1,67 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       String @id @default(cuid())
+  username String @unique
+  password String
+}
+
+model Course {
+  id             String         @id @default(cuid())
+  name           String         @unique // e.g. "11CS", "CP"
+  studiedComment String? // Intro text
+  classes        Class[]
+  commentGroups  CommentGroup[]
+}
+
+model Class {
+  id       String    @id @default(cuid())
+  name     String    @unique // e.g. "7CP"
+  courseId String
+  course   Course    @relation(fields: [courseId], references: [id])
+  students Student[]
+}
+
+model Student {
+  id        String @id @default(cuid())
+  firstName String
+  lastName  String
+  gender    String // "Male", "Female"
+  classId   String
+  class     Class  @relation(fields: [classId], references: [id])
+
+  // Codes (e.g. "H", "M", "L")
+  wpCode String?
+  thCode String?
+  psCode String?
+  oaCode String?
+
+  comment String? // The final editable comment text
+}
+
+model CommentGroup {
+  id       String          @id @default(cuid())
+  name     String // "WP", "TH", "PS", "OA"
+  courseId String
+  course   Course          @relation(fields: [courseId], references: [id])
+  options  CommentOption[]
+
+  @@unique([courseId, name])
+}
+
+model CommentOption {
+  id      String       @id @default(cuid())
+  code    String // "H", "M", "L"
+  text    String
+  groupId String
+  group   CommentGroup @relation(fields: [groupId], references: [id])
+
+  @@unique([groupId, code])
+}
