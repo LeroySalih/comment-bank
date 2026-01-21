@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import QuickGroupSelector from '@/components/QuickGroupSelector';
+import CopyCommentButton from '@/components/CopyCommentButton';
 
 export default async function ClassPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = await params;
@@ -101,9 +102,16 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                           );
                       })}
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
-                        <Link href={`/student/${student.id}`} className="text-blue-600 hover:text-blue-900 hover:underline">
-                          Write Comment
-                        </Link>
+                        <div className="flex items-center justify-end gap-3">
+                          <CopyCommentButton 
+                            student={student} 
+                            course={cls.course} 
+                            groups={groups} 
+                          />
+                          <Link href={`/student/${student.id}`} className="text-blue-600 hover:text-blue-900 hover:underline">
+                            Write Comment
+                          </Link>
+                        </div>
                       </td>
                     </tr>
                   ))}

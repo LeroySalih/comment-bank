@@ -7,14 +7,21 @@ export const parseComment = (commentText: string, firstName: string, gender: str
     const isMale = gender.toLowerCase() === "male";
     
     const replacements = isMale ? {
-        "<He>": "he",
+        "<He>": "He",
         "<he>": "he",
+        "<Him>": "Him", // Rarely used at start, but consistent
         "<him>": "him",
-        "<his>": "his"
+        "<His>": "His",
+        "<his>": "his",
+        "<She>": "He",
+        "<she>": "he",
+        "<Her>": "Him",
     } : {
-        "<He>": "she",
+        "<He>": "She",
         "<he>": "she",
+        "<Him>": "Her",
         "<him>": "her",
+        "<His>": "Her", // "His book" -> "Her book" (possessive)
         "<his>": "her"
     };
 

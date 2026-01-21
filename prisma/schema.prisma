@@ -19,6 +19,8 @@ model Course {
   studiedComment String? // Intro text
   classes        Class[]
   commentGroups  CommentGroup[]
+  ownerId        String?
+  owner          User?          @relation(fields: [ownerId], references: [id])
 }
 
 model Class {
@@ -60,6 +62,7 @@ model CommentOption {
   id      String       @id @default(cuid())
   code    String // "H", "M", "L"
   text    String
+  order   Int          @default(0)
   groupId String
   group   CommentGroup @relation(fields: [groupId], references: [id])
 

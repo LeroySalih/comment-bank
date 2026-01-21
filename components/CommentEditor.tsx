@@ -211,7 +211,15 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
                 <div key={group.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">{group.name} Comments</h3>
                     <div className="space-y-3">
-                        {group.options.map(option => (
+                        {group.options.sort((a,b) => {
+                             const order = ['H', 'M', 'L'];
+                             const indexA = order.indexOf(a.code);
+                             const indexB = order.indexOf(b.code);
+                             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+                             if (indexA !== -1) return -1;
+                             if (indexB !== -1) return 1;
+                             return a.code.localeCompare(b.code);
+                        }).map(option => (
                            <label key={option.id} className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all select-none">
                               <input 
                                 type="radio" 

@@ -46,7 +46,16 @@ export default function QuickGroupSelector({
   // Actually commonly H, M, L.
   // Let's just sort by ID or insert order or Code?
   // Let's sort by code.
-  const sortedOptions = [...options].sort((a,b) => a.code.localeCompare(b.code));
+  // Sort options: H, M, L
+  const order = ['H', 'M', 'L'];
+  const sortedOptions = [...options].sort((a,b) => {
+    const indexA = order.indexOf(a.code);
+    const indexB = order.indexOf(b.code);
+    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
+    if (indexA !== -1) return -1;
+    if (indexB !== -1) return 1;
+    return a.code.localeCompare(b.code);
+  });
 
   return (
     <div className="relative">
