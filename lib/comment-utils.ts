@@ -23,11 +23,18 @@ type MinimalStudent = {
   thCode?: string | null;
   psCode?: string | null;
   oaCode?: string | null;
+  eoyLevel?: string | null;
+  targetLevel?: string | null;
 };
 
 type MinimalCourse = {
   studiedComment?: string | null;
+  subject?: string | null;
 };
+
+type MinimalClass = {
+    year?: string | null;
+}
 
 /**
  * Generates the full comment string for a student based on their codes and course configuration.
@@ -36,7 +43,8 @@ type MinimalCourse = {
 export function generateComment(
   student: MinimalStudent,
   course: MinimalCourse,
-  groups: MinimalGroup[]
+  groups: MinimalGroup[],
+  cls?: MinimalClass // Added class context
 ): string {
     // Helper to find option text by group name and code
     const getOptionText = (groupName: string, code: string | null | undefined): string => {
@@ -75,5 +83,13 @@ export function generateComment(
     // So for now, we only handle the standard 4. 
     // If dynamic groups are added later to the schema, this needs update.
     
-    return parseComment(combined, student.firstName, student.gender);
+    return parseComment(
+        combined, 
+        student.firstName, 
+        student.gender,
+        course.subject,
+        cls?.year,
+        student.eoyLevel,
+        student.targetLevel
+    );
 }

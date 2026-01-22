@@ -1,4 +1,13 @@
-export const parseComment = (commentText: string, firstName: string, gender: string) => {
+export const parseComment = (
+    commentText: string, 
+    firstName: string, 
+    gender: string,
+    // New optional fields
+    subject?: string | null,
+    year?: string | null,
+    eoyLevel?: string | null,
+    targetLevel?: string | null
+) => {
     if (!commentText) return "";
 
     let comment = commentText;
@@ -25,8 +34,7 @@ export const parseComment = (commentText: string, firstName: string, gender: str
         "<his>": "her"
     };
 
-    // Apply replacements
-    // Note: The original code used replaceAll.
+    // Apply gender replacements
     Object.entries(replacements).forEach(([placeholder, value]) => {
         comment = comment.replaceAll(placeholder, value);
     });
@@ -34,18 +42,16 @@ export const parseComment = (commentText: string, firstName: string, gender: str
     // Name replacement
     comment = comment.replaceAll('<Name>', firstName);
 
-    // Capitalization fix for start of sentences if needed? 
-    // The original code converted <He> -> he (lowercase). 
-    // Wait, <He> usually starts a sentence. Original: commentText.replaceAll("<He>", "he").
-    // If the template has "<He> is good", it becomes "he is good". That seems WRONG strictly speaking, but maybe the templates rely on previous sentence flow?
-    // Let's check `main.js`:
-    // comment = gender == "Male" ? commentText.replaceAll("<He>", "he") : commentText.replaceAll("<He>", "she")
-    // Yes, it replaces <He> with lowercase he/she.
-    // This implies <He> is NOT sentence start? Or the user's templates are weird?
-    // Actually, look at line 27: `<He>` -> `he`.
-    // Maybe `<He>` is just a token.
-    // However, usually `<He>` implies Capitalized.
-    // Let's stick EXACTLY to `main.js` logic to be safe.
-    
+    // New Variable Replacements
+    if (subject) comment = comment.replaceAll('<Subject>', subject);
+    if (year) comment = comment.replaceAll('<Year>', year);
+    if (eoyLevel) comment = comment.replaceAll('<EoYLevel>', eoyLevel);
+    if (targetLevel) comment = comment.replaceAll('<TargetLevel>', targetLevel);
+
     return comment;
+}
+
+export const countWords = (text: string) => {
+    if (!text) return 0;
+    return text.trim().split(/\s+/).filter(word => word.length > 0).length;
 }

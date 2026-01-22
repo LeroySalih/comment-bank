@@ -1,11 +1,38 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import SignOutButton from '@/components/SignOutButton';
+import { getServerSession } from 'next-auth';
+import { authOptions } from './api/auth/[...nextauth]/route';
+import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
 
 export default async function Home() {
+  const session = await getServerSession(authOptions);
+  
+  const userIsAdmin = isAdmin(session?.user);
+  const userIsHoD = isHoD(session?.user);
+  const userIsTeacher = isTeacher(session?.user);
+  const userId = session?.user?.id;
+
+  // Filter logic:
+  // Admin and HOD see all classes.
+  // Teachers only see classes they are assigned to.
   const courses = await prisma.course.findMany({
+    where: (userIsAdmin || userIsHoD) ? {} : {
+       classes: {
+          some: {
+             teachers: {
+                some: { id: userId }
+             }
+          }
+       }
+    },
     include: {
       classes: {
+        where: (userIsAdmin || userIsHoD) ? {} : {
+          teachers: {
+            some: { id: userId }
+          }
+        },
         orderBy: { name: 'asc' },
         include: {
           students: {
@@ -25,14 +52,6 @@ export default async function Home() {
   return (
     <main className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-4xl mx-auto">
-        <header className="mb-8 flex justify-between items-start">
-          <div>
-            <h1 className="text-3xl font-bold text-gray-900">Comment Bank</h1>
-            <p className="text-gray-600">Select a class to begin writing comments.</p>
-          </div>
-          <SignOutButton />
-        </header>
-
         <div className="grid gap-6">
           {courses.map((course) => (
             <div key={course.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">

@@ -10,28 +10,35 @@ const mockStudent = {
   wpCode: 'H',
   thCode: 'M',
   psCode: 'L',
-  oaCode: 'H'
+  oaCode: 'H',
+  eoyLevel: '5A',
+  targetLevel: '6B'
 };
 
 const mockCourse = {
-  studiedComment: 'This term we studied Shakespeare.'
+  studiedComment: 'This term <Subject> students studied Shakespeare.',
+  subject: 'English'
+};
+
+const mockClass = {
+  year: '9'
 };
 
 const mockGroups = [
   {
     id: 'g1',
     name: 'WP',
-    options: [{ id: 'o1', code: 'H', text: '<He> has worked hard.' }]
+    options: [{ id: 'o1', code: 'H', text: '<He> has worked hard in Year <Year>.' }]
   },
   {
     id: 'g2',
     name: 'TH',
-    options: [{ id: 'o2', code: 'M', text: '<He> shows moderate understanding.' }]
+    options: [{ id: 'o2', code: 'M', text: '<He> shows moderate understanding. Target: <TargetLevel>.' }]
   },
   {
     id: 'g3',
     name: 'PS',
-    options: [{ id: 'o3', code: 'L', text: '<His> practical skills need improvement.' }]
+    options: [{ id: 'o3', code: 'L', text: '<His> practical skills need improvement. EoY: <EoYLevel>.' }]
   },
   {
     id: 'g4',
@@ -41,22 +48,22 @@ const mockGroups = [
 ];
 
 // Expected Output:
-// This term we studied Shakespeare.
+// This term English students studied Shakespeare.
 //
-// He has worked hard. he shows moderate understanding. his practical skills need improvement.
+// He has worked hard in Year 9. he shows moderate understanding. Target: 6B. his practical skills need improvement. EoY: 5A.
 //
 // Overall excellent.
 
 console.log("Running Test...");
-const result = generateComment(mockStudent, mockCourse, mockGroups);
+const result = generateComment(mockStudent, mockCourse, mockGroups, mockClass);
 console.log("Result:");
 console.log(result);
 
-const expectedMiddle = "He has worked hard. he shows moderate understanding. his practical skills need improvement.";
-
-if (result.includes("This term we studied Shakespeare.") && 
+if (result.includes("This term English students studied Shakespeare.") && 
     result.includes("Overall excellent.") &&
-    result.includes("He has worked hard")) {
+    result.includes("He has worked hard in Year 9") &&
+    result.includes("Target: 6B") &&
+    result.includes("EoY: 5A")) {
     console.log("✅ simple content checks passed");
 } else {
     console.log("❌ content checks failed");

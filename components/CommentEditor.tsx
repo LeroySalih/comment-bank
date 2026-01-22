@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { parseComment } from '@/lib/utils';
+import { parseComment, countWords } from '@/lib/utils';
 import { Copy, Check } from 'lucide-react';
 import { updateStudentComment, updateStudentCommentText } from '@/app/actions';
 
@@ -27,11 +27,17 @@ type Student = {
   psCode?: string | null;
   oaCode?: string | null;
   comment?: string | null;
+  eoyLevel?: string | null;
+  targetLevel?: string | null;
+  class?: {
+    year?: string | null;
+  };
 };
 
 type Course = {
   id: string;
   name: string;
+  subject?: string | null;
   studiedComment?: string | null;
 };
 
@@ -152,7 +158,15 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
         if (t) combined += "\n\n" + t;
     });
 
-    setPreview(parseComment(combined, student.firstName, student.gender));
+    setPreview(parseComment(
+      combined, 
+      student.firstName, 
+      student.gender,
+      course.subject,
+      student.class?.year,
+      student.eoyLevel,
+      student.targetLevel
+    ));
 
   }, [selections, course, groups, student]);
 
@@ -233,7 +247,15 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
                                 <div className="flex items-center justify-between mb-1">
                                     <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{option.code}</span>
                                 </div>
-                                <p className="text-sm text-gray-700">{parseComment(option.text, student.firstName, student.gender)}</p>
+                                <p className="text-sm text-gray-700">{parseComment(
+                                  option.text, 
+                                  student.firstName, 
+                                  student.gender,
+                                  course.subject,
+                                  student.class?.year,
+                                  student.eoyLevel,
+                                  student.targetLevel
+                                )}</p>
                               </div>
                            </label>
                         ))}
@@ -267,6 +289,7 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
             </div>
             <div className="px-4 py-2 bg-gray-50 text-xs text-gray-400 border-t items-center flex justify-between">
                 <span>Changes saved automatically on blur.</span>
+                <span className="font-medium">{countWords(preview)} words</span>
             </div>
         </div>
     </div>

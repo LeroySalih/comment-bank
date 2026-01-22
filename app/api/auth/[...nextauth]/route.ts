@@ -3,7 +3,9 @@ import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
 
-const handler = NextAuth({
+import { NextAuthOptions } from "next-auth"
+
+export const authOptions: NextAuthOptions = {
   session: {
     strategy: "jwt",
   },
@@ -25,6 +27,9 @@ const handler = NextAuth({
         const user = await prisma.user.findUnique({
           where: {
             username: credentials.username
+          },
+          include: {
+            roles: true
           }
         })
 
@@ -41,10 +46,32 @@ const handler = NextAuth({
         return {
           id: user.id,
           name: user.username,
+          username: user.username,
+          roles: user.roles.map(r => r.name)
         }
       }
     })
-  ]
-})
+  ],
+  callbacks: {
+    async jwt({ token, user }) {
+      if (user) {
+        token.id = user.id
+        token.username = user.username
+        token.roles = user.roles
+      }
+      return token
+    },
+    async session({ session, token }) {
+      if (session.user) {
+        session.user.id = token.id
+        session.user.username = token.username
+        session.user.roles = token.roles
+      }
+      return session
+    }
+  }
+}
+
+const handler = NextAuth(authOptions)
 
 export { handler as GET, handler as POST }
