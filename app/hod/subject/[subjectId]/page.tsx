@@ -33,13 +33,13 @@ export default async function SubjectPage({ params }: Props) {
     orderBy: { username: 'asc' }
   })
 
-  const subject = await prisma.course.findUnique({
+  const subject = await (prisma as any).subject.findUnique({
     where: { id: subjectId },
     include: {
       classes: {
         orderBy: { name: 'asc' },
         include: { 
-          _count: { select: { students: true } },
+          _count: { select: { assignments: true } },
           teachers: { select: { id: true, username: true } }
         }
       },
@@ -51,12 +51,12 @@ export default async function SubjectPage({ params }: Props) {
         }
       }
     }
-  })
+  }) as any;
 
   if (!subject) notFound()
 
-  const totalWordsInSubject = subject.commentGroups.reduce((acc, group) => {
-    return acc + group.options.reduce((sum, opt) => sum + countWords(opt.text), 0)
+  const totalWordsInSubject = subject.commentGroups.reduce((acc: any, group: any) => {
+    return acc + group.options.reduce((sum: any, opt: any) => sum + countWords(opt.text), 0)
   }, 0)
   const avgWordsPerGroup = subject.commentGroups.length > 0 ? (totalWordsInSubject / subject.commentGroups.length).toFixed(1) : 0
 
@@ -78,7 +78,7 @@ export default async function SubjectPage({ params }: Props) {
           </div>
           
           <div className="space-y-4">
-            {subject.classes.map(cls => (
+            {subject.classes.map((cls: any) => (
               <div key={cls.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border group/item hover:bg-gray-100 transition-colors">
                 <div className="flex flex-col gap-2 w-full">
                   <div className="flex justify-between items-center w-full">
@@ -99,7 +99,7 @@ export default async function SubjectPage({ params }: Props) {
                         availableTeachers={teachers}
                       />
                       <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
-                        {cls._count.students} Pupils
+                        {cls._count.assignments} Pupils
                       </span>
                     </div>
                   </div>

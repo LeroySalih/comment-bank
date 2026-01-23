@@ -7,7 +7,7 @@ import Link from "next/link"
 export const dynamic = 'force-dynamic'
 
 export default async function HoDDashboard() {
-  const subjects = await prisma.course.findMany({
+  const subjects = await (prisma as any).subject.findMany({
     orderBy: { name: 'asc' },
     include: {
       _count: {
@@ -25,7 +25,7 @@ export default async function HoDDashboard() {
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subjects.map(subject => (
+        {subjects.map((subject: any) => (
           <div key={subject.id} className="relative group">
             <Link 
               href={`/hod/subject/${subject.id}`}

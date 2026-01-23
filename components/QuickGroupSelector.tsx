@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react';
-import { updateStudentComment } from '@/app/actions';
+import { updateAssignmentCode } from '@/app/actions';
 
 type Option = {
   id: string;
@@ -10,15 +10,15 @@ type Option = {
 };
 
 interface QuickGroupSelectorProps {
-  studentId: string;
-  groupName: string;
+  assignmentId: string;
+  groupId: string;
   currentCode: string | null | undefined;
   options: Option[];
 }
 
 export default function QuickGroupSelector({ 
-  studentId, 
-  groupName, 
+  assignmentId, 
+  groupId, 
   currentCode, 
   options 
 }: QuickGroupSelectorProps) {
@@ -30,12 +30,7 @@ export default function QuickGroupSelector({
     setVal(newCode || "");
     setLoading(true);
     
-    // If clearing (value is empty string), send null
-    // If selecting, send the code
-    
-    // We need to find the code. wait, the value IS the code in my design below?
-    // Let's use code as value.
-    await updateStudentComment(studentId, groupName, newCode);
+    await updateAssignmentCode(assignmentId, groupId, newCode);
     setLoading(false);
   };
 

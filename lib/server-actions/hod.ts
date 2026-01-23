@@ -29,7 +29,7 @@ export async function createSubject(formData: FormData) {
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    await prisma.course.create({
+    await (prisma as any).subject.create({
       data: {
         name,
         studiedComment: introduction
@@ -51,7 +51,7 @@ export async function updateSubject(subjectId: string, formData: FormData) {
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    await prisma.course.update({
+    await (prisma as any).subject.update({
       where: { id: subjectId },
       data: {
         name,
@@ -70,7 +70,7 @@ export async function deleteSubject(subjectId: string) {
   await checkHoDAccess()
 
   try {
-    await prisma.course.delete({
+    await (prisma as any).subject.delete({
       where: { id: subjectId }
     })
     revalidatePath("/hod")
@@ -88,10 +88,10 @@ export async function createClass(subjectId: string, formData: FormData) {
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    await prisma.class.create({
+    await (prisma as any).class.create({
       data: {
         name,
-        courseId: subjectId
+        subjectId: subjectId
       }
     })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -109,7 +109,7 @@ export async function updateClass(classId: string, subjectId: string, formData: 
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    await prisma.class.update({
+    await (prisma as any).class.update({
       where: { id: classId },
       data: { name }
     })
@@ -125,7 +125,7 @@ export async function deleteClass(classId: string, subjectId: string) {
   await checkHoDAccess()
 
   try {
-    await prisma.class.delete({
+    await (prisma as any).class.delete({
       where: { id: classId }
     })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -136,7 +136,6 @@ export async function deleteClass(classId: string, subjectId: string) {
   }
 }
 
-
 export async function createCommentGroup(subjectId: string, formData: FormData) {
   await checkHoDAccess()
   const name = formData.get("name") as string
@@ -144,18 +143,17 @@ export async function createCommentGroup(subjectId: string, formData: FormData) 
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    // Get the current max order
-    const maxOrderGroup = await prisma.commentGroup.findFirst({
-      where: { courseId: subjectId },
+    const maxOrderGroup = await (prisma as any).commentGroup.findFirst({
+      where: { subjectId: subjectId },
       orderBy: { displayOrder: 'desc' },
       select: { displayOrder: true }
     })
     const nextOrder = (maxOrderGroup?.displayOrder ?? -1) + 1
 
-    await prisma.commentGroup.create({
+    await (prisma as any).commentGroup.create({
       data: {
         name,
-        courseId: subjectId,
+        subjectId: subjectId,
         displayOrder: nextOrder
       }
     })
@@ -174,7 +172,7 @@ export async function updateCommentGroup(groupId: string, subjectId: string, for
   if (!name) return { success: false, error: "Name is required" }
 
   try {
-    await prisma.commentGroup.update({
+    await (prisma as any).commentGroup.update({
       where: { id: groupId },
       data: { name }
     })
@@ -190,7 +188,7 @@ export async function deleteCommentGroup(groupId: string, subjectId: string) {
   await checkHoDAccess()
 
   try {
-    await prisma.commentGroup.delete({
+    await (prisma as any).commentGroup.delete({
       where: { id: groupId }
     })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -200,13 +198,12 @@ export async function deleteCommentGroup(groupId: string, subjectId: string) {
     return { success: false, error: "Failed to delete group" }
   }
 }
-
 export async function reorderCommentGroups(subjectId: string, items: { id: string, order: number }[]) {
   await checkHoDAccess()
 
   try {
     const transaction = items.map((item) => 
-      prisma.commentGroup.update({
+      (prisma as any).commentGroup.update({
         where: { id: item.id },
         data: { displayOrder: item.order }
       })
@@ -221,7 +218,6 @@ export async function reorderCommentGroups(subjectId: string, items: { id: strin
   }
 }
 
-
 export async function createComment(groupId: string, subjectId: string, formData: FormData) {
   await checkHoDAccess()
   const text = formData.get("text") as string
@@ -235,7 +231,6 @@ export async function createComment(groupId: string, subjectId: string, formData
         text,
         code,
         groupId
-        // displayOrder not set here, using default 0
       }
     })
     revalidatePath(`/hod/subject/${subjectId}/group/${groupId}`)
@@ -296,11 +291,6 @@ export async function reorderComments(groupId: string, items: { id: string, orde
     )
 
     await prisma.$transaction(transaction)
-    // No path to revalidate easily passed here without subjectId, but client can trust optimistic update or we can fetch path. 
-    // Actually, we should probably pass path or specific IDs. 
-    // But typically drag and drop is optimistic. 
-    // Let's rely on client router.refresh() or just pass the subjectId if we want revalidatePath.
-    // For now, let's just return success.
     return { success: true }
   } catch (error) {
     console.error("Failed to reorder comments:", error)
@@ -308,52 +298,32 @@ export async function reorderComments(groupId: string, items: { id: string, orde
   }
 }
 
-export async function createStudent(classId: string, formData: FormData) {
+export async function createAssignment(classId: string, formData: FormData) {
   await checkHoDAccess()
+  const admissionNumber = formData.get("admissionNumber") as string
   const firstName = formData.get("firstName") as string
   const lastName = formData.get("lastName") as string
   const gender = formData.get("gender") as string
   const targetLevel = formData.get("targetLevel") as string
   const actualLevel = formData.get("actualLevel") as string
 
-  if (!firstName || !lastName || !gender) return { success: false, error: "First Name, Last Name and Gender are required" }
-
-  try {
-    await prisma.student.create({
-      data: {
-        firstName,
-        lastName,
-        gender,
-        targetLevel,
-        actualLevel,
-        classId
-      }
-    })
-    revalidatePath(`/hod/class/${classId}`)
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to create student:", error)
-    return { success: false, error: "Failed to create student" }
+  if (!admissionNumber || !firstName || !lastName || !gender) {
+    return { success: false, error: "Admission Number, Names and Gender are required" }
   }
-}
-
-export async function updateStudent(studentId: string, classId: string, formData: FormData) {
-  await checkHoDAccess()
-  const firstName = formData.get("firstName") as string
-  const lastName = formData.get("lastName") as string
-  const gender = formData.get("gender") as string
-  const targetLevel = formData.get("targetLevel") as string
-  const actualLevel = formData.get("actualLevel") as string
-
-  if (!firstName || !lastName || !gender) return { success: false, error: "First Name, Last Name and Gender are required" }
 
   try {
-    await prisma.student.update({
-      where: { id: studentId },
+    // Upsert Pupil first
+    await (prisma as any).pupil.upsert({
+      where: { admissionNumber },
+      update: { firstName, lastName, gender },
+      create: { admissionNumber, firstName, lastName, gender }
+    })
+
+    // Create Assignment
+    await (prisma as any).assignment.create({
       data: {
-        firstName,
-        lastName,
-        gender,
+        pupilId: admissionNumber,
+        classId,
         targetLevel,
         actualLevel
       }
@@ -361,25 +331,65 @@ export async function updateStudent(studentId: string, classId: string, formData
     revalidatePath(`/hod/class/${classId}`)
     return { success: true }
   } catch (error) {
-    console.error("Failed to update student:", error)
-    return { success: false, error: "Failed to update student" }
+    console.error("Failed to create assignment:", error)
+    return { success: false, error: "Failed to create assignment" }
   }
 }
 
-export async function deleteStudent(studentId: string, classId: string) {
+export async function updateAssignment(assignmentId: string, classId: string, formData: FormData) {
+  await checkHoDAccess()
+  const firstName = formData.get("firstName") as string
+  const lastName = formData.get("lastName") as string
+  const gender = formData.get("gender") as string
+  const targetLevel = formData.get("targetLevel") as string
+  const actualLevel = formData.get("actualLevel") as string
+
+  if (!firstName || !lastName || !gender) return { success: false, error: "Names and Gender are required" }
+
+  try {
+    const assignment = await (prisma as any).assignment.findUnique({
+      where: { id: assignmentId },
+      select: { pupilId: true }
+    })
+
+    if (!assignment) return { success: false, error: "Assignment not found" }
+
+    // Update Pupil
+    await (prisma as any).pupil.update({
+      where: { admissionNumber: assignment.pupilId },
+      data: { firstName, lastName, gender }
+    })
+
+    // Update Assignment
+    await (prisma as any).assignment.update({
+      where: { id: assignmentId },
+      data: { targetLevel, actualLevel }
+    })
+
+    revalidatePath(`/hod/class/${classId}`)
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update assignment:", error)
+    return { success: false, error: "Failed to update assignment" }
+  }
+}
+
+export async function deleteAssignment(assignmentId: string, classId: string) {
   await checkHoDAccess()
 
   try {
-    await prisma.student.delete({
-      where: { id: studentId }
+    await (prisma as any).assignment.delete({
+      where: { id: assignmentId }
     })
     revalidatePath(`/hod/class/${classId}`)
     return { success: true }
   } catch (error) {
-    console.error("Failed to delete student:", error)
-    return { success: false, error: "Failed to delete student" }
+    console.error("Failed to delete assignment:", error)
+    return { success: false, error: "Failed to delete assignment" }
   }
 }
+
+export { createAssignment as createStudent, updateAssignment as updateStudent, deleteAssignment as deleteStudent };
 
 export async function assignTeachersToClass(classId: string, teacherIds: string[]) {
   await checkHoDAccess()

@@ -11,13 +11,13 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const { classId } = await params;
   const session = await getServerSession(authOptions);
 
-  const cls = await prisma.class.findUnique({
+  const cls = await (prisma as any).class.findUnique({
     where: { id: classId },
     include: {
       teachers: {
         select: { id: true }
       },
-      course: {
+      subject: {
         include: {
             commentGroups: {
                 orderBy: { displayOrder: 'asc' },
@@ -25,8 +25,14 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
             }
         }
       },
-      students: {
-        orderBy: { lastName: 'asc' }
+      assignments: {
+        where: {
+          pupil: { isActive: true }
+        },
+        include: {
+          pupil: true,
+          codes: true
+        }
       }
     }
   });
@@ -41,13 +47,13 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const userIsTeacher = isTeacher(session?.user);
   
   if (userIsTeacher && !userIsAdmin && !userIsHoD) {
-    const isAssigned = cls.teachers.some(t => t.id === session?.user?.id);
+    const isAssigned = cls.teachers.some((t: any) => t.id === session?.user?.id);
     if (!isAssigned) {
       return <div>Class not found or access denied</div>;
     }
   }
 
-  const groups = cls.course.commentGroups;
+  const groups = cls.subject.commentGroups;
 
   return (
     <main className="min-h-screen p-8 bg-gray-50">
@@ -60,10 +66,10 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
           <div className="flex justify-between items-end">
              <div>
                 <h1 className="text-3xl font-bold text-gray-900">{cls.name}</h1>
-                <p className="text-gray-600">{cls.course.name}</p>
+                <p className="text-gray-600">{cls.subject.name}</p>
              </div>
              <div className="text-gray-500">
-                {cls.students.length} Pupils
+                {cls.assignments.length} Pupils
              </div>
           </div>
         </header>
@@ -85,27 +91,23 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                   </tr>
                 </thead>
                 <tbody className="bg-white divide-y divide-gray-200">
-                  {cls.students.map((student) => (
-                    <tr key={student.id} className="hover:bg-gray-50 group">
+                  {cls.assignments.sort((a: any, b: any) => a.pupil.lastName.localeCompare(b.pupil.lastName)).map((assignment: any) => (
+                    <tr key={assignment.id} className="hover:bg-gray-50 group">
                       <td className="sticky left-0 z-10 px-6 py-4 whitespace-nowrap bg-white group-hover:bg-gray-50 border-b border-gray-100 w-[200px] min-w-[200px]">
-                        <div className="text-sm font-medium text-gray-900">{student.lastName}, {student.firstName}</div>
+                        <div className="text-sm font-medium text-gray-900">{assignment.pupil.lastName}, {assignment.pupil.firstName}</div>
                       </td>
                       <td className="sticky left-[200px] z-10 px-6 py-4 whitespace-nowrap text-sm text-gray-500 bg-white group-hover:bg-gray-50 border-b border-gray-100 w-[100px] min-w-[100px]">
-                        {student.gender}
+                        {assignment.pupil.gender}
                       </td>
                       {groups.map((g: any) => {
-                          // Get current code for this group on this student
-                          let currentCode = null;
-                          if (g.name === 'WP') currentCode = student.wpCode;
-                          if (g.name === 'TH') currentCode = student.thCode;
-                          if (g.name === 'PS') currentCode = student.psCode;
-                          if (g.name === 'OA') currentCode = student.oaCode;
+                          const currentCodeObj = assignment.codes.find((c: any) => c.groupId === g.id);
+                          const currentCode = currentCodeObj?.code || null;
 
                           return (
                               <td key={g.id} className="px-4 py-4 whitespace-nowrap">
                                   <QuickGroupSelector 
-                                    studentId={student.id} 
-                                    groupName={g.name} 
+                                    assignmentId={assignment.id} 
+                                    groupId={g.id} 
                                     currentCode={currentCode}
                                     options={g.options} 
                                   />
@@ -115,11 +117,11 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                       <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium border-b border-gray-100">
                         <div className="flex items-center justify-end gap-3">
                           <CopyCommentButton 
-                            student={student} 
-                            course={cls.course} 
+                            assignment={assignment} 
+                            subject={cls.subject} 
                             groups={groups} 
                           />
-                          <Link href={`/student/${student.id}`} className="text-blue-600 hover:text-blue-900 hover:underline">
+                          <Link href={`/student/${assignment.id}`} className="text-blue-600 hover:text-blue-900 hover:underline">
                             Write Comment
                           </Link>
                         </div>

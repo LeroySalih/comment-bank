@@ -8,9 +8,12 @@ import { Pencil, Trash2, X, Check } from "lucide-react"
 interface StudentRowProps {
   student: {
     id: string
-    firstName: string
-    lastName: string
-    gender: string
+    pupil: {
+      admissionNumber: string
+      firstName: string
+      lastName: string
+      gender: string
+    }
     targetLevel: string | null
     actualLevel: string | null
   }
@@ -23,9 +26,9 @@ export function StudentRow({ student, classId }: StudentRowProps) {
   const [error, setError] = useState<string | null>(null)
   
   // Form state
-  const [firstName, setFirstName] = useState(student.firstName)
-  const [lastName, setLastName] = useState(student.lastName)
-  const [gender, setGender] = useState(student.gender)
+  const [firstName, setFirstName] = useState(student.pupil.firstName)
+  const [lastName, setLastName] = useState(student.pupil.lastName)
+  const [gender, setGender] = useState(student.pupil.gender)
   const [targetLevel, setTargetLevel] = useState(student.targetLevel || "")
   const [actualLevel, setActualLevel] = useState(student.actualLevel || "")
 
@@ -51,8 +54,18 @@ export function StudentRow({ student, classId }: StudentRowProps) {
     }
   }
 
+  function handleCancel() {
+    setIsEditing(false)
+    setFirstName(student.pupil.firstName)
+    setLastName(student.pupil.lastName)
+    setGender(student.pupil.gender)
+    setTargetLevel(student.targetLevel || "")
+    setActualLevel(student.actualLevel || "")
+    setError(null)
+  }
+
   async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete ${student.firstName} ${student.lastName}?`)) return
+    if (!confirm(`Are you sure you want to delete the assignment for ${student.pupil.firstName} ${student.pupil.lastName}? This will only remove them from this class.`)) return
 
     setIsDeleting(true)
     const result = await deleteStudent(student.id, classId)
@@ -62,16 +75,6 @@ export function StudentRow({ student, classId }: StudentRowProps) {
       setError(result.error || "Failed to delete student")
       setIsDeleting(false)
     }
-  }
-
-  function handleCancel() {
-    setIsEditing(false)
-    setFirstName(student.firstName)
-    setLastName(student.lastName)
-    setGender(student.gender)
-    setTargetLevel(student.targetLevel || "")
-    setActualLevel(student.actualLevel || "")
-    setError(null)
   }
 
   if (isEditing) {
@@ -145,7 +148,7 @@ export function StudentRow({ student, classId }: StudentRowProps) {
   return (
     <tr className="hover:bg-gray-50 group">
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center gap-2">
-        {student.lastName}, {student.firstName}
+        {student.pupil.lastName}, {student.pupil.firstName}
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ml-2">
           <button 
             onClick={() => setIsEditing(true)} 
@@ -165,7 +168,7 @@ export function StudentRow({ student, classId }: StudentRowProps) {
         </div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {student.gender}
+        {student.pupil.gender}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         {student.targetLevel || "-"}

@@ -18,7 +18,7 @@ interface Props {
 export default async function GroupPage({ params }: Props) {
   const { subjectId, groupId } = await params
   
-  const group = await prisma.commentGroup.findUnique({
+  const group = await (prisma as any).commentGroup.findUnique({
     where: { id: groupId },
     include: {
       options: {
@@ -27,13 +27,13 @@ export default async function GroupPage({ params }: Props) {
           { code: 'asc' }
         ]
       },
-      course: true
+      subject: true
     }
-  })
+  }) as any;
 
-  if (!group || group.courseId !== subjectId) notFound()
+  if (!group || group.subjectId !== subjectId) notFound()
   
-  const totalWords = group.options.reduce((acc, opt) => acc + countWords(opt.text), 0)
+  const totalWords = group.options.reduce((acc: any, opt: any) => acc + countWords(opt.text), 0)
   const avgWords = group.options.length > 0 ? (totalWords / group.options.length).toFixed(1) : 0
 
   return (
@@ -42,7 +42,7 @@ export default async function GroupPage({ params }: Props) {
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.course.name}</Link>
+           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.subject.name}</Link>
            <span>/</span>
            <span>{group.name}</span>
         </div>
@@ -62,7 +62,7 @@ export default async function GroupPage({ params }: Props) {
 
         <div className="grid grid-cols-1 gap-4">
           <CommentList 
-            initialComments={group.options.map(o => ({ ...o, order: o.displayOrder }))}
+            initialComments={group.options.map((o: any) => ({ ...o, order: o.displayOrder }))}
             subjectId={subjectId}
             groupId={groupId}
           />

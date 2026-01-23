@@ -36,7 +36,17 @@ export function PupilForm({ classId }: { classId: string }) {
     <div className="mt-4 border rounded p-4 bg-gray-50 mb-6">
       <h3 className="text-sm font-medium mb-3">Add Pupil</h3>
       <form action={handleSubmit} className="flex flex-col gap-3">
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-3 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500">Adm. Number</label>
+            <input 
+              type="text" 
+              name="admissionNumber" 
+              required 
+              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1 text-sm font-mono"
+              placeholder="e.g. 123456"
+            />
+          </div>
           <div>
             <label className="block text-xs font-medium text-gray-500">First Name</label>
             <input 

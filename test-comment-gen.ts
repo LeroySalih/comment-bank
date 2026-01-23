@@ -2,20 +2,25 @@
 import { generateComment } from './lib/comment-utils';
 
 // Mock data
-const mockStudent = {
+const mockAssignment: any = {
   id: '1',
-  firstName: 'John',
-  lastName: 'Doe',
-  gender: 'Male',
-  wpCode: 'H',
-  thCode: 'M',
-  psCode: 'L',
-  oaCode: 'H',
+  pupil: {
+    admissionNumber: '123456',
+    firstName: 'John',
+    lastName: 'Doe',
+    gender: 'Male',
+  },
+  codes: [
+    { groupId: 'g1', code: 'H' },
+    { groupId: 'g2', code: 'M' },
+    { groupId: 'g3', code: 'L' },
+    { groupId: 'g4', code: 'H' }
+  ],
   eoyLevel: '5A',
   targetLevel: '6B'
 };
 
-const mockCourse = {
+const mockSubject = {
   studiedComment: 'This term <Subject> students studied Shakespeare.',
   subject: 'English'
 };
@@ -47,15 +52,8 @@ const mockGroups = [
   }
 ];
 
-// Expected Output:
-// This term English students studied Shakespeare.
-//
-// He has worked hard in Year 9. he shows moderate understanding. Target: 6B. his practical skills need improvement. EoY: 5A.
-//
-// Overall excellent.
-
 console.log("Running Test...");
-const result = generateComment(mockStudent, mockCourse, mockGroups, mockClass);
+const result = generateComment(mockAssignment, mockSubject, mockGroups, mockClass);
 console.log("Result:");
 console.log(result);
 

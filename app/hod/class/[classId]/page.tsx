@@ -16,13 +16,14 @@ interface Props {
 export default async function ClassPage({ params }: Props) {
   const { classId } = await params
   
-  const classData = await prisma.class.findUnique({
+  const classData = await (prisma as any).class.findUnique({
     where: { id: classId },
     include: {
-      students: {
-        orderBy: { lastName: 'asc' }
+      assignments: {
+        include: { pupil: true },
+        orderBy: { pupil: { lastName: 'asc' } }
       },
-      course: true
+      subject: true
     }
   })
 
@@ -34,7 +35,7 @@ export default async function ClassPage({ params }: Props) {
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${classData.courseId}`} className="hover:text-indigo-600">{classData.course.name}</Link>
+           <Link href={`/hod/subject/${classData.subjectId}`} className="hover:text-indigo-600">{classData.subject.name}</Link>
            <span>/</span>
            <span>{classData.name}</span>
         </div>
@@ -58,16 +59,16 @@ export default async function ClassPage({ params }: Props) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {classData.students.map((student) => (
+              {classData.assignments.map((assignment: any) => (
                 <StudentRow 
-                  key={student.id} 
-                  student={student} 
+                  key={assignment.id} 
+                  student={assignment} 
                   classId={classData.id} 
                 />
               ))}
-              {classData.students.length === 0 && (
+              {classData.assignments.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-6 py-10 text-center text-sm text-gray-500">
+                  <td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">
                     No pupils added to this class yet.
                   </td>
                 </tr>

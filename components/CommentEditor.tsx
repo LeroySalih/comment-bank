@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { parseComment, countWords } from '@/lib/utils';
 import { Copy, Check } from 'lucide-react';
-import { updateStudentComment, updateStudentCommentText } from '@/app/actions';
+import { updateAssignmentCode, updateAssignmentCommentText } from '@/app/actions';
 
 type CommentOption = {
   id: string;
@@ -17,24 +17,32 @@ type CommentGroup = {
   options: CommentOption[];
 };
 
-type Student = {
-  id: string;
+type Pupil = {
+  admissionNumber: string;
   firstName: string;
   lastName: string;
   gender: string;
-  wpCode?: string | null;
-  thCode?: string | null;
-  psCode?: string | null;
-  oaCode?: string | null;
-  comment?: string | null;
+};
+
+type PupilCode = {
+  groupId: string;
+  code: string | null;
+};
+
+type Assignment = {
+  id: string;
+  pupil: Pupil;
+  codes: PupilCode[];
+  finalComment?: string | null;
   eoyLevel?: string | null;
   targetLevel?: string | null;
   class?: {
+    name: string;
     year?: string | null;
   };
 };
 
-type Course = {
+type Subject = {
   id: string;
   name: string;
   subject?: string | null;
@@ -42,147 +50,113 @@ type Course = {
 };
 
 interface CommentEditorProps {
-  student: Student;
-  course: Course;
+  assignment: Assignment;
+  subject: Subject;
   groups: CommentGroup[];
 }
 
-export default function CommentEditor({ student, course, groups }: CommentEditorProps) {
-  const [selections, setSelections] = useState<Record<string, string>>({});
+export default function CommentEditor({ assignment, subject, groups }: CommentEditorProps) {
+  const [selections, setSelections] = useState<Record<string, string>>({}); // groupId -> optionId
   const [preview, setPreview] = useState('');
   const [copied, setCopied] = useState(false);
 
-  // Initialize selections with student's pre-assigned codes if available
+  // Initialize selections with assignment's pre-assigned codes
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
     
-    // Helper to find option ID by code
-    const findOptionId = (groupName: string, code: string | null | undefined) => {
-      if (!code) return undefined;
-      const group = groups.find(g => g.name === groupName);
-      const option = group?.options.find(o => o.code === code);
-      return option?.id;
-    };
-
-    const wpId = findOptionId('WP', student.wpCode);
-    if (wpId) initialSelections['WP'] = wpId;
-
-    const thId = findOptionId('TH', student.thCode);
-    if (thId) initialSelections['TH'] = thId;
-
-    const psId = findOptionId('PS', student.psCode);
-    if (psId) initialSelections['PS'] = psId;
-
-    const oaId = findOptionId('OA', student.oaCode);
-    if (oaId) initialSelections['OA'] = oaId;
+    assignment.codes.forEach(pc => {
+        const group = groups.find(g => g.id === pc.groupId);
+        if (group && pc.code) {
+            const option = group.options.find(o => o.code === pc.code);
+            if (option) {
+                initialSelections[group.id] = option.id;
+            }
+        }
+    });
 
     setSelections(initialSelections);
-  }, [student, groups]);
+  }, [assignment, groups]);
 
-  // Track if we have done the initial load
   const [initialLoad, setInitialLoad] = useState(true);
 
   // Generate Preview
   useEffect(() => {
-    // If it's the very first load and we have a saved comment, use that.
-    // Discard the generated text this one time.
     if (initialLoad) {
-        if (student.comment) {
-            setPreview(student.comment);
+        if (assignment.finalComment) {
+            setPreview(assignment.finalComment);
             setInitialLoad(false);
             return;
         }
         setInitialLoad(false);
     }
     
-    // Normal generation logic follows...
     const parts: string[] = [];
 
-    // 1. Studied Comment (Course Intro)
-    if (course.studiedComment) {
-      parts.push(course.studiedComment);
+    // 1. Studied Comment (Subject Intro)
+    if (subject.studiedComment) {
+      parts.push(subject.studiedComment);
     }
 
-    // 2. Groups in specific order: WP, TH, PS, OA
-    const order = ['WP', 'TH', 'PS', 'OA'];
-    // And others?
-    const otherGroups = groups.filter(g => !order.includes(g.name)).map(g => g.name);
-    const finalOrder = [...order, ...otherGroups];
-
-    finalOrder.forEach(groupName => {
-        // Find group ID from name (we stored selections by Group NAME for easier ordering?)
-        // Actually selections key is group NAME for simplicity in this logic
-        const selectedOptionId = selections[groupName];
-        if (selectedOptionId) {
-            const group = groups.find(g => g.name === groupName);
-            const option = group?.options.find(o => o.id === selectedOptionId);
-            if (option) {
-                parts.push(option.text);
-            }
-        }
-    });
-
-    const rawText = parts.join('\n\n'); // Separate paragraphs? Or spaces? 
-    // Legacy app used: studiedComment + " " + wp + " " + th + " " + ps + "\n" + oa
-    // logic:
-    // studiedComment
-    // wpComment + " " + thComment + " " + psComment
-    // oaComment
+    // 2. Groups ordered by display order
+    const sortedGroups = [...groups].sort((a,b) => (a as any).displayOrder || 0 - ((b as any).displayOrder || 0));
     
-    // Let's replicate this specific formatting for known groups.
-    const studied = course.studiedComment || "";
-    
-    const getOptText = (name: string) => {
-        const id = selections[name];
-        if (!id) return "";
-        const g = groups.find(g => g.name === name);
-        return g?.options.find(o => o.id === id)?.text || "";
+    // Formatting logic similar to legacy
+    // Let's identify WP, TH, PS, OA for legacy layout if they exist
+    const wp = sortedGroups.find(g => g.name === 'WP');
+    const th = sortedGroups.find(g => g.name === 'TH');
+    const ps = sortedGroups.find(g => g.name === 'PS');
+    const oa = sortedGroups.find(g => g.name === 'OA');
+    const others = sortedGroups.filter(g => !['WP', 'TH', 'PS', 'OA'].includes(g.name));
+
+    const getOptText = (group?: CommentGroup) => {
+        if (!group) return "";
+        const selectedOptionId = selections[group.id];
+        if (!selectedOptionId) return "";
+        return group.options.find(o => o.id === selectedOptionId)?.text || "";
     };
 
-    const wp = getOptText("WP");
-    const th = getOptText("TH");
-    const ps = getOptText("PS");
-    const oa = getOptText("OA");
+    const wpText = getOptText(wp);
+    const thText = getOptText(th);
+    const psText = getOptText(ps);
+    const oaText = getOptText(oa);
 
     let combined = "";
-    if (studied) combined += studied + "\n\n";
+    if (subject.studiedComment) combined += subject.studiedComment + "\n\n";
     
-    const middleBlock = [wp, th, ps].filter(Boolean).join(" ");
+    const middleBlock = [wpText, thText, psText].filter(Boolean).join(" ");
     if (middleBlock) combined += middleBlock + "\n\n";
 
-    if (oa) combined += oa;
+    if (oaText) combined += oaText;
 
-    // Handle unknown groups (append at end)
-    otherGroups.forEach(name => {
-        const t = getOptText(name);
+    // Handle unknown groups
+    others.forEach(g => {
+        const t = getOptText(g);
         if (t) combined += "\n\n" + t;
     });
 
     setPreview(parseComment(
       combined, 
-      student.firstName, 
-      student.gender,
-      course.subject,
-      student.class?.year,
-      student.eoyLevel,
-      student.targetLevel
+      assignment.pupil.firstName, 
+      assignment.pupil.gender,
+      subject.subject,
+      assignment.class?.year,
+      assignment.eoyLevel,
+      assignment.targetLevel
     ));
 
-  }, [selections, course, groups, student]);
+  }, [selections, subject, groups, assignment, initialLoad]);
 
-  const handleSelection = async (groupName: string, optionId: string) => {
-    // Optimistic update
+  const handleSelection = async (groupId: string, optionId: string) => {
     setSelections(prev => ({
       ...prev,
-      [groupName]: optionId
+      [groupId]: optionId
     }));
     
-    // Find the code for this option
-    const group = groups.find(g => g.name === groupName);
+    const group = groups.find(g => g.id === groupId);
     const option = group?.options.find(o => o.id === optionId);
     
     if (option) {
-        await updateStudentComment(student.id, groupName, option.code);
+        await updateAssignmentCode(assignment.id, groupId, option.code);
     }
   };
 
@@ -197,50 +171,24 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
   };
 
   const handleTextBlur = async () => {
-    // Persist on blur
-    await updateStudentCommentText(student.id, preview);
+    await updateAssignmentCommentText(assignment.id, preview);
   };
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-140px)]">
-        {/* Left: Controls */}
         <div className="overflow-y-auto pr-4 space-y-8">
-            {groups.sort((a,b) => {
-                const order = ['WP', 'TH', 'PS', 'OA'];
-                 const indexA = order.indexOf(a.name);
-                 const indexB = order.indexOf(b.name);
-                 
-                 // If both are in the order list, sort by index
-                 if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                 
-                 // If only A is in list, A comes first
-                 if (indexA !== -1) return -1;
-                 
-                 // If only B is in list, B comes first
-                 if (indexB !== -1) return 1;
-                 
-                 // Otherwise sort alphabetically
-                 return a.name.localeCompare(b.name);
-            }).map(group => (
+            {groups.map(group => (
                 <div key={group.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
                     <h3 className="text-lg font-semibold text-gray-800 mb-4">{group.name} Comments</h3>
                     <div className="space-y-3">
-                        {group.options.sort((a,b) => {
-                             const order = ['H', 'M', 'L'];
-                             const indexA = order.indexOf(a.code);
-                             const indexB = order.indexOf(b.code);
-                             if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-                             if (indexA !== -1) return -1;
-                             if (indexB !== -1) return 1;
-                             return a.code.localeCompare(b.code);
-                        }).map(option => (
+                        {group.options.map(option => (
                            <label key={option.id} className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all select-none">
                               <input 
                                 type="radio" 
-                                name={group.name} 
+                                name={group.id} 
                                 value={option.id}
-                                checked={selections[group.name] === option.id}
-                                onChange={() => handleSelection(group.name, option.id)}
+                                checked={selections[group.id] === option.id}
+                                onChange={() => handleSelection(group.id, option.id)}
                                 className="mt-1 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
                               />
                               <div className="flex-1">
@@ -249,12 +197,12 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
                                 </div>
                                 <p className="text-sm text-gray-700">{parseComment(
                                   option.text, 
-                                  student.firstName, 
-                                  student.gender,
-                                  course.subject,
-                                  student.class?.year,
-                                  student.eoyLevel,
-                                  student.targetLevel
+                                  assignment.pupil.firstName, 
+                                  assignment.pupil.gender,
+                                  subject.subject,
+                                  assignment.class?.year,
+                                  assignment.eoyLevel,
+                                  assignment.targetLevel
                                 )}</p>
                               </div>
                            </label>
@@ -264,7 +212,6 @@ export default function CommentEditor({ student, course, groups }: CommentEditor
             ))}
         </div>
 
-        {/* Right: Preview (Editable) */}
         <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full sticky top-8">
             <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center rounded-t-xl">
                 <h2 className="font-semibold text-gray-700">Preview (Editable)</h2>

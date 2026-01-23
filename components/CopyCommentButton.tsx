@@ -16,37 +16,46 @@ type MinimalGroup = {
   options: MinimalOption[];
 };
 
-type MinimalStudent = {
-  id: string;
+type MinimalPupil = {
   firstName: string;
   lastName: string;
   gender: string;
-  wpCode?: string | null;
-  thCode?: string | null;
-  psCode?: string | null;
-  oaCode?: string | null;
 };
 
-type MinimalCourse = {
+type MinimalPupilCode = {
+  groupId: string;
+  code: string | null;
+};
+
+type MinimalAssignment = {
+  id: string;
+  pupil: MinimalPupil;
+  codes: MinimalPupilCode[];
+  eoyLevel?: string | null;
+  targetLevel?: string | null;
+};
+
+type MinimalSubject = {
   studiedComment?: string | null;
+  subject?: string | null;
 };
 
 interface CopyCommentButtonProps {
-  student: MinimalStudent;
-  course: MinimalCourse;
+  assignment: MinimalAssignment;
+  subject: MinimalSubject;
   groups: MinimalGroup[];
 }
 
-export default function CopyCommentButton({ student, course, groups }: CopyCommentButtonProps) {
+export default function CopyCommentButton({ assignment, subject, groups }: CopyCommentButtonProps) {
   const [copied, setCopied] = useState(false);
 
   const handleCopy = (e: React.MouseEvent) => {
-    e.preventDefault(); // Prevent navigation if placed inside a Link (though it shouldn't be)
+    e.preventDefault();
     e.stopPropagation();
 
-    const comment = generateComment(student, course, groups);
+    const comment = generateComment(assignment, subject, groups);
     
-    if (!comment) return; // Nothing to copy
+    if (!comment) return;
 
     navigator.clipboard.writeText(comment);
     setCopied(true);

@@ -12,7 +12,7 @@ model User {
   username String @unique
   password String
   roles    Role[]
-  courses  Course[]
+  subjects Subject[]
   classes  Class[]
 }
 
@@ -22,7 +22,7 @@ model Role {
   users User[]
 }
 
-model Course {
+model Subject {
   id             String         @id @default(cuid())
   name           String         @unique // e.g. "11CS", "CP"
   subject        String?        // e.g. "Computer Science"
@@ -34,46 +34,61 @@ model Course {
 }
 
 model Class {
-  id       String    @id @default(cuid())
-  name     String    @unique // e.g. "7CP"
-  year     String?   // e.g. "7", "8"
-  courseId String
-  course   Course    @relation(fields: [courseId], references: [id], onDelete: Cascade)
-  students Student[]
-  teachers User[]
+  id          String       @id @default(cuid())
+  name        String       @unique // e.g. "7CP"
+  year        String?      // e.g. "7", "8"
+  subjectId   String
+  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  assignments Assignment[]
+  teachers    User[]
 }
 
-model Student {
+model Pupil {
+  admissionNumber String       @id
+  firstName       String
+  lastName        String
+  gender          String       // "Male", "Female"
+  isActive        Boolean      @default(true)
+  assignments     Assignment[]
+}
+
+model Assignment {
   id        String @id @default(cuid())
-  firstName String
-  lastName  String
-  gender    String // "Male", "Female"
+  pupilId   String
+  pupil     Pupil  @relation(fields: [pupilId], references: [admissionNumber], onDelete: Cascade)
   classId   String
   class     Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  // Codes (e.g. "H", "M", "L")
-  wpCode String?
-  thCode String?
-  psCode String?
-  oaCode String?
 
   // Levels
   eoyLevel    String?
   targetLevel String?
   actualLevel String?
 
-  comment String? // The final editable comment text
+  finalComment String? // The final editable comment text
+  codes        PupilCode[]
+}
+
+model PupilCode {
+  id           String       @id @default(cuid())
+  assignmentId String
+  assignment   Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  groupId      String
+  group        CommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  code         String?      // The selected code (e.g. "H", "M", "L")
+
+  @@unique([assignmentId, groupId])
 }
 
 model CommentGroup {
   id           String          @id @default(cuid())
   name         String // "WP", "TH", "PS", "OA"
   displayOrder Int             @default(0)
-  courseId     String
-  course       Course          @relation(fields: [courseId], references: [id], onDelete: Cascade)
+  subjectId    String
+  subject      Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   options      CommentOption[]
+  pupilCodes   PupilCode[]
 
-  @@unique([courseId, name])
+  @@unique([subjectId, name])
 }
 
 model CommentOption {

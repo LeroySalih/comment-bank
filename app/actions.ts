@@ -3,57 +3,41 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 
-export async function updateStudentComment(
-  studentId: string, 
-  groupName: string, 
+export async function updateAssignmentCode(
+  assignmentId: string, 
+  groupId: string, 
   code: string | null
 ) {
-  const data: Record<string, string | null> = {}
-
-  // Map Group Name to DB Column
-  // Note: This relies on the hardcoded columns in the schema
-  switch (groupName) {
-    case 'WP':
-      data.wpCode = code
-      break
-    case 'TH':
-      data.thCode = code
-      break
-    case 'PS':
-      data.psCode = code
-      break
-    case 'OA':
-      data.oaCode = code
-      break
-    default:
-      // For groups not in the schema columns, we can't save them in this iteration 
-      // without schema changes. Ignoring for now as per legacy support.
-      return { success: false, error: 'Unknown group' }
-  }
-
   try {
-    await prisma.student.update({
-      where: { id: studentId },
-      data
-    })
+    if (code === null) {
+      await (prisma as any).pupilCode.delete({
+        where: { assignmentId_groupId: { assignmentId, groupId } }
+      }).catch(() => {});
+    } else {
+      await (prisma as any).pupilCode.upsert({
+        where: { assignmentId_groupId: { assignmentId, groupId } },
+        update: { code },
+        create: { assignmentId, groupId, code }
+      })
+    }
     
-    revalidatePath(`/student/${studentId}`)
-    revalidatePath('/') // Revalidate dashboard for completion stats
+    revalidatePath(`/student/${assignmentId}`)
+    revalidatePath('/')
     return { success: true }
   } catch (error) {
-    console.error('Failed to update comment:', error)
+    console.error('Failed to update code:', error)
     return { success: false, error: 'Database error' }
   }
 }
 
-export async function updateStudentCommentText(studentId: string, comment: string) {
+export async function updateAssignmentCommentText(assignmentId: string, comment: string) {
   try {
-    await prisma.student.update({
-      where: { id: studentId },
-      data: { comment }
+    await (prisma as any).assignment.update({
+      where: { id: assignmentId },
+      data: { finalComment: comment }
     })
     
-    revalidatePath(`/student/${studentId}`)
+    revalidatePath(`/student/${assignmentId}`)
     return { success: true }
   } catch (error) {
     console.error('Failed to update comment text:', error)
