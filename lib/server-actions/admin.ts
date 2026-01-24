@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { isAdmin } from "@/lib/access-control"
 import { revalidatePath } from "next/cache"
+import { encrypt, decrypt } from "@/lib/encryption"
 
 export async function updateUserRoles(userId: string, roleNames: string[]) {
   const session = await getServerSession(authOptions)
@@ -50,9 +51,13 @@ export async function updatePupil(admissionNumber: string, data: {
   }
 
   try {
+    const updateData: any = { ...data }
+    if (data.firstName) updateData.firstName = encrypt(data.firstName)
+    if (data.lastName) updateData.lastName = encrypt(data.lastName)
+
     await (prisma as any).pupil.update({
       where: { admissionNumber },
-      data
+      data: updateData
     })
 
     revalidatePath("/admin")
@@ -71,18 +76,27 @@ export async function getPupils(query: string = "") {
 
   try {
     const pupils = await (prisma as any).pupil.findMany({
-      where: {
-        OR: [
-          { firstName: { contains: query } },
-          { lastName: { contains: query } },
-          { admissionNumber: { contains: query } }
-        ]
-      },
       orderBy: {
         lastName: 'asc'
       }
     })
-    return { success: true, pupils }
+
+    const searchLower = query.toLowerCase()
+    
+    const processedPupils = pupils.map((p: any) => ({
+      ...p,
+      firstName: decrypt(p.firstName),
+      lastName: decrypt(p.lastName)
+    })).filter((p: any) => {
+      if (!query) return true
+      return (
+        p.firstName.toLowerCase().includes(searchLower) ||
+        p.lastName.toLowerCase().includes(searchLower) ||
+        p.admissionNumber.toLowerCase().includes(searchLower)
+      )
+    })
+
+    return { success: true, pupils: processedPupils }
   } catch (error) {
     console.error("Failed to fetch pupils:", error)
     return { success: false, error: "Failed to fetch pupils" }
@@ -132,8 +146,8 @@ export async function processPupilUpload(content: string) {
           await tx.pupil.create({
             data: {
               admissionNumber: pupil.admissionNumber,
-              firstName: pupil.firstName,
-              lastName: pupil.lastName,
+              firstName: encrypt(pupil.firstName),
+              lastName: encrypt(pupil.lastName),
               gender: pupil.gender,
               isActive: true
             }
@@ -163,5 +177,151 @@ export async function processPupilUpload(content: string) {
   } catch (error) {
     console.error("Failed to process pupil upload:", error)
     return { success: false, error: "Failed to process upload" }
+  }
+}
+
+// Subject Management Actions
+
+export async function createSubject(formData: FormData) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  const code = formData.get("code") as string
+  const title = formData.get("title") as string
+  const introduction = formData.get("introduction") as string
+
+  if (!code) return { success: false, error: "Code is required" }
+
+  try {
+    await (prisma as any).subject.create({
+      data: {
+        code,
+        title,
+        studiedComment: introduction
+      }
+    })
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to create subject:", error)
+    return { success: false, error: "Failed to create subject" }
+  }
+}
+
+export async function updateSubject(subjectId: string, formData: FormData) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  const code = formData.get("code") as string
+  const title = formData.get("title") as string
+  const introduction = formData.get("introduction") as string
+
+  if (!code) return { success: false, error: "Code is required" }
+
+  try {
+    await (prisma as any).subject.update({
+      where: { id: subjectId },
+      data: {
+        code,
+        title,
+        studiedComment: introduction
+      }
+    })
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to update subject:", error)
+    return { success: false, error: "Failed to update subject" }
+  }
+}
+
+export async function deleteSubject(subjectId: string) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    await (prisma as any).subject.delete({
+      where: { id: subjectId }
+    })
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to delete subject:", error)
+    return { success: false, error: "Failed to delete subject" }
+  }
+}
+
+export async function assignUserToSubject(subjectId: string, userId: string) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    await (prisma as any).subject.update({
+      where: { id: subjectId },
+      data: {
+        users: {
+          connect: { id: userId }
+        }
+      }
+    })
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to assign user:", error)
+    return { success: false, error: "Failed to assign user" }
+  }
+}
+
+export async function removeUserFromSubject(subjectId: string, userId: string) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    await (prisma as any).subject.update({
+      where: { id: subjectId },
+      data: {
+        users: {
+          disconnect: { id: userId }
+        }
+      }
+    })
+    revalidatePath("/admin")
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to remove user:", error)
+    return { success: false, error: "Failed to remove user" }
+  }
+}
+
+export async function assignTeachersToClass(classId: string, teacherIds: string[]) {
+  const session = await getServerSession(authOptions)
+  if (!isAdmin(session?.user as any)) {
+    throw new Error("Unauthorized")
+  }
+
+  try {
+    await prisma.class.update({
+      where: { id: classId },
+      data: {
+        teachers: {
+          set: teacherIds.map(id => ({ id }))
+        }
+      }
+    })
+    revalidatePath(`/hod/subject`)
+    return { success: true }
+  } catch (error) {
+    console.error("Failed to assign teachers:", error)
+    return { success: false, error: "Failed to assign teachers" }
   }
 }

@@ -6,6 +6,7 @@ import CopyCommentButton from '@/components/CopyCommentButton';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
+import { decrypt } from '@/lib/encryption';
 
 export default async function ClassPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = await params;
@@ -55,6 +56,21 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
 
   const groups = cls.subject.commentGroups;
 
+  // Decrypt pupil names for display
+  cls.assignments = cls.assignments.map((assignment: any) => ({
+    ...assignment,
+    pupil: {
+      ...assignment.pupil,
+      firstName: decrypt(assignment.pupil.firstName),
+      lastName: decrypt(assignment.pupil.lastName)
+    }
+  }));
+
+  // Re-sort because database sort was on encrypted strings
+  cls.assignments.sort((a: any, b: any) => 
+    a.pupil.lastName.localeCompare(b.pupil.lastName)
+  );
+
   return (
     <main className="min-h-screen p-8 bg-gray-50">
       <div className="max-w-6xl mx-auto">
@@ -66,7 +82,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
           <div className="flex justify-between items-end">
              <div>
                 <h1 className="text-3xl font-bold text-gray-900">{cls.name}</h1>
-                <p className="text-gray-600">{cls.subject.name}</p>
+                <p className="text-gray-600">{cls.subject.code}</p>
              </div>
              <div className="text-gray-500">
                 {cls.assignments.length} Pupils

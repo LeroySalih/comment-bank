@@ -14,24 +14,33 @@ export default async function Home() {
   const userId = session?.user?.id;
 
   // Filter logic:
-  // Admin and HOD see all subjects.
-  // Teachers only see subjects with classes they are assigned to.
+  // Admin sees all subjects.
+  // Others see subjects they are assigned to (via Subject or Class).
   const subjects = await prisma.subject.findMany({
-    where: (userIsAdmin || userIsHoD) ? {} : {
-       classes: {
-          some: {
-             teachers: {
-                some: { id: userId }
-             }
-          }
-       }
+    where: userIsAdmin ? {} : {
+      OR: [
+        { users: { some: { id: userId } } },
+        { classes: { some: { teachers: { some: { id: userId } } } } }
+      ]
     },
     include: {
       classes: {
-        where: (userIsAdmin || userIsHoD) ? {} : {
-          teachers: {
-            some: { id: userId }
-          }
+        where: userIsAdmin ? {} : {
+          // If assigned to Subject, see all classes.
+          // If assigned to Class only, see only that class.
+          // This nested where is tricky because we can't reference parent subject assignment easily in nested where.
+          // Correct logic: return class IF (user in Subject.users) OR (user in Class.teachers).
+          // Prisma doesn't support "parent" reference in nested include filter easily.
+          // However, if I fetch ALL classes, I can filter in memory? Or keep it simple.
+          // If I am a Teacher assigned to 1 class, I shouldn't see other classes in the subject?
+          // "If a user is linked to a specific Class but not the Subject, they only have access to that specific class."
+          // So I MUST filter classes.
+          // BUT if I am linked to Subject, I see ALL classes.
+          // Prisma query for this:
+          OR: [
+             { subject: { users: { some: { id: userId } } } },
+             { teachers: { some: { id: userId } } }
+          ]
         },
         orderBy: { name: 'asc' },
         include: {
@@ -45,7 +54,7 @@ export default async function Home() {
         }
       }
     },
-    orderBy: { name: 'asc' }
+    orderBy: { code: 'asc' }
   });
 
   return (
@@ -56,7 +65,8 @@ export default async function Home() {
             <div key={subject.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
               <h2 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
                 <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">Subject</span>
-                {subject.name}
+                {subject.code}
+                {subject.title && <span className="text-gray-500 font-normal text-base">- {subject.title}</span>}
               </h2>
               
               {subject.classes.length > 0 ? (

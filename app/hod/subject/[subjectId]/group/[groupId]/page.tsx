@@ -42,7 +42,7 @@ export default async function GroupPage({ params }: Props) {
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.subject.name}</Link>
+           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.subject.code}</Link>
            <span>/</span>
            <span>{group.name}</span>
         </div>

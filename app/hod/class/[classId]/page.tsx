@@ -1,9 +1,9 @@
-
 import { prisma } from "@/lib/prisma"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PupilForm } from "./_components/pupil-form"
 import { StudentRow } from "./_components/student-row"
+import { decrypt } from "@/lib/encryption"
 
 export const dynamic = 'force-dynamic'
 
@@ -29,13 +29,28 @@ export default async function ClassPage({ params }: Props) {
 
   if (!classData) notFound()
 
+  // Decrypt pupil names
+  classData.assignments = classData.assignments.map((assignment: any) => ({
+    ...assignment,
+    pupil: {
+      ...assignment.pupil,
+      firstName: decrypt(assignment.pupil.firstName),
+      lastName: decrypt(assignment.pupil.lastName)
+    }
+  }))
+
+  // Re-sort because database sort was on encrypted strings
+  classData.assignments.sort((a: any, b: any) => 
+    a.pupil.lastName.localeCompare(b.pupil.lastName)
+  )
+
   return (
     <div className="container mx-auto py-10">
       <div className="flex flex-col gap-2 mb-8">
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${classData.subjectId}`} className="hover:text-indigo-600">{classData.subject.name}</Link>
+           <Link href={`/hod/subject/${classData.subjectId}`} className="hover:text-indigo-600">{classData.subject.code}</Link>
            <span>/</span>
            <span>{classData.name}</span>
         </div>

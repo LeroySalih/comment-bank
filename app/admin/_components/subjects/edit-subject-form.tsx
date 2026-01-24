@@ -1,7 +1,7 @@
 "use client"
 
 import { useState } from "react"
-import { updateSubject, deleteSubject } from "@/lib/server-actions/hod"
+import { updateSubject, deleteSubject } from "@/lib/server-actions/admin"
 import { useRouter } from "next/navigation"
 import { Pencil, Trash2, X, Check } from "lucide-react"
 import { VariablePreview } from "@/components/VariablePreview"
@@ -9,14 +9,16 @@ import { VariablePreview } from "@/components/VariablePreview"
 interface EditSubjectFormProps {
   subject: {
     id: string
-    name: string
+    code: string
+    title: string | null
     studiedComment: string | null
   }
 }
 
 export function EditSubjectForm({ subject }: EditSubjectFormProps) {
   const [isEditing, setIsEditing] = useState(false)
-  const [name, setName] = useState(subject.name)
+  const [code, setCode] = useState(subject.code)
+  const [title, setTitle] = useState(subject.title || "")
   const [introduction, setIntroduction] = useState(subject.studiedComment || "")
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -29,7 +31,8 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
     setError(null)
     
     const formData = new FormData()
-    formData.append("name", name)
+    formData.append("code", code)
+    formData.append("title", title)
     formData.append("introduction", introduction)
 
     const result = await updateSubject(subject.id, formData)
@@ -45,7 +48,7 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
     e.preventDefault()
     e.stopPropagation()
     
-    if (!confirm(`Are you sure you want to delete "${subject.name}"? This will delete all classes, pupils, groups and comments associated with it.`)) return
+    if (!confirm(`Are you sure you want to delete "${subject.code}"? This will delete all classes, pupils, groups and comments associated with it.`)) return
 
     setIsDeleting(true)
     const result = await deleteSubject(subject.id)
@@ -61,16 +64,27 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
     return (
       <div className="mt-4 border-t pt-4" onClick={(e) => e.stopPropagation()}>
         <form onSubmit={handleUpdate} className="space-y-3">
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase">Subject Name</label>
-            <input
-              type="text"
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
-              required
-              autoFocus
-            />
+          <div className="flex gap-2">
+            <div className="w-1/3">
+              <label className="block text-xs font-medium text-gray-500 uppercase">Code</label>
+              <input
+                type="text"
+                value={code}
+                onChange={(e) => setCode(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
+                required
+                autoFocus
+              />
+            </div>
+            <div className="w-2/3">
+              <label className="block text-xs font-medium text-gray-500 uppercase">Title</label>
+              <input
+                type="text"
+                value={title}
+                onChange={(e) => setTitle(e.target.value)}
+                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
+              />
+            </div>
           </div>
           <div>
             <label className="block text-xs font-medium text-gray-500 uppercase">Introduction (Optional)</label>
@@ -82,7 +96,7 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
             />
           </div>
 
-          <VariablePreview text={introduction} subjectName={name} />
+          <VariablePreview text={introduction} subjectName={title || code} />
 
           <div className="flex gap-2">
             <button 

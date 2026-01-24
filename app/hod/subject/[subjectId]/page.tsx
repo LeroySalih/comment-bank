@@ -19,8 +19,14 @@ interface Props {
   }>
 }
 
+import { getServerSession } from "next-auth"
+import { authOptions } from "@/app/api/auth/[...nextauth]/route"
+import { isAdmin } from "@/lib/access-control"
+
 export default async function SubjectPage({ params }: Props) {
   const { subjectId } = await params
+  const session = await getServerSession(authOptions)
+  const userIsAdmin = isAdmin(session?.user as any)
   
   // Fetch available teachers (all users with 'teacher' role)
   const teachers = await prisma.user.findMany({
@@ -66,7 +72,10 @@ export default async function SubjectPage({ params }: Props) {
         <Link href="/hod" className="text-indigo-600 hover:text-indigo-800">
           ← Back to Dashboard
         </Link>
-        <h1 className="text-3xl font-bold">{subject.name}</h1>
+        <div>
+          <h1 className="text-3xl font-bold">{subject.code}</h1>
+          {subject.title && <h2 className="text-xl text-gray-600">{subject.title}</h2>}
+        </div>
       </div>
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
@@ -97,6 +106,7 @@ export default async function SubjectPage({ params }: Props) {
                         classId={cls.id}
                         currentTeachers={cls.teachers}
                         availableTeachers={teachers}
+                        readOnly={!userIsAdmin}
                       />
                       <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
                         {cls._count.assignments} Pupils

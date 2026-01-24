@@ -2,6 +2,7 @@ import { PrismaClient } from '@prisma/client';
 import fs from 'fs';
 import path from 'path';
 import { hash } from 'bcryptjs';
+import { encrypt } from '../lib/encryption';
 
 const prisma = new PrismaClient();
 const PUPIL_LIST_PATH = './data/pupil-list.md';
@@ -9,14 +10,14 @@ const PUPIL_LIST_PATH = './data/pupil-list.md';
 async function main() {
   // Clear existing data
   console.log("Clearing existing data...");
-  await prisma.pupilCode.deleteMany({});
-  await prisma.assignment.deleteMany({});
-  await prisma.pupil.deleteMany({});
+  await (prisma as any).pupilCode.deleteMany({});
+  await (prisma as any).assignment.deleteMany({});
+  await (prisma as any).pupil.deleteMany({});
   await prisma.class.deleteMany({});
   await prisma.commentOption.deleteMany({});
   await prisma.commentGroup.deleteMany({});
-  await prisma.subject.deleteMany({});
-  await prisma.user.deleteMany({ where: { username: { in: ['admin', 'leroysalih'] } } });
+  await (prisma as any).subject.deleteMany({});
+  await (prisma as any).user.deleteMany({ where: { username: { in: ['admin', 'leroysalih'] } } });
 
   // Seed Roles
   const adminRole = await prisma.role.upsert({ where: { name: 'admin' }, update: {}, create: { name: 'admin' } });
@@ -39,11 +40,14 @@ async function main() {
   });
 
   // Create a default Subject
-  const subject = await prisma.subject.create({
+  // Create a default Subject
+  const subject = await (prisma as any).subject.create({
     data: {
-      name: "7CS",
-      subject: "Computer Science",
-      ownerId: adminUser.id,
+      code: "7CS",
+      title: "Computer Science",
+      users: {
+        connect: { id: adminUser.id }
+      },
       commentGroups: {
         create: [
           {
@@ -93,14 +97,25 @@ async function main() {
     const className = parts[4];
 
     // Create/Update Pupil
-    const pupil = await prisma.pupil.upsert({
+    const pupil = await (prisma as any).pupil.upsert({
       where: { admissionNumber },
-      update: { firstName, lastName, gender, isActive: true },
-      create: { admissionNumber, firstName, lastName, gender, isActive: true }
+      update: { 
+        firstName: encrypt(firstName), 
+        lastName: encrypt(lastName), 
+        gender, 
+        isActive: true 
+      },
+      create: { 
+        admissionNumber, 
+        firstName: encrypt(firstName), 
+        lastName: encrypt(lastName), 
+        gender, 
+        isActive: true 
+      }
     });
 
     // Create/Update Class
-    const cls = await prisma.class.upsert({
+    const cls = await (prisma as any).class.upsert({
       where: { name: className },
       update: {},
       create: { 
@@ -111,7 +126,7 @@ async function main() {
     });
 
     // Create Assignment
-    await prisma.assignment.create({
+    await (prisma as any).assignment.create({
       data: {
         pupilId: pupil.admissionNumber,
         classId: cls.id,

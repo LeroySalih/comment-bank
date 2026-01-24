@@ -3,14 +3,16 @@
 import { useState } from "react"
 import { UserManagement } from "./user-management"
 import { PupilManagement } from "./pupil-management"
+import { SubjectManagement } from "./subject-management"
 
 interface AdminTabsProps {
   users: any[]
   roles: any[]
+  subjects: any[]
 }
 
-export function AdminTabs({ users, roles }: AdminTabsProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'pupils'>('users')
+export function AdminTabs({ users, roles, subjects }: AdminTabsProps) {
+  const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects'>('users')
 
   return (
     <div className="space-y-6">
@@ -35,13 +37,25 @@ export function AdminTabs({ users, roles }: AdminTabsProps) {
         >
           Pupils
         </button>
+        <button
+          className={`px-4 py-2 font-medium text-sm transition-colors ${
+            activeTab === 'subjects'
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setActiveTab('subjects')}
+        >
+          Subjects
+        </button>
       </div>
 
       <div className="mt-6">
         {activeTab === 'users' ? (
           <UserManagement users={users} roles={roles} />
-        ) : (
+        ) : activeTab === 'pupils' ? (
           <PupilManagement />
+        ) : (
+          <SubjectManagement subjects={subjects} users={users} />
         )}
       </div>
     </div>

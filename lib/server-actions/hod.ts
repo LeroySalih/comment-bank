@@ -5,6 +5,7 @@ import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { isHoD, isAdmin } from "@/lib/access-control"
 import { revalidatePath } from "next/cache"
+import { encrypt, decrypt } from "@/lib/encryption"
 import { Session } from "next-auth"
 
 async function checkHoDAccess() {
@@ -21,68 +22,49 @@ async function checkHoDAccess() {
   return session
 }
 
-export async function createSubject(formData: FormData) {
-  await checkHoDAccess()
-  const name = formData.get("name") as string
-  const introduction = formData.get("introduction") as string
+async function checkSubjectAccess(subjectId: string) {
+  const session = await checkHoDAccess()
+  // Admin has access to everything
+  if (isAdmin(session.user as any)) return session
 
-  if (!name) return { success: false, error: "Name is required" }
+  const hasAccess = await (prisma as any).subject.findFirst({
+    where: {
+      id: subjectId,
+      users: { some: { id: session.user.id } }
+    }
+  })
 
-  try {
-    await (prisma as any).subject.create({
-      data: {
-        name,
-        studiedComment: introduction
-      }
-    })
-    revalidatePath("/hod")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to create subject:", error)
-    return { success: false, error: "Failed to create subject" }
+  if (!hasAccess) {
+    throw new Error("Unauthorized Access to Subject")
   }
+  return session
 }
 
-export async function updateSubject(subjectId: string, formData: FormData) {
-  await checkHoDAccess()
-  const name = formData.get("name") as string
-  const introduction = formData.get("introduction") as string
-
-  if (!name) return { success: false, error: "Name is required" }
-
-  try {
-    await (prisma as any).subject.update({
-      where: { id: subjectId },
-      data: {
-        name,
-        studiedComment: introduction
-      }
-    })
-    revalidatePath("/hod")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to update subject:", error)
-    return { success: false, error: "Failed to update subject" }
-  }
+async function checkClassAccess(classId: string) {
+  const cls = await (prisma as any).class.findUnique({
+    where: { id: classId },
+    select: { subjectId: true }
+  })
+  
+  if (!cls) throw new Error("Class not found")
+  
+  return checkSubjectAccess(cls.subjectId)
 }
 
-export async function deleteSubject(subjectId: string) {
-  await checkHoDAccess()
-
-  try {
-    await (prisma as any).subject.delete({
-      where: { id: subjectId }
-    })
-    revalidatePath("/hod")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to delete subject:", error)
-    return { success: false, error: "Failed to delete subject" }
-  }
+async function checkGroupAccess(groupId: string) {
+  const group = await (prisma as any).commentGroup.findUnique({
+    where: { id: groupId },
+    select: { subjectId: true }
+  })
+  
+  if (!group) throw new Error("Group not found")
+  
+  return checkSubjectAccess(group.subjectId)
 }
+
 
 export async function createClass(subjectId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const name = formData.get("name") as string
 
   if (!name) return { success: false, error: "Name is required" }
@@ -103,7 +85,7 @@ export async function createClass(subjectId: string, formData: FormData) {
 }
 
 export async function updateClass(classId: string, subjectId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const name = formData.get("name") as string
 
   if (!name) return { success: false, error: "Name is required" }
@@ -122,7 +104,7 @@ export async function updateClass(classId: string, subjectId: string, formData: 
 }
 
 export async function deleteClass(classId: string, subjectId: string) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
 
   try {
     await (prisma as any).class.delete({
@@ -137,7 +119,7 @@ export async function deleteClass(classId: string, subjectId: string) {
 }
 
 export async function createCommentGroup(subjectId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const name = formData.get("name") as string
 
   if (!name) return { success: false, error: "Name is required" }
@@ -166,7 +148,7 @@ export async function createCommentGroup(subjectId: string, formData: FormData) 
 }
 
 export async function updateCommentGroup(groupId: string, subjectId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const name = formData.get("name") as string
 
   if (!name) return { success: false, error: "Name is required" }
@@ -185,7 +167,7 @@ export async function updateCommentGroup(groupId: string, subjectId: string, for
 }
 
 export async function deleteCommentGroup(groupId: string, subjectId: string) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
 
   try {
     await (prisma as any).commentGroup.delete({
@@ -199,7 +181,7 @@ export async function deleteCommentGroup(groupId: string, subjectId: string) {
   }
 }
 export async function reorderCommentGroups(subjectId: string, items: { id: string, order: number }[]) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
 
   try {
     const transaction = items.map((item) => 
@@ -219,7 +201,7 @@ export async function reorderCommentGroups(subjectId: string, items: { id: strin
 }
 
 export async function createComment(groupId: string, subjectId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const text = formData.get("text") as string
   const code = formData.get("code") as string
 
@@ -242,7 +224,7 @@ export async function createComment(groupId: string, subjectId: string, formData
 }
 
 export async function updateComment(commentId: string, subjectId: string, groupId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
   const text = formData.get("text") as string
   const code = formData.get("code") as string
 
@@ -265,7 +247,7 @@ export async function updateComment(commentId: string, subjectId: string, groupI
 }
 
 export async function deleteComment(commentId: string, subjectId: string, groupId: string) {
-  await checkHoDAccess()
+  await checkSubjectAccess(subjectId)
 
   try {
     await prisma.commentOption.delete({
@@ -280,7 +262,7 @@ export async function deleteComment(commentId: string, subjectId: string, groupI
 }
 
 export async function reorderComments(groupId: string, items: { id: string, order: number }[]) {
-  await checkHoDAccess()
+  await checkGroupAccess(groupId)
 
   try {
     const transaction = items.map((item) => 
@@ -299,7 +281,7 @@ export async function reorderComments(groupId: string, items: { id: string, orde
 }
 
 export async function createAssignment(classId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkClassAccess(classId)
   const admissionNumber = formData.get("admissionNumber") as string
   const firstName = formData.get("firstName") as string
   const lastName = formData.get("lastName") as string
@@ -315,8 +297,17 @@ export async function createAssignment(classId: string, formData: FormData) {
     // Upsert Pupil first
     await (prisma as any).pupil.upsert({
       where: { admissionNumber },
-      update: { firstName, lastName, gender },
-      create: { admissionNumber, firstName, lastName, gender }
+      update: { 
+        firstName: encrypt(firstName), 
+        lastName: encrypt(lastName), 
+        gender 
+      },
+      create: { 
+        admissionNumber, 
+        firstName: encrypt(firstName), 
+        lastName: encrypt(lastName), 
+        gender 
+      }
     })
 
     // Create Assignment
@@ -337,7 +328,7 @@ export async function createAssignment(classId: string, formData: FormData) {
 }
 
 export async function updateAssignment(assignmentId: string, classId: string, formData: FormData) {
-  await checkHoDAccess()
+  await checkClassAccess(classId)
   const firstName = formData.get("firstName") as string
   const lastName = formData.get("lastName") as string
   const gender = formData.get("gender") as string
@@ -357,7 +348,11 @@ export async function updateAssignment(assignmentId: string, classId: string, fo
     // Update Pupil
     await (prisma as any).pupil.update({
       where: { admissionNumber: assignment.pupilId },
-      data: { firstName, lastName, gender }
+      data: { 
+        firstName: encrypt(firstName), 
+        lastName: encrypt(lastName), 
+        gender 
+      }
     })
 
     // Update Assignment
@@ -375,7 +370,7 @@ export async function updateAssignment(assignmentId: string, classId: string, fo
 }
 
 export async function deleteAssignment(assignmentId: string, classId: string) {
-  await checkHoDAccess()
+  await checkClassAccess(classId)
 
   try {
     await (prisma as any).assignment.delete({
@@ -391,24 +386,5 @@ export async function deleteAssignment(assignmentId: string, classId: string) {
 
 export { createAssignment as createStudent, updateAssignment as updateStudent, deleteAssignment as deleteStudent };
 
-export async function assignTeachersToClass(classId: string, teacherIds: string[]) {
-  await checkHoDAccess()
-
-  try {
-    await prisma.class.update({
-      where: { id: classId },
-      data: {
-        teachers: {
-          set: teacherIds.map(id => ({ id }))
-        }
-      }
-    })
-    revalidatePath(`/hod/subject`)
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to assign teachers:", error)
-    return { success: false, error: "Failed to assign teachers" }
-  }
-}
 
 

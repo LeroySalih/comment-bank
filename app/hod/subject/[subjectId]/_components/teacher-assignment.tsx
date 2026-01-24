@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useRef, useEffect } from "react"
-import { assignTeachersToClass } from "@/lib/server-actions/hod"
+import { assignTeachersToClass } from "@/lib/server-actions/admin"
 import { useRouter } from "next/navigation"
 import { Users, Check, ChevronDown, X } from "lucide-react"
 
@@ -14,9 +14,10 @@ interface TeacherAssignmentProps {
   classId: string
   currentTeachers: Teacher[]
   availableTeachers: Teacher[]
+  readOnly?: boolean
 }
 
-export function TeacherAssignment({ classId, currentTeachers, availableTeachers }: TeacherAssignmentProps) {
+export function TeacherAssignment({ classId, currentTeachers, availableTeachers, readOnly }: TeacherAssignmentProps) {
   const [isOpen, setIsOpen] = useState(false)
   const [selectedIds, setSelectedIds] = useState<string[]>(currentTeachers.map(t => t.id))
   const [isSaving, setIsSaving] = useState(false)
@@ -57,6 +58,17 @@ export function TeacherAssignment({ classId, currentTeachers, availableTeachers 
     .filter(t => selectedIds.includes(t.id))
     .map(t => t.username)
     .join(", ")
+
+  if (readOnly) {
+    return (
+      <div className="flex items-center gap-2 px-3 py-1.5 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-500 cursor-not-allowed" title="Only Admins can assign teachers">
+        <Users size={16} className="text-gray-400" />
+        <span className="max-w-[150px] truncate">
+          {selectedIds.length === 0 ? "No Teachers" : currentTeacherNames}
+        </span>
+      </div>
+    )
+  }
 
   return (
     <div className="relative" ref={dropdownRef} onClick={(e) => e.stopPropagation()}>

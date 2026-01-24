@@ -20,6 +20,18 @@ export default async function AdminPage() {
     }
   })
 
+  const subjects = await (prisma as any).subject.findMany({
+    orderBy: { code: 'asc' },
+    include: {
+      _count: {
+        select: { classes: true, commentGroups: true }
+      },
+      users: {
+        select: { id: true, username: true, roles: { select: { name: true } } }
+      }
+    }
+  })
+
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-8">
@@ -27,7 +39,7 @@ export default async function AdminPage() {
         <SignOutButton />
       </div>
       
-      <AdminTabs users={users} roles={roles} />
+      <AdminTabs users={users} roles={roles} subjects={subjects} />
     </div>
   )
 }

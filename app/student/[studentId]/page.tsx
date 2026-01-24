@@ -5,6 +5,7 @@ import CommentEditor from '@/components/CommentEditor';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
+import { decrypt } from '@/lib/encryption';
 
 export default async function StudentPage({ params }: { params: Promise<{ studentId: string }> }) {
   const { studentId: assignmentId } = await params;
@@ -51,6 +52,13 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
 
   const subject = assignment.class.subject;
   const groups = subject.commentGroups;
+
+  // Decrypt pupil names
+  assignment.pupil = {
+    ...assignment.pupil,
+    firstName: decrypt(assignment.pupil.firstName),
+    lastName: decrypt(assignment.pupil.lastName)
+  };
 
   return (
     <main className="min-h-screen p-6 bg-gray-100">

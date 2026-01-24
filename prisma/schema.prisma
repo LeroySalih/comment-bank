@@ -24,13 +24,12 @@ model Role {
 
 model Subject {
   id             String         @id @default(cuid())
-  name           String         @unique // e.g. "11CS", "CP"
-  subject        String?        // e.g. "Computer Science"
+  code           String         @unique // e.g. "11CS", "CP"
+  title          String?        // e.g. "Computer Science"
   studiedComment String? // Intro text
   classes        Class[]
   commentGroups  CommentGroup[]
-  ownerId        String?
-  owner          User?          @relation(fields: [ownerId], references: [id])
+  users          User[]
 }
 
 model Class {
