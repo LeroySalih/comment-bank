@@ -1,4 +1,3 @@
-
 import { generateComment } from './lib/comment-utils';
 
 // Mock data
@@ -22,7 +21,7 @@ const mockAssignment: any = {
 
 const mockSubject = {
   studiedComment: 'This term <Subject> students studied Shakespeare.',
-  subject: 'English'
+  title: 'English'
 };
 
 const mockClass = {

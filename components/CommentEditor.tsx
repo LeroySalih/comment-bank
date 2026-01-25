@@ -44,8 +44,7 @@ type Assignment = {
 
 type Subject = {
   id: string;
-  name: string;
-  subject?: string | null;
+  title: string | null;
   studiedComment?: string | null;
 };
 
@@ -138,7 +137,7 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
       combined, 
       assignment.pupil.firstName, 
       assignment.pupil.gender,
-      subject.subject,
+      subject.title || '',
       assignment.class?.year,
       assignment.eoyLevel,
       assignment.targetLevel
@@ -199,7 +198,7 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
                                   option.text, 
                                   assignment.pupil.firstName, 
                                   assignment.pupil.gender,
-                                  subject.subject,
+                                  subject.title || '',
                                   assignment.class?.year,
                                   assignment.eoyLevel,
                                   assignment.targetLevel

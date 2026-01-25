@@ -34,7 +34,7 @@ type MinimalAssignment = {
 
 type MinimalSubject = {
   studiedComment?: string | null;
-  subject?: string | null;
+  title?: string | null;
 };
 
 type MinimalClass = {
@@ -82,7 +82,7 @@ export function generateComment(
         combined, 
         assignment.pupil.firstName, 
         assignment.pupil.gender,
-        subject.subject,
+        subject.title || '',
         cls?.year,
         assignment.eoyLevel,
         assignment.targetLevel

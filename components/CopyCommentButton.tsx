@@ -37,7 +37,7 @@ type MinimalAssignment = {
 
 type MinimalSubject = {
   studiedComment?: string | null;
-  subject?: string | null;
+  title?: string | null;
 };
 
 interface CopyCommentButtonProps {
