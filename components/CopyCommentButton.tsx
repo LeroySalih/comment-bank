@@ -49,10 +49,17 @@ interface CopyCommentButtonProps {
 
 export default function CopyCommentButton({ assignment, subject, groups }: CopyCommentButtonProps) {
   const [copied, setCopied] = useState(false);
+  
+  // Check if all groups have a selected code
+  const isComplete = groups.every(g => 
+    assignment.codes.some(c => c.groupId === g.id && c.code)
+  );
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
+
+    if (!isComplete) return;
 
     const comment = generateComment(assignment, subject, groups);
     
@@ -66,26 +73,37 @@ export default function CopyCommentButton({ assignment, subject, groups }: CopyC
   const [preview, setPreview] = useState<string | null>(null);
 
   const handleMouseEnter = () => {
+    if (!isComplete) {
+      setPreview("Please select options for all groups first");
+      return;
+    }
     const comment = generateComment(assignment, subject, groups);
     setPreview(comment || "No comment generated");
   };
 
   return (
     <Tooltip 
-        content={<div className="font-normal whitespace-pre-wrap">{preview}</div>}
+        content={
+          <div className={`font-normal whitespace-pre-wrap ${!isComplete ? 'text-red-500' : ''}`}>
+            {preview}
+          </div>
+        }
         maxWidth="max-w-md"
     >
         <button
         onMouseEnter={handleMouseEnter}
         onClick={handleCopy}
+        disabled={!isComplete}
         className={`
             p-2 rounded-full transition-all duration-200
-            ${copied 
-            ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-            : 'text-gray-400 hover:text-blue-600 hover:bg-blue-50'
+            ${!isComplete
+              ? 'bg-red-50 text-red-500 cursor-not-allowed'
+              : copied 
+                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
+                : 'text-green-600 hover:bg-green-50'
             }
         `}
-        title="Copy Comment"
+        title={!isComplete ? "Incomplete selection" : "Copy Comment"}
         >
         {copied ? (
             <Check className="w-4 h-4" />

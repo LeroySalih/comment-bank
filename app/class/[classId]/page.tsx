@@ -2,6 +2,7 @@ import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import QuickGroupSelector from '@/components/QuickGroupSelector';
+import Tooltip from '@/components/Tooltip';
 import CopyCommentButton from '@/components/CopyCommentButton';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
@@ -111,7 +112,9 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 </th>
                                 {groups.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
-                                        {g.name}
+                                        <Tooltip content={g.name}>
+                                            {g.name}
+                                        </Tooltip>
                                     </th>
                                 ))}
                                 <th scope="col" className="sticky top-0 right-0 z-30 px-6 py-4 text-[#617289] dark:text-gray-400 text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] text-right min-w-[120px]">

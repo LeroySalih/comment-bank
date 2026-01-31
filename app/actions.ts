@@ -23,6 +23,16 @@ export async function updateAssignmentCode(
     
     revalidatePath(`/student/${assignmentId}`)
     revalidatePath('/')
+    
+    // Also revalidate the class page
+    const assignment = await (prisma as any).assignment.findUnique({
+      where: { id: assignmentId },
+      select: { classId: true }
+    });
+    if (assignment?.classId) {
+      revalidatePath(`/class/${assignment.classId}`);
+    }
+
     return { success: true }
   } catch (error) {
     console.error('Failed to update code:', error)
