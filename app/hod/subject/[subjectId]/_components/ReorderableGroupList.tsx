@@ -64,16 +64,16 @@ export function ReorderableGroupList({ subjectId, initialGroups }: Props) {
                   >
                     <div 
                       {...provided.dragHandleProps}
-                      className="text-gray-400 hover:text-gray-600 cursor-grab active:cursor-grabbing p-1"
+                      className="text-[#617289] dark:text-gray-500 hover:text-primary cursor-grab active:cursor-grabbing p-1"
                     >
                       <GripVertical size={20} />
                     </div>
                     <Link 
                       href={`/hod/subject/${subjectId}/group/${group.id}`}
-                      className="flex-1 flex justify-between items-center p-3 bg-gray-50 rounded border hover:border-indigo-500 transition-colors group/item"
+                      className="flex-1 flex justify-between items-center p-3 bg-white dark:bg-gray-900 rounded-lg border border-[#f0f2f4] dark:border-gray-700 hover:border-primary dark:hover:border-primary transition-colors group/item"
                     >
                       <div className="flex items-center gap-3">
-                        <span className="font-medium">{group.name}</span>
+                        <span className="font-bold text-[#111418] dark:text-white">{group.name}</span>
                         <div onClick={(e) => e.preventDefault()}>
                             <EditGroupForm 
                                 groupId={group.id} 
@@ -82,7 +82,7 @@ export function ReorderableGroupList({ subjectId, initialGroups }: Props) {
                             />
                         </div>
                       </div>
-                      <span className="text-sm text-gray-500">{group._count.options} Comments →</span>
+                      <span className="text-sm font-medium text-[#617289] dark:text-gray-400">{group._count.options} Comments →</span>
                     </Link>
                   </div>
                 )}

@@ -61,20 +61,40 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   };
 
   return (
-    <main className="min-h-screen p-6 bg-gray-100">
-      <div className="max-w-7xl mx-auto h-full">
-        <header className="mb-6 flex items-center justify-between">
-            <div className="flex items-center gap-4">
-                <Link href={`/class/${assignment.classId}`} className="p-2 hover:bg-white rounded-full transition-colors text-gray-500 hover:text-gray-900">
-                    <ArrowLeft className="w-5 h-5" />
-                </Link>
-                <div>
-                     <h1 className="text-2xl font-bold text-gray-900">{assignment.pupil.firstName} {assignment.pupil.lastName}</h1>
-                     <p className="text-sm text-gray-500">{assignment.class.name} • {assignment.pupil.gender}</p>
-                </div>
-            </div>
-        </header>
-        
+    <main className="min-h-screen flex flex-col bg-background-light dark:bg-background-dark">
+      {/* Breadcrumbs */}
+      <div className="px-10 py-4 flex items-center justify-between">
+        <div className="flex flex-wrap gap-2 items-center">
+            <Link href="/" className="text-[#617289] dark:text-gray-400 text-sm font-medium hover:text-primary transition-colors">Dashboard</Link>
+            <span className="text-[#617289] dark:text-gray-600 material-symbols-outlined text-sm">chevron_right</span>
+            <Link href={`/class/${assignment.classId}`} className="text-[#617289] dark:text-gray-400 text-sm font-medium hover:text-primary transition-colors">{assignment.class.name}</Link>
+            <span className="text-[#617289] dark:text-gray-600 material-symbols-outlined text-sm">chevron_right</span>
+            <span className="text-[#111418] dark:text-white text-sm font-semibold">{assignment.pupil.firstName} {assignment.pupil.lastName}</span>
+        </div>
+        <div className="flex items-center gap-2 text-xs text-[#617289] dark:text-gray-400 italic">
+            <span className="material-symbols-outlined text-xs">sync</span>
+            Auto-save enabled
+        </div>
+      </div>
+
+      {/* Page Header */}
+      <div className="px-10 pb-6 flex flex-wrap justify-between items-end gap-3">
+        <div className="flex min-w-72 flex-col gap-1">
+            <h1 className="text-[#111418] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Edit Report: {assignment.pupil.firstName} {assignment.pupil.lastName}</h1>
+            <p className="text-[#617289] dark:text-gray-400 text-base font-normal">{subject.title} • {assignment.pupil.gender}</p>
+        </div>
+        <div className="flex gap-3">
+            <button className="flex min-w-[100px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-[#f0f2f4] dark:bg-gray-800 text-[#111418] dark:text-white text-sm font-bold hover:bg-gray-200 transition-colors">
+                <span className="truncate">Save Draft</span>
+            </button>
+            <button className="flex min-w-[140px] cursor-pointer items-center justify-center rounded-lg h-10 px-4 bg-primary text-white text-sm font-bold hover:opacity-90 transition-opacity gap-2">
+                <span className="material-symbols-outlined text-base">check_circle</span>
+                <span className="truncate">Mark as Complete</span>
+            </button>
+        </div>
+      </div>
+
+      <div className="flex-1 px-10 pb-10 flex gap-8">
         <CommentEditor assignment={assignment} subject={subject} groups={groups} />
       </div>
     </main>

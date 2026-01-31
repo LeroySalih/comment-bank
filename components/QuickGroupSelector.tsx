@@ -1,7 +1,9 @@
-'use client'
+'use client';
 
 import { useState } from 'react';
 import { updateAssignmentCode } from '@/app/actions';
+import Tooltip from './Tooltip';
+import { parseComment } from '@/lib/utils';
 
 type Option = {
   id: string;
@@ -14,23 +16,31 @@ interface QuickGroupSelectorProps {
   groupId: string;
   currentCode: string | null | undefined;
   options: Option[];
+  context?: {
+    firstName: string;
+    gender: string;
+    subjectTitle?: string;
+    year?: string | null;
+    eoyLevel?: string | null;
+    targetLevel?: string | null;
+  }
 }
 
 export default function QuickGroupSelector({ 
   assignmentId, 
   groupId, 
   currentCode, 
-  options 
+  options,
+  context
 }: QuickGroupSelectorProps) {
   const [val, setVal] = useState(currentCode || "");
   const [loading, setLoading] = useState(false);
 
-  const handleChange = async (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const newCode = e.target.value || null;
-    setVal(newCode || "");
+  const handleChange = async (newValue: string | null) => {
+    setVal(newValue || "");
     setLoading(true);
     
-    await updateAssignmentCode(assignmentId, groupId, newCode);
+    await updateAssignmentCode(assignmentId, groupId, newValue);
     setLoading(false);
   };
 
@@ -53,20 +63,44 @@ export default function QuickGroupSelector({
   });
 
   return (
-    <div className="relative">
-        <select 
-            value={val} 
-            onChange={handleChange}
-            disabled={loading}
-            className={`block w-full rounded-md border-gray-300 shadow-sm focus:border-blue-500 focus:ring-blue-500 sm:text-xs py-1 px-2 ${loading ? 'opacity-50' : ''} ${val ? 'bg-blue-50 text-blue-800 font-medium' : 'text-gray-500'}`}
-        >
-            <option value="">-</option>
-            {sortedOptions.map(opt => (
-                <option key={opt.id} value={opt.code} title={opt.text}>
-                    {opt.code}
-                </option>
-            ))}
-        </select>
+    <div className="flex rounded-lg overflow-hidden border border-[#dbe0e6] dark:border-[#3a4454] w-fit bg-gray-50 dark:bg-[#101822] divide-x divide-[#dbe0e6] dark:divide-[#3a4454]">
+      {sortedOptions.map((opt) => {
+        const isActive = val === opt.code;
+        
+        let tooltipContent = opt.text;
+        if (context) {
+            tooltipContent = parseComment(
+                opt.text,
+                context.firstName,
+                context.gender,
+                context.subjectTitle,
+                context.year,
+                context.eoyLevel,
+                context.targetLevel
+            );
+        }
+
+        return (
+          <Tooltip 
+            key={opt.id} 
+            content={<div className="font-normal"><span className="font-bold mb-1 block">{opt.code}</span>{tooltipContent}</div>}
+            maxWidth="max-w-xs"
+          >
+            <button
+                onClick={() => val === opt.code ? handleChange("") : handleChange(opt.code)}
+                disabled={loading}
+                className={`px-3 py-1.5 text-xs font-bold transition-colors min-w-[32px]
+                ${isActive 
+                    ? 'bg-primary text-white' 
+                    : 'text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2d3748]'}
+                ${loading ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+            >
+                {opt.code}
+            </button>
+          </Tooltip>
+        );
+      })}
     </div>
   );
 }

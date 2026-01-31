@@ -57,46 +57,136 @@ export default async function Home() {
     orderBy: { code: 'asc' }
   });
 
+  // Calculate aggregated stats
+  let totalStudents = 0;
+  let totalAssignments = 0;
+  let startedAssignments = 0;
+
+  subjects.forEach(sub => {
+    sub.classes.forEach(cls => {
+      totalStudents += cls.assignments.length;
+      totalAssignments += cls.assignments.length;
+      startedAssignments += cls.assignments.filter(a => a.codes.length > 0).length;
+    });
+  });
+
+  const completionRate = totalAssignments > 0 ? Math.round((startedAssignments / totalAssignments) * 100) : 0;
+
   return (
-    <main className="min-h-screen p-8 bg-gray-50">
-      <div className="max-w-4xl mx-auto">
-        <div className="grid gap-6">
-          {subjects.map((subject) => (
-            <div key={subject.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-200">
-              <h2 className="text-xl font-semibold mb-4 text-gray-800 flex items-center gap-2">
-                <span className="bg-blue-100 text-blue-800 text-sm font-medium px-2.5 py-0.5 rounded">Subject</span>
-                {subject.code}
-                {subject.title && <span className="text-gray-500 font-normal text-base">- {subject.title}</span>}
-              </h2>
-              
-              {subject.classes.length > 0 ? (
-                <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-                  {subject.classes.map((cls) => {
-                    const totalAssignments = cls.assignments.length;
-                    const startedAssignments = cls.assignments.filter(a => a.codes.length > 0).length;
-                    const percent = totalAssignments > 0 ? Math.round((startedAssignments / totalAssignments) * 100) : 0;
-                    
-                    return (
-                    <Link 
-                      key={cls.id} 
-                      href={`/class/${cls.id}`}
-                      className="block p-4 border border-gray-200 rounded-md hover:border-blue-500 hover:ring-1 hover:ring-blue-500 transition-colors bg-gray-50 hover:bg-white text-center relative overflow-hidden"
-                    >
-                      <div className="absolute bottom-0 left-0 h-1 bg-blue-100 w-full">
-                         <div className="h-full bg-blue-500 transition-all duration-500" style={{ width: `${percent}%` }} />
-                      </div>
-                      <div className="text-lg font-medium text-gray-900">{cls.name}</div>
-                      <div className="text-sm text-gray-500">{totalAssignments} Pupils</div>
-                      <div className="text-xs text-blue-600 font-semibold mt-1">{percent}% Complete</div>
-                    </Link>
-                  )})}
-                </div>
-              ) : (
-                <p className="text-gray-400 italic">No classes found.</p>
-              )}
-            </div>
-          ))}
+    <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark">
+      {/* PageHeading */}
+      <div className="flex flex-wrap items-center justify-between gap-4 p-8">
+        <div className="flex min-w-72 flex-col gap-1">
+          <p className="text-slate-900 dark:text-white text-3xl font-extrabold leading-tight tracking-tight">Teacher Dashboard</p>
+          <p className="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Manage your subjects and track report completion progress.</p>
         </div>
+        <div className="flex gap-3">
+
+        </div>
+      </div>
+
+      {/* Statistics Bar */}
+      <div className="px-8 pb-4 grid grid-cols-1 md:grid-cols-4 gap-4">
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Total Students</span>
+          <span className="text-2xl font-extrabold text-slate-900 dark:text-white">{totalStudents}</span>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Completion Rate</span>
+          <span className="text-2xl font-extrabold text-primary">{completionRate}%</span>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Avg. Grade</span>
+          <span className="text-2xl font-extrabold text-slate-900 dark:text-white">--</span>
+        </div>
+        <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
+          <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Next Deadline</span>
+          <span className="text-2xl font-extrabold text-red-500">Upcoming</span>
+        </div>
+      </div>
+
+      {/* SectionHeader */}
+      <div className="px-8 pt-4">
+        <h2 className="text-slate-900 dark:text-white text-xl font-bold leading-tight tracking-tight border-b border-slate-200 dark:border-slate-800 pb-3">My Subjects</h2>
+      </div>
+
+      {/* ImageGrid / Subjects Cards */}
+      <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 p-8">
+        {subjects.map((subject, index) => {
+          // Generate a gradient based on index to vary the look
+          const gradients = [
+            "from-blue-600 to-indigo-700",
+            "from-emerald-500 to-teal-600",
+            "from-purple-500 to-indigo-600",
+            "from-orange-500 to-red-600",
+            "from-pink-500 to-rose-600"
+          ];
+          const gradient = gradients[index % gradients.length];
+          const subjectTotalStudents = subject.classes.reduce((acc, cls) => acc + cls.assignments.length, 0);
+
+          return (
+            <div key={subject.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
+              <div className={`h-32 bg-gradient-to-r ${gradient} relative p-6 flex items-end`}>
+                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full px-3 py-1 text-white text-xs font-bold">{subject.classes.length} Classes</div>
+                <div className="flex items-center gap-3">
+                  <div className="size-10 bg-white rounded-xl flex items-center justify-center text-slate-700 shadow-lg">
+                    <span className="material-symbols-outlined">auto_stories</span>
+                  </div>
+                  <div className="text-white">
+                    <h3 className="text-lg font-bold leading-none">{subject.title || subject.code}</h3>
+                    <p className="text-blue-100 text-xs mt-1">{subjectTotalStudents} Students Total</p>
+                  </div>
+                </div>
+              </div>
+              
+              <div className="p-5 space-y-4">
+                <div className="space-y-3">
+                  {subject.classes.length > 0 ? subject.classes.map(cls => {
+                     const clsTotal = cls.assignments.length;
+                     const clsStarted = cls.assignments.filter(a => a.codes.length > 0).length;
+                     const percent = clsTotal > 0 ? Math.round((clsStarted / clsTotal) * 100) : 0;
+                     let statusColor = "text-primary";
+                     let statusBg = "bg-primary";
+                     let statusText = "On Track";
+                     let badgeBg = "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
+                     
+                     if (percent === 100) {
+                        statusColor = "text-emerald-500";
+                        statusBg = "bg-emerald-500";
+                        statusText = "Completed";
+                        badgeBg = "bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-400";
+                     } else if (percent < 50) {
+                        statusColor = "text-orange-500";
+                        statusBg = "bg-orange-500";
+                        statusText = "In Progress";
+                        badgeBg = "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
+                     }
+                     
+                     return (
+                      <Link key={cls.id} href={`/class/${cls.id}`} className="block hover:bg-slate-50 dark:hover:bg-slate-800/50 p-2 rounded-lg transition-colors -mx-2">
+                        <div className="flex flex-col gap-2">
+                          <div className="flex justify-between items-center text-sm">
+                            <span className="font-bold text-slate-700 dark:text-slate-300">{cls.name}</span>
+                            <span className={`${statusColor} font-bold`}>{percent}%</span>
+                          </div>
+                          <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                            <div className={`${statusBg} h-full rounded-full`} style={{ width: `${percent}%` }}></div>
+                          </div>
+                          <div className="flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                            <span>{clsStarted}/{clsTotal} Reports Done</span>
+                            <span className={`px-2 py-0.5 rounded-full ${badgeBg}`}>{statusText}</span>
+                          </div>
+                        </div>
+                      </Link>
+                     )
+                  }) : (
+                    <p className="text-gray-400 text-sm italic">No classes assigned.</p>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })}
       </div>
     </main>
   );

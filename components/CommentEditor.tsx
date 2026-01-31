@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react';
 import { parseComment, countWords } from '@/lib/utils';
-import { Copy, Check } from 'lucide-react';
 import { updateAssignmentCode, updateAssignmentCommentText } from '@/app/actions';
 
 type CommentOption = {
@@ -173,69 +172,141 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
     await updateAssignmentCommentText(assignment.id, preview);
   };
 
-  return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 h-[calc(100vh-140px)]">
-        <div className="overflow-y-auto pr-4 space-y-8">
-            {groups.map(group => (
-                <div key={group.id} className="bg-white p-6 rounded-lg shadow-sm border border-gray-100">
-                    <h3 className="text-lg font-semibold text-gray-800 mb-4">{group.name} Comments</h3>
-                    <div className="space-y-3">
-                        {group.options.map(option => (
-                           <label key={option.id} className="flex items-start gap-3 p-3 rounded-md hover:bg-gray-50 cursor-pointer border border-transparent hover:border-gray-200 transition-all select-none">
-                              <input 
-                                type="radio" 
-                                name={group.id} 
-                                value={option.id}
-                                checked={selections[group.id] === option.id}
-                                onChange={() => handleSelection(group.id, option.id)}
-                                className="mt-1 w-4 h-4 text-blue-600 bg-gray-100 border-gray-300 focus:ring-blue-500"
-                              />
-                              <div className="flex-1">
-                                <div className="flex items-center justify-between mb-1">
-                                    <span className="text-xs font-bold text-gray-500 uppercase tracking-wide">{option.code}</span>
-                                </div>
-                                <p className="text-sm text-gray-700">{parseComment(
-                                  option.text, 
-                                  assignment.pupil.firstName, 
-                                  assignment.pupil.gender,
-                                  subject.title || '',
-                                  assignment.class?.year,
-                                  assignment.eoyLevel,
-                                  assignment.targetLevel
-                                )}</p>
-                              </div>
-                           </label>
-                        ))}
-                    </div>
-                </div>
-            ))}
-        </div>
+  const wordCount = countWords(preview);
+  const targetWordCount = 100; // Configurable or hardcoded for now
+  const percent = Math.min(100, Math.round((wordCount / targetWordCount) * 100));
+  const dashArray = 100; 
+  const dashOffset = 100 - (percent / 100 * 100); // SVG stroke-dashoffset calculation
 
-        <div className="bg-white rounded-xl shadow-lg border border-gray-200 flex flex-col h-full sticky top-8">
-            <div className="p-4 border-b border-gray-100 bg-gray-50 flex justify-between items-center rounded-t-xl">
-                <h2 className="font-semibold text-gray-700">Preview (Editable)</h2>
-                <div className="flex gap-2">
+  return (
+    <div className="flex-1 flex flex-col lg:flex-row gap-8 align-start">
+        {/* Sidebar */}
+        <aside className="w-full lg:w-80 flex-shrink-0 flex flex-col gap-6">
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-[#f0f2f4] dark:border-gray-800 shadow-sm">
+                <h3 className="text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider mb-4">Report Categories</h3>
+                <div className="flex flex-col gap-2">
+                    {groups.map(group => {
+                        const selectedOptionId = selections[group.id];
+                        const selectedOption = group.options.find(o => o.id === selectedOptionId);
+                        const isSelected = !!selectedOption;
+                        
+                        return (
+                            <div key={group.id} className={`flex flex-col gap-2 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-transparent ${isSelected ? 'bg-primary/5 border-primary/10' : 'hover:bg-[#f0f2f4] dark:hover:bg-gray-800'}`}>
+                                <div className="flex items-center justify-between">
+                                    <div className="flex items-center gap-3">
+                                        <span className={`material-symbols-outlined text-xl ${isSelected ? 'text-primary' : 'text-gray-400'}`}>
+                                            {group.name === 'Attainment' ? 'school' : 
+                                             group.name === 'Effort' ? 'fitness_center' : 
+                                             group.name === 'Homework' ? 'home_work' : 'article'}
+                                        </span>
+                                        <p className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-[#111418] dark:text-gray-300'}`}>{group.name}</p>
+                                    </div>
+                                    {isSelected && <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full">{selectedOption?.code}</span>}
+                                </div>
+                                {/* Options (Inline for now or Expandable) - Let's keep them inline for quick access as per logic */}
+                                <div className="pl-8 flex flex-wrap gap-2 mt-1">
+                                    {group.options.map(opt => (
+                                        <button 
+                                            key={opt.id}
+                                            onClick={() => handleSelection(group.id, opt.id)}
+                                            className={`text-xs px-2 py-1 rounded border ${selections[group.id] === opt.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
+                                            title={opt.text}
+                                        >
+                                            {opt.code}
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        )
+                    })}
+                </div>
+            </div>
+
+            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-[#f0f2f4] dark:border-gray-800 shadow-sm">
+                <h3 className="text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider mb-4">Selected Codes</h3>
+                <div className="flex flex-wrap gap-2">
+                     {Object.entries(selections).map(([gid, oid]) => {
+                         const group = groups.find(g => g.id === gid);
+                         const option = group?.options.find(o => o.id === oid);
+                         if (!group || !option) return null;
+                         return (
+                            <span key={gid} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium border border-blue-200 dark:border-blue-800">
+                                #{group.name}{option.code}
+                            </span>
+                         )
+                     })}
+                     {Object.keys(selections).length === 0 && <span className="text-gray-400 text-xs italic">No selection</span>}
+                </div>
+            </div>
+        </aside>
+
+        {/* Editor Section */}
+        <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm overflow-hidden min-h-[500px]">
+            <div className="px-8 py-5 border-b border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <h3 className="text-[#111418] dark:text-white text-lg font-bold leading-tight">Report Preview & Editor</h3>
+                <div className="flex items-center gap-4">
+                    {/* Progress Ring and Word Count */}
+                    <div className="flex items-center gap-3">
+                        <div className="relative flex items-center justify-center size-10">
+                            <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 40 40">
+                                <circle className="text-gray-200 dark:text-gray-700" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" strokeWidth="3"></circle>
+                                <circle 
+                                    className="text-primary transition-all duration-500" 
+                                    cx="20" cy="20" 
+                                    fill="transparent" 
+                                    r="16" 
+                                    stroke="currentColor" 
+                                    strokeDasharray="100" 
+                                    strokeDashoffset={100 - percent} 
+                                    strokeLinecap="round" 
+                                    strokeWidth="3"
+                                ></circle>
+                            </svg>
+                            <span className="absolute text-[10px] font-bold text-primary">{percent}%</span>
+                        </div>
+                        <div className="flex flex-col">
+                            <span className="text-xs font-bold text-[#111418] dark:text-white leading-none">{wordCount}/{targetWordCount} words</span>
+                            <span className="text-[10px] text-[#617289] dark:text-gray-400">Target length</span>
+                        </div>
+                    </div>
+                    <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 mx-2"></div>
                     <button 
                         onClick={copyToClipboard}
-                        className="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-md text-sm font-medium transition-colors"
-                    >
-                        {copied ? <Check className="w-4 h-4" /> : <Copy className="w-4 h-4" />}
-                        {copied ? 'Copied!' : 'Copy Text'}
+                        className="text-[#617289] dark:text-gray-400 hover:text-primary transition-colors flex items-center gap-1">
+                        <span className="material-symbols-outlined text-lg">{copied ? 'check' : 'content_copy'}</span>
                     </button>
                 </div>
             </div>
-            <div className="flex-1 p-0 overflow-hidden flex flex-col">
-                <textarea
-                    value={preview}
-                    onChange={handleTextChange}
-                    onBlur={handleTextBlur}
-                    className="flex-1 w-full p-6 text-lg text-gray-800 leading-relaxed border-none resize-none focus:ring-0 focus:outline-none"
-                    placeholder="Select comments to generate a preview..."
-                />
+            
+            <div className="flex-1 p-8 relative">
+                <div className="relative h-full flex flex-col">
+                    <label className="text-xs font-bold text-primary uppercase mb-2 block">Generated Comment</label>
+                    <textarea 
+                        className="flex-1 w-full p-6 text-lg leading-relaxed text-[#111418] dark:text-gray-100 bg-background-light/50 dark:bg-gray-950/50 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none outline-none font-display transition-all" 
+                        placeholder="Start typing student comments here..."
+                        value={preview}
+                        onChange={handleTextChange}
+                        onBlur={handleTextBlur}
+                    ></textarea>
+                    
+                    {/* Editor Toolbar Floating */}
+                    <div className="absolute bottom-6 right-6 flex gap-2 bg-white dark:bg-gray-800 shadow-xl rounded-lg p-1.5 border border-gray-100 dark:border-gray-700">
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">format_bold</span></button>
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">format_italic</span></button>
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">auto_fix_high</span></button>
+                        <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 my-auto"></div>
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">undo</span></button>
+                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">redo</span></button>
+                    </div>
+                </div>
             </div>
-            <div className="px-4 py-2 bg-gray-50 text-xs text-gray-400 border-t items-center flex justify-between">
-                <span>Changes saved automatically on blur.</span>
-                <span className="font-medium">{countWords(preview)} words</span>
+            
+            <div className="px-8 py-4 bg-primary/5 dark:bg-primary/10 border-t border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center">
+                <div className="flex items-center gap-2 text-primary">
+                    <span className="material-symbols-outlined text-base">lightbulb</span>
+                    <span className="text-xs font-semibold">Tip: Changes are saved automatically.</span>
+                </div>
+
             </div>
         </div>
     </div>

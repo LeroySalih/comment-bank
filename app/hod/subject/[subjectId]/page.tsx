@@ -67,79 +67,104 @@ export default async function SubjectPage({ params }: Props) {
   const avgWordsPerGroup = subject.commentGroups.length > 0 ? (totalWordsInSubject / subject.commentGroups.length).toFixed(1) : 0
 
   return (
-    <div className="container mx-auto py-10">
-      <div className="flex items-center gap-4 mb-8">
-        <Link href="/hod" className="text-indigo-600 hover:text-indigo-800">
-          ← Back to Dashboard
-        </Link>
-        <div>
-          <h1 className="text-3xl font-bold">{subject.code}</h1>
-          {subject.title && <h2 className="text-xl text-gray-600">{subject.title}</h2>}
-        </div>
+    <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark min-h-[calc(100vh-64px)]">
+      {/* Header */}
+      <div className="bg-white dark:bg-gray-900 border-b border-[#f0f2f4] dark:border-gray-800 px-8 py-6">
+          <Link href="/hod" className="inline-flex items-center text-sm font-medium text-[#617289] hover:text-primary transition-colors mb-4">
+              <span className="material-symbols-outlined text-lg mr-1">arrow_back</span>
+              Back to Department
+          </Link>
+          <div className="flex justify-between items-end">
+             <div>
+                <h1 className="text-3xl font-black text-[#111418] dark:text-white leading-tight tracking-tight">{subject.code}</h1>
+                <p className="text-[#617289] dark:text-gray-400 mt-1 text-lg">{subject.title}</p>
+             </div>
+             <div className="flex gap-4">
+                 <div className="text-right hidden md:block">
+                     <p className="text-sm text-[#617289] uppercase font-bold tracking-wider">Avg. Words</p>
+                     <p className="text-xl font-black text-[#111418] dark:text-white">{avgWordsPerGroup}</p>
+                 </div>
+                 <div className="h-10 w-px bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
+                 <div className="text-right hidden md:block">
+                     <p className="text-sm text-[#617289] uppercase font-bold tracking-wider">Groups</p>
+                     <p className="text-xl font-black text-[#111418] dark:text-white">{subject.commentGroups.length}</p>
+                 </div>
+             </div>
+          </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+      <div className="p-8 grid grid-cols-1 xl:grid-cols-2 gap-8">
         {/* Classes Section */}
-        <div className="bg-white shadow rounded-lg p-6 h-fit">
-          <div className="flex justify-between items-center mb-4">
-            <h2 className="text-xl font-semibold">Classes</h2>
-            <ClassForm subjectId={subject.id} />
-          </div>
-          
-          <div className="space-y-4">
-            {subject.classes.map((cls: any) => (
-              <div key={cls.id} className="flex justify-between items-center p-3 bg-gray-50 rounded border group/item hover:bg-gray-100 transition-colors">
-                <div className="flex flex-col gap-2 w-full">
-                  <div className="flex justify-between items-center w-full">
-                    <div className="flex items-center gap-3">
-                      <Link href={`/hod/class/${cls.id}`} className="font-medium hover:underline text-lg">
-                        {cls.name}
-                      </Link>
-                      <EditClassForm 
-                        classId={cls.id} 
-                        subjectId={subject.id} 
-                        initialName={cls.name} 
-                      />
+        <section className="bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm flex flex-col overflow-hidden h-fit">
+            <div className="p-6 border-b border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-lg bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center text-primary">
+                        <span className="material-symbols-outlined text-lg">school</span>
                     </div>
-                    <div className="flex items-center gap-4">
-                      <TeacherAssignment 
-                        classId={cls.id}
-                        currentTeachers={cls.teachers}
-                        availableTeachers={teachers}
-                        readOnly={!userIsAdmin}
-                      />
-                      <span className="text-xs text-gray-400 bg-gray-100 px-2 py-1 rounded-full whitespace-nowrap">
-                        {cls._count.assignments} Pupils
-                      </span>
-                    </div>
-                  </div>
+                    <h2 className="text-lg font-bold text-[#111418] dark:text-white">Classes</h2>
                 </div>
-              </div>
-            ))}
-            {subject.classes.length === 0 && (
-              <p className="text-gray-500 text-sm italic">No classes added yet.</p>
-            )}
-          </div>
-        </div>
+                <ClassForm subjectId={subject.id} />
+            </div>
+            
+            <div className="p-2 overflow-y-auto max-h-[600px]">
+                <div className="space-y-1">
+                    {subject.classes.map((cls: any) => (
+                      <div key={cls.id} className="group p-4 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors border border-transparent hover:border-[#f0f2f4] dark:hover:border-gray-700">
+                        <div className="flex justify-between items-start">
+                           <div className="flex-1">
+                               <div className="flex items-center gap-2 mb-1">
+                                    <Link href={`/hod/class/${cls.id}`} className="text-base font-bold text-[#111418] dark:text-white hover:text-primary transition-colors flex items-center gap-1">
+                                        {cls.name}
+                                        <span className="material-symbols-outlined text-gray-300 text-sm opacity-0 group-hover:opacity-100 transition-opacity">open_in_new</span>
+                                    </Link>
+                                    <EditClassForm 
+                                        classId={cls.id} 
+                                        subjectId={subject.id} 
+                                        initialName={cls.name} 
+                                      />
+                               </div>
+                               <div className="flex items-center gap-2 mt-2">
+                                   <TeacherAssignment 
+                                        classId={cls.id}
+                                        currentTeachers={cls.teachers}
+                                        availableTeachers={teachers}
+                                        readOnly={!userIsAdmin}
+                                      />
+                               </div>
+                           </div>
+                           <span className="bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-300 text-xs font-bold px-2 py-1 rounded-md">
+                                {cls._count.assignments} Pupils
+                           </span>
+                        </div>
+                      </div>
+                    ))}
+                    {subject.classes.length === 0 && (
+                        <div className="py-12 text-center text-gray-400 italic">No classes found. Add one to get started.</div>
+                    )}
+                </div>
+            </div>
+        </section>
 
         {/* Comment Groups Section */}
-        <div className="bg-white shadow rounded-lg p-6 h-fit">
-          <div className="flex justify-between items-center mb-4">
-            <div>
-              <h2 className="text-xl font-semibold">Comment Groups</h2>
-              {subject.commentGroups.length > 0 && (
-                <p className="text-sm text-gray-500">{avgWordsPerGroup} avg words per group</p>
-              )}
+        <section className="bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm flex flex-col overflow-hidden h-fit">
+           <div className="p-6 border-b border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
+                <div className="flex items-center gap-3">
+                    <div className="size-8 rounded-lg bg-emerald-100 dark:bg-emerald-900/30 flex items-center justify-center text-emerald-600">
+                        <span className="material-symbols-outlined text-lg">library_books</span>
+                    </div>
+                    <h2 className="text-lg font-bold text-[#111418] dark:text-white">Comment Bank</h2>
+                </div>
+                <GroupForm subjectId={subject.id} />
             </div>
-            <GroupForm subjectId={subject.id} />
-          </div>
 
-          <ReorderableGroupList 
-            subjectId={subject.id} 
-            initialGroups={subject.commentGroups} 
-          />
-        </div>
+            <div className="p-6">
+                 <ReorderableGroupList 
+                    subjectId={subject.id} 
+                    initialGroups={subject.commentGroups} 
+                  />
+            </div>
+        </section>
       </div>
-    </div>
+    </main>
   )
 }
