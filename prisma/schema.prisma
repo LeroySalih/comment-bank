@@ -117,3 +117,12 @@ model User {
   Subject             Subject[]
   CheckedAssignments  Assignment[] @relation("CheckedAssignments")
 }
+
+model Deadline {
+  id          String   @id
+  title       String
+  date        DateTime
+  description String?
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+}

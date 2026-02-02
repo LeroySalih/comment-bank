@@ -32,6 +32,10 @@ export default async function AdminPage() {
     }
   })
 
+  const deadlines = await prisma.deadline.findMany({
+    orderBy: { date: 'asc' }
+  })
+
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-8">
@@ -39,7 +43,7 @@ export default async function AdminPage() {
         <SignOutButton />
       </div>
       
-      <AdminTabs users={users} roles={roles} subjects={subjects} />
+      <AdminTabs users={users} roles={roles} subjects={subjects} deadlines={deadlines} />
     </div>
   )
 }

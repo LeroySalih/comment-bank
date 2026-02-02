@@ -17,8 +17,12 @@ import {
   DeleteSubjectSchema,
   AssignUserToSubjectSchema,
   AssignTeachersSchema,
+  CreateDeadlineSchema,
+  UpdateDeadlineSchema,
+  DeleteDeadlineSchema,
   validateFormData
 } from '@/lib/validation-schemas'
+import { createId } from '@paralleldrive/cuid2'
 import * as XLSX from 'xlsx'
 
 /**
@@ -576,6 +580,132 @@ export const removePupilsFromClass = withRole('admin', async (classId: string, p
     return { success: true as const }
   } catch (error) {
     logger.error('Failed to remove pupils from class', { error, classId })
+    return handleServerActionError(error)
+  }
+})
+
+// ============================================================================
+// Deadline Management Actions
+// ============================================================================
+
+/**
+ * Get all deadlines (Admin only)
+ */
+export const getDeadlines = withRole('admin', async () => {
+  try {
+    const deadlines = await prisma.deadline.findMany({
+      orderBy: [
+        { date: 'asc' }
+      ]
+    })
+    return { success: true as const, deadlines }
+  } catch (error) {
+    logger.error('Failed to get deadlines', { error })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Create a new deadline (Admin only)
+ */
+export const createDeadline = withRole('admin', async (formData: FormData) => {
+  try {
+    const data = {
+      title: formData.get('title') as string,
+      date: formData.get('date') as string,
+      description: formData.get('description') as string || undefined
+    }
+
+    const validation = validateFormData(CreateDeadlineSchema, data)
+    if (!validation.success) {
+      return validation
+    }
+
+    const validated = validation.data
+    await prisma.deadline.create({
+      data: {
+        id: createId(),
+        title: validated.title,
+        date: new Date(validated.date),
+        description: validated.description || null
+      }
+    })
+
+    logger.info('Deadline created', { title: validated.title })
+    revalidatePath('/admin')
+    revalidatePath('/')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to create deadline', { error })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Update a deadline (Admin only)
+ */
+export const updateDeadline = withRole('admin', async (
+  deadlineId: string,
+  formData: FormData
+) => {
+  try {
+    const data = {
+      deadlineId,
+      title: formData.get('title') as string || undefined,
+      date: formData.get('date') as string || undefined,
+      description: formData.get('description') as string || undefined,
+      isActive: formData.has('isActive') ? formData.get('isActive') === 'true' : undefined
+    }
+
+    const validation = validateFormData(UpdateDeadlineSchema, data)
+    if (!validation.success) {
+      return validation
+    }
+
+    const validated = validation.data
+    await prisma.deadline.update({
+      where: { id: validated.deadlineId },
+      data: {
+        title: validated.title,
+        date: validated.date ? new Date(validated.date) : undefined,
+        description: validated.description,
+        isActive: validated.isActive
+      }
+    })
+
+    logger.info('Deadline updated', { deadlineId })
+    revalidatePath('/admin')
+    revalidatePath('/')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to update deadline', { error, deadlineId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Delete a deadline (Admin only)
+ */
+export const deleteDeadline = withRole('admin', async (deadlineId: string) => {
+  try {
+    const validation = validateFormData(DeleteDeadlineSchema, { deadlineId })
+    if (!validation.success) {
+      return validation
+    }
+
+    await prisma.deadline.delete({
+      where: { id: deadlineId }
+    })
+
+    logger.info('Deadline deleted', { deadlineId })
+    revalidatePath('/admin')
+    revalidatePath('/')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to delete deadline', { error, deadlineId })
     return handleServerActionError(error)
   }
 })

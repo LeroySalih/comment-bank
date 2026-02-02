@@ -114,6 +114,15 @@ export default async function Home() {
 
   const completionRate = totalAssignments > 0 ? Math.round((startedAssignments / totalAssignments) * 100) : 0;
 
+  // Get next upcoming deadline
+  const nextDeadline = await prisma.deadline.findFirst({
+    where: {
+      isActive: true,
+      date: { gte: new Date() }
+    },
+    orderBy: { date: 'asc' }
+  });
+
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark">
       {/* PageHeading */}
@@ -143,7 +152,21 @@ export default async function Home() {
         </div>
         <div className="bg-white dark:bg-slate-900 p-5 rounded-2xl border border-slate-200 dark:border-slate-800 flex flex-col shadow-sm">
           <span className="text-slate-500 dark:text-slate-400 text-xs font-semibold uppercase tracking-wider mb-2">Next Deadline</span>
-          <span className="text-2xl font-extrabold text-red-500">Upcoming</span>
+          {nextDeadline ? (
+            <div>
+              <span className="text-2xl font-extrabold text-red-500">
+                {new Date(nextDeadline.date).toLocaleDateString('en-GB', {
+                  day: 'numeric',
+                  month: 'short'
+                })}
+              </span>
+              <p className="text-sm text-slate-600 dark:text-slate-400 mt-1 truncate" title={nextDeadline.title}>
+                {nextDeadline.title}
+              </p>
+            </div>
+          ) : (
+            <span className="text-2xl font-extrabold text-slate-400">None</span>
+          )}
         </div>
       </div>
 

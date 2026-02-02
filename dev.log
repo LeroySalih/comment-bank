@@ -1653,3 +1653,140 @@ getAllForms: Returning forms [ '7A', '7B', '7C' ]
  GET / 200 in 752ms (compile: 440ms, proxy.ts: 54ms, render: 257ms)
  GET /forms/7A 200 in 725ms (compile: 283ms, render: 442ms)
  POST /forms/7A 200 in 213ms (compile: 33ms, render: 180ms)
+ GET / 200 in 243ms (compile: 77ms, proxy.ts: 36ms, render: 129ms)
+ GET /api/auth/csrf 200 in 333ms (compile: 126ms, render: 207ms)
+ POST /api/auth/signout 200 in 51ms (compile: 6ms, render: 45ms)
+ GET /login 200 in 307ms (compile: 25ms, render: 282ms)
+✓ Compiled in 412ms
+ GET /login 200 in 1208ms (compile: 33ms, render: 1175ms)
+ GET /login 200 in 938ms (compile: 79ms, render: 859ms)
+ GET / 200 in 1393ms (compile: 35ms, proxy.ts: 425ms, render: 933ms)
+ GET / 200 in 822ms (compile: 8ms, proxy.ts: 33ms, render: 781ms)
+✓ Compiled in 287ms
+ GET /login 200 in 265ms (compile: 17ms, render: 247ms)
+ GET / 200 in 384ms (compile: 36ms, proxy.ts: 159ms, render: 189ms)
+✓ Compiled in 266ms
+ GET /api/auth/providers 200 in 66ms (compile: 27ms, render: 39ms)
+ GET /api/auth/csrf 200 in 20ms (compile: 12ms, render: 9ms)
+ POST /api/auth/callback/credentials 200 in 173ms (compile: 2ms, render: 170ms)
+ GET / 200 in 241ms (compile: 17ms, proxy.ts: 6ms, render: 218ms)
+ GET / 200 in 206ms (compile: 10ms, proxy.ts: 7ms, render: 189ms)
+ GET /admin 200 in 880ms (compile: 770ms, proxy.ts: 20ms, render: 91ms)
+✓ Compiled in 129ms
+✓ Compiled in 160ms
+ GET / 200 in 2.2s (compile: 897ms, proxy.ts: 47ms, render: 1209ms)
+ GET /admin 200 in 2.2s (compile: 729ms, proxy.ts: 35ms, render: 1400ms)
+✓ Compiled in 1461ms
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+ GET /admin 200 in 2.1s (compile: 1579ms, proxy.ts: 185ms, render: 346ms)
+ GET / 200 in 2.1s (compile: 1732ms, proxy.ts: 132ms, render: 231ms)
+✓ Compiled in 74ms
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+ GET / 200 in 549ms (compile: 366ms, proxy.ts: 55ms, render: 128ms)
+ GET /admin 500 in 560ms (compile: 267ms, proxy.ts: 58ms, render: 235ms)
+✓ Compiled in 162ms
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+⨯ TypeError: Cannot read properties of undefined (reading 'findFirst')
+    at Home (app/page.tsx:118:46)
+  116 |
+  117 |   // Get next upcoming deadline
+> 118 |   const nextDeadline = await prisma.deadline.findFirst({
+      |                                              ^
+  119 |     where: {
+  120 |       isActive: true,
+  121 |       date: { gte: new Date() } {
+  digest: '596137836'
+}
+ GET / 200 in 747ms (compile: 230ms, proxy.ts: 30ms, render: 487ms)
+ GET /admin 500 in 774ms (compile: 58ms, proxy.ts: 36ms, render: 680ms)
+✓ Compiled in 203ms
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+⨯ TypeError: Cannot read properties of undefined (reading 'findFirst')
+    at Home (app/page.tsx:118:46)
+  116 |
+  117 |   // Get next upcoming deadline
+> 118 |   const nextDeadline = await prisma.deadline.findFirst({
+      |                                              ^
+  119 |     where: {
+  120 |       isActive: true,
+  121 |       date: { gte: new Date() } {
+  digest: '596137836'
+}
+ GET /admin 500 in 2.9s (compile: 40ms, proxy.ts: 125ms, render: 2.8s)
+ GET / 500 in 3.0s (compile: 332ms, proxy.ts: 105ms, render: 2.5s)
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+ GET /admin 500 in 300ms (compile: 43ms, proxy.ts: 56ms, render: 201ms)
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+ GET /admin 500 in 324ms (compile: 37ms, proxy.ts: 39ms, render: 248ms)
+⨯ TypeError: Cannot read properties of undefined (reading 'findMany')
+    at AdminPage (app/admin/page.tsx:35:43)
+  33 |   })
+  34 |
+> 35 |   const deadlines = await prisma.deadline.findMany({
+     |                                           ^
+  36 |     orderBy: { date: 'asc' }
+  37 |   })
+  38 | {
+  digest: '3569266908'
+}
+ GET /admin 500 in 305ms (compile: 37ms, proxy.ts: 48ms, render: 221ms)

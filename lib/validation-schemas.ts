@@ -125,6 +125,25 @@ export const ReorderCommentOptionsSchema = z.object({
   optionIds: z.array(z.string()).min(1, 'At least one option is required')
 })
 
+// Deadline Management Schemas
+export const CreateDeadlineSchema = z.object({
+  title: z.string().min(1, 'Title is required').max(200),
+  date: z.string().min(1, 'Date is required'),
+  description: z.string().max(500).optional()
+})
+
+export const UpdateDeadlineSchema = z.object({
+  deadlineId: z.string().min(1, 'Deadline ID is required'),
+  title: z.string().min(1).max(200).optional(),
+  date: z.string().optional(),
+  description: z.string().max(500).optional(),
+  isActive: z.boolean().optional()
+})
+
+export const DeleteDeadlineSchema = z.object({
+  deadlineId: z.string().min(1, 'Deadline ID is required')
+})
+
 /**
  * Helper function to validate form data
  */
