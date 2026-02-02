@@ -897,3 +897,33 @@ Verified in DB: This is a new comment.
 ✓ Compiled in 75ms
  GET /class/DTKS3-25-7A-DT 200 in 206ms (compile: 56ms, proxy.ts: 8ms, render: 143ms)
  GET / 200 in 235ms (compile: 12ms, proxy.ts: 37ms, render: 186ms)
+ GET / 200 in 472ms (compile: 66ms, proxy.ts: 67ms, render: 339ms)
+ GET /admin 200 in 588ms (compile: 441ms, proxy.ts: 18ms, render: 129ms)
+[2026-02-02T13:14:34.157Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 110ms (compile: 6ms, proxy.ts: 14ms, render: 91ms)
+[2026-02-02T13:14:34.183Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+getAllForms: Starting query
+getAllForms: Query result [ { form: '7A' }, { form: '7B' }, { form: '7C' } ]
+getAllForms: Returning forms [ '7A', '7B', '7C' ]
+ POST /admin 200 in 22ms (compile: 3ms, proxy.ts: 2ms, render: 17ms)
+[2026-02-02T13:14:34.335Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 150ms (compile: 1430µs, proxy.ts: 4ms, render: 144ms)
+[2026-02-02T13:14:34.359Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 16ms (compile: 1945µs, proxy.ts: 3ms, render: 11ms)
+[2026-02-02T13:14:34.375Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+getAllForms: Starting query
+getAllForms: Query result [ { form: '7A' }, { form: '7B' }, { form: '7C' } ]
+getAllForms: Returning forms [ '7A', '7B', '7C' ]
+ POST /admin 200 in 12ms (compile: 1327µs, proxy.ts: 3ms, render: 8ms)
+[2026-02-02T13:14:34.388Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 13ms (compile: 1305µs, proxy.ts: 2ms, render: 9ms)
+[2026-02-02T13:14:50.071Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+[2026-02-02T13:14:50.123Z] [INFO] Class created {
+  className: '25-7A-7C',
+  formName: '7C',
+  subjectId: 'DTKS3',
+  hasFormPupils: true
+}
+ POST /admin 200 in 150ms (compile: 12ms, proxy.ts: 18ms, render: 121ms)
+[2026-02-02T13:14:57.540Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 76ms (compile: 12ms, proxy.ts: 27ms, render: 36ms)
