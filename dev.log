@@ -888,3 +888,6 @@ Verified in DB: This is a new comment.
 ✓ Compiled in 198ms
  GET / 200 in 183ms (compile: 10ms, proxy.ts: 20ms, render: 153ms)
  GET /class/DTKS3-25-7A-DT 200 in 193ms (compile: 80ms, proxy.ts: 5ms, render: 107ms)
+✓ Compiled in 331ms
+ GET / 200 in 690ms (compile: 35ms, proxy.ts: 219ms, render: 437ms)
+ GET /class/DTKS3-25-7A-DT 200 in 657ms (compile: 249ms, proxy.ts: 178ms, render: 231ms)

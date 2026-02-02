@@ -155,9 +155,14 @@ export function ClassManagement({ subjects }: ClassManagementProps) {
   }
 
   const fetchForms = async () => {
+    console.log('fetchForms: Calling getAllForms')
     const result = await getAllForms()
+    console.log('fetchForms: Result', result)
     if (result.success && result.forms) {
+      console.log('fetchForms: Setting forms', result.forms)
       setForms(result.forms)
+    } else {
+      console.log('fetchForms: No forms or error', result)
     }
   }
 
