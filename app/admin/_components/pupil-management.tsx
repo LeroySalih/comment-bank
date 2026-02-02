@@ -72,8 +72,10 @@ export function PupilManagement() {
     const reader = new FileReader()
     reader.onload = async (e) => {
       const content = e.target?.result as string
+      // Extract base64 content (remove data URL prefix)
+      const base64Content = content.split(',')[1]
       setUploading(true)
-      const result = await processPupilUpload(content)
+      const result = await processPupilUpload(base64Content)
       setUploading(false)
       
       if (result.success) {
@@ -83,7 +85,7 @@ export function PupilManagement() {
         alert('error' in result ? result.error : "Failed to process upload")
       }
     }
-    reader.readAsText(file)
+    reader.readAsDataURL(file)
     // Clear the input
     if (fileInputRef.current) fileInputRef.current.value = ""
   }
@@ -96,7 +98,7 @@ export function PupilManagement() {
           <div className="flex items-center gap-4">
             <input
               type="file"
-              accept=".md"
+              accept=".csv,.xlsx,.xls"
               ref={fileInputRef}
               onChange={handleFileUpload}
               className="hidden"
@@ -106,7 +108,7 @@ export function PupilManagement() {
               disabled={uploading}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50"
             >
-              {uploading ? "Uploading..." : "Upload Pupil List (.md)"}
+              {uploading ? "Uploading..." : "Upload Pupil List"}
             </button>
           </div>
         </div>

@@ -113,6 +113,7 @@ export const processPupilUpload = withRole('admin', async (content: string) => {
       firstName: String(row.FirstName || row.firstName || row.Forename || '').trim(),
       lastName: String(row.LastName || row.lastName || row.Surname || '').trim(),
       gender: String(row.Gender || row.gender || 'M').trim().toUpperCase(),
+      form: String(row.Form || row.form || '').trim() || null,
       isActive: true
     }))
 

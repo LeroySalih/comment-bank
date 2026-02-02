@@ -864,3 +864,16 @@ Verified in DB: This is a new comment.
  POST /student/DTKS3-25-7A-DT-12352 200 in 29ms (compile: 8ms, proxy.ts: 7ms, render: 15ms)
  GET /class/DTKS3-25-7A-DT 200 in 40ms (compile: 5ms, proxy.ts: 4ms, render: 30ms)
  GET /hod 200 in 54ms (compile: 5ms, proxy.ts: 3ms, render: 46ms)
+ GET / 200 in 443ms (compile: 57ms, proxy.ts: 91ms, render: 296ms)
+ GET /admin 200 in 416ms (compile: 351ms, proxy.ts: 8ms, render: 56ms)
+[2026-02-02T03:00:40.210Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 97ms (compile: 6ms, proxy.ts: 7ms, render: 83ms)
+[2026-02-02T03:00:45.587Z] [DEBUG] Authorization successful { userId: 'nqf5l4wh4twd32v2yaic64qi', requiredRoles: [ 'admin' ] }
+ POST /admin 200 in 36ms (compile: 3ms, proxy.ts: 15ms, render: 19ms)
+✓ Compiled in 1483ms
+ GET /admin 200 in 684ms (compile: 385ms, proxy.ts: 31ms, render: 268ms)
+ GET / 200 in 761ms (compile: 39ms, proxy.ts: 92ms, render: 631ms)
+ GET /class/DTKS3-25-7A-DT 200 in 711ms (compile: 499ms, proxy.ts: 30ms, render: 181ms)
+✓ Compiled in 132ms
+✓ Compiled in 76ms
+✓ Compiled in 68ms
