@@ -1,6 +1,7 @@
 import { prisma } from '@/lib/prisma'
 import { decrypt } from '@/lib/encryption'
 import { NotFoundError, ForbiddenError } from '@/lib/errors'
+import { createId } from '@paralleldrive/cuid2'
 
 /**
  * Repository for Class data access
@@ -212,7 +213,7 @@ export class ClassRepository {
   async create(data: { name: string; year: string | null; subjectId: string }) {
     return prisma.class.create({
       data: {
-        id: `${data.subjectId}-${data.name}`,
+        id: createId(),
         name: data.name,
         year: data.year,
         subjectId: data.subjectId

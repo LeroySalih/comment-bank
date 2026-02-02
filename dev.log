@@ -894,3 +894,6 @@ Verified in DB: This is a new comment.
 ✓ Compiled in 636ms
  GET / 200 in 327ms (compile: 16ms, proxy.ts: 37ms, render: 274ms)
  GET /class/DTKS3-25-7A-DT 200 in 339ms (compile: 81ms, proxy.ts: 48ms, render: 210ms)
+✓ Compiled in 75ms
+ GET /class/DTKS3-25-7A-DT 200 in 206ms (compile: 56ms, proxy.ts: 8ms, render: 143ms)
+ GET / 200 in 235ms (compile: 12ms, proxy.ts: 37ms, render: 186ms)
