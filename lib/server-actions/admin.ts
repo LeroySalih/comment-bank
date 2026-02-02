@@ -1,6 +1,7 @@
 "use server"
 
 import { revalidatePath } from 'next/cache'
+import { prisma } from '@/lib/prisma'
 import { withRole } from '@/lib/auth/with-role'
 import { userRepository } from '@/lib/db/repositories/user-repository'
 import { pupilRepository } from '@/lib/db/repositories/pupil-repository'
