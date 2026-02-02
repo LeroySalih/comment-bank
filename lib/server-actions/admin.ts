@@ -508,17 +508,17 @@ export const getClassPupils = withRole('admin', async (classId: string) => {
  */
 export const getAllForms = withRole('admin', async () => {
   try {
-    const forms = await prisma.pupil.findMany({
+    const result = await prisma.pupil.groupBy({
+      by: ['form'],
       where: {
         form: { not: null },
         isActive: true
       },
-      select: { form: true },
-      distinct: ['form'],
       orderBy: { form: 'asc' }
     })
 
-    return { success: true as const, forms: forms.map((f: { form: string | null }) => f.form).filter(Boolean) as string[] }
+    const forms = result.map((r: { form: string | null }) => r.form).filter(Boolean) as string[]
+    return { success: true as const, forms }
   } catch (error) {
     logger.error('Failed to get forms', { error })
     return handleServerActionError(error)

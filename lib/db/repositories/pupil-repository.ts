@@ -121,6 +121,7 @@ export class PupilRepository {
       firstName: string
       lastName: string
       gender: string
+      form?: string | null
       isActive?: boolean
     }>
   ): Promise<number> {
