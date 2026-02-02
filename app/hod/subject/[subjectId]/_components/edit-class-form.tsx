@@ -31,7 +31,7 @@ export function EditClassForm({ classId, subjectId, initialName }: EditClassForm
       setIsEditing(false)
       router.refresh()
     } else {
-      setError(result.error || "Failed to update class")
+      setError(('error' in result ? result.error : "Failed to update class") || "Failed to update class")
     }
   }
 
@@ -43,7 +43,7 @@ export function EditClassForm({ classId, subjectId, initialName }: EditClassForm
     if (result.success) {
       router.refresh()
     } else {
-      setError(result.error || "Failed to delete class")
+      setError(('error' in result ? result.error : "Failed to delete class") || "Failed to delete class")
       setIsDeleting(false)
     }
   }

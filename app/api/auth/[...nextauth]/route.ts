@@ -30,7 +30,7 @@ export const authOptions: NextAuthOptions = {
             username: credentials.username
           },
           include: {
-            roles: true
+            Role: true
           }
         })
 
@@ -48,7 +48,7 @@ export const authOptions: NextAuthOptions = {
           id: user.id,
           name: user.username,
           username: user.username,
-          roles: user.roles.map(r => r.name)
+          roles: user.Role.map((r: any) => r.name)
         }
       }
     })
@@ -57,8 +57,8 @@ export const authOptions: NextAuthOptions = {
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.username = user.username
-        token.roles = user.roles
+        token.username = (user as any).username
+        token.roles = (user as any).roles
       }
       return token
     },
@@ -66,7 +66,7 @@ export const authOptions: NextAuthOptions = {
       if (session.user) {
         session.user.id = token.id
         session.user.username = token.username
-        session.user.roles = token.roles
+        session.user.roles = token.roles as any
       }
       return session
     }

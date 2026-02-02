@@ -18,23 +18,23 @@ interface Props {
 export default async function GroupPage({ params }: Props) {
   const { subjectId, groupId } = await params
   
-  const group = await (prisma as any).commentGroup.findUnique({
+  const group = await prisma.commentGroup.findUnique({
     where: { id: groupId },
     include: {
-      options: {
+      CommentOption: {
         orderBy: [
           { displayOrder: 'asc' },
           { code: 'asc' }
         ]
       },
-      subject: true
+      Subject: true
     }
-  }) as any;
+  });
 
   if (!group || group.subjectId !== subjectId) notFound()
-  
-  const totalWords = group.options.reduce((acc: any, opt: any) => acc + countWords(opt.text), 0)
-  const avgWords = group.options.length > 0 ? (totalWords / group.options.length).toFixed(1) : 0
+
+  const totalWords = group.CommentOption.reduce((acc: number, opt) => acc + countWords(opt.text), 0)
+  const avgWords = group.CommentOption.length > 0 ? (totalWords / group.CommentOption.length).toFixed(1) : 0
 
   return (
     <div className="container mx-auto py-10">
@@ -42,7 +42,7 @@ export default async function GroupPage({ params }: Props) {
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.subject.code}</Link>
+           <Link href={`/hod/subject/${subjectId}`} className="hover:text-indigo-600">{group.Subject.code}</Link>
            <span>/</span>
            <span>{group.name}</span>
         </div>
@@ -53,7 +53,7 @@ export default async function GroupPage({ params }: Props) {
         <div className="flex justify-between items-center mb-6">
            <div>
             <h2 className="text-xl font-semibold">Comment Options</h2>
-            {group.options.length > 0 && (
+            {group.CommentOption.length > 0 && (
               <p className="text-sm text-gray-500">{avgWords} avg words per comment</p>
             )}
            </div>
@@ -62,11 +62,11 @@ export default async function GroupPage({ params }: Props) {
 
         <div className="grid grid-cols-1 gap-4">
           <CommentList 
-            initialComments={group.options.map((o: any) => ({ ...o, order: o.displayOrder }))}
+            initialComments={group.CommentOption.map((o: any) => ({ ...o, order: o.displayOrder }))}
             subjectId={subjectId}
             groupId={groupId}
           />
-          {group.options.length === 0 && (
+          {group.CommentOption.length === 0 && (
              <p className="text-gray-500 text-center py-10">No comments added to this group yet.</p>
           )}
         </div>

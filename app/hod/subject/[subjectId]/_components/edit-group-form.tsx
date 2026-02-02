@@ -9,29 +9,32 @@ interface EditGroupFormProps {
   groupId: string
   subjectId: string
   initialName: string
+  initialTitle: string
 }
 
-export function EditGroupForm({ groupId, subjectId, initialName }: EditGroupFormProps) {
+export function EditGroupForm({ groupId, subjectId, initialName, initialTitle }: EditGroupFormProps) {
   const [isEditing, setIsEditing] = useState(false)
   const [name, setName] = useState(initialName)
+  const [title, setTitle] = useState(initialTitle)
   const [error, setError] = useState<string | null>(null)
   const [isDeleting, setIsDeleting] = useState(false)
-  
+
   const router = useRouter()
 
   async function handleUpdate(e: React.FormEvent) {
     e.preventDefault()
     setError(null)
-    
+
     const formData = new FormData()
     formData.append("name", name)
+    formData.append("title", title)
 
     const result = await updateCommentGroup(groupId, subjectId, formData)
     if (result.success) {
       setIsEditing(false)
       router.refresh()
     } else {
-      setError(result.error || "Failed to update group")
+      setError(('error' in result ? result.error : "Failed to update group") || "Failed to update group")
     }
   }
 
@@ -43,7 +46,7 @@ export function EditGroupForm({ groupId, subjectId, initialName }: EditGroupForm
     if (result.success) {
       router.refresh()
     } else {
-      setError(result.error || "Failed to delete group")
+      setError(('error' in result ? result.error : "Failed to delete group") || "Failed to delete group")
       setIsDeleting(false)
     }
   }
@@ -56,21 +59,31 @@ export function EditGroupForm({ groupId, subjectId, initialName }: EditGroupForm
             type="text"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            className="border rounded px-2 py-1 text-sm w-32"
+            className="border rounded px-2 py-1 text-sm w-20"
+            placeholder="Code"
             required
             autoFocus
           />
-          <button 
+          <input
+            type="text"
+            value={title}
+            onChange={(e) => setTitle(e.target.value)}
+            className="border rounded px-2 py-1 text-sm w-40"
+            placeholder="Title"
+            required
+          />
+          <button
             type="submit"
             className="text-green-600 hover:text-green-800 p-1"
           >
             Save
           </button>
-          <button 
-            type="button" 
+          <button
+            type="button"
             onClick={() => {
               setIsEditing(false)
               setName(initialName)
+              setTitle(initialTitle)
               setError(null)
             }}
             className="text-gray-500 hover:text-gray-700 p-1"

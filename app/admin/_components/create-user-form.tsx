@@ -1,19 +1,22 @@
 "use client"
 
 import { useState } from "react"
+import { useRouter } from "next/navigation"
 import { createUser } from "@/lib/server-actions/create-user"
 
 export function CreateUserForm({ roles }: { roles: { id: string, name: string }[] }) {
   const [error, setError] = useState<string | null>(null)
+  const router = useRouter() // Added for router.refresh()
   
   async function handleSubmit(formData: FormData) {
     setError(null)
     const result = await createUser(formData)
     if (!result.success) {
-      setError(result.error || "Failed to create user")
+      setError(('error' in result ? result.error : "Failed to create user") || "Failed to create user")
     } else {
       // Optional: Reset form or show success toast
       alert("User created!")
+      router.refresh()
     }
   }
 

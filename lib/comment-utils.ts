@@ -10,7 +10,7 @@ type MinimalOption = {
 type MinimalGroup = {
   id: string;
   name: string;
-  options: MinimalOption[];
+  CommentOption: MinimalOption[];
 };
 
 type MinimalPupil = {
@@ -26,8 +26,8 @@ type MinimalPupilCode = {
 
 type MinimalAssignment = {
   id: string;
-  pupil: MinimalPupil;
-  codes: MinimalPupilCode[];
+  Pupil: MinimalPupil;
+  PupilCode: MinimalPupilCode[];
   eoyLevel?: string | null;
   targetLevel?: string | null;
 };
@@ -50,38 +50,42 @@ export function generateComment(
   groups: MinimalGroup[],
   cls?: MinimalClass
 ): string {
-    // Helper to find option text by group name
-    const getOptionText = (groupName: string): string => {
-        const group = groups.find(g => g.name === groupName);
-        if (!group) return "";
-        const pc = assignment.codes.find(c => c.groupId === group.id);
+    // Helper to get selected option text for a group
+    const getOptionTextForGroup = (group: MinimalGroup): string => {
+        const pc = assignment.PupilCode?.find(c => c.groupId === group.id);
         if (!pc || !pc.code) return "";
-        const option = group.options.find(o => o.code === pc.code);
+        const option = group.CommentOption?.find(o => o.code === pc.code);
         return option?.text || "";
     };
 
-    const studied = subject.studiedComment || "";
-    
-    // Fetch texts for standard groups
-    const wp = getOptionText("WP");
-    const th = getOptionText("TH");
-    const ps = getOptionText("PS");
-    const oa = getOptionText("OA");
+    const parts: string[] = [];
 
-    let combined = "";
-    if (studied) combined += studied + "\n\n";
-    
-    // Middle block: WP, TH, PS joined by spaces
-    const middleBlock = [wp, th, ps].filter(Boolean).join(" ");
-    if (middleBlock) combined += middleBlock + "\n\n";
+    // Add studied comment if present
+    if (subject.studiedComment) {
+        parts.push(subject.studiedComment);
+    }
 
-    // OA is separate paragraph usually
-    if (oa) combined += oa;
+    // Iterate through all groups in order and collect their selected texts
+    const groupTexts: string[] = [];
+    for (const group of groups) {
+        const text = getOptionTextForGroup(group);
+        if (text) {
+            groupTexts.push(text);
+        }
+    }
+
+    // Join all group texts with spaces
+    if (groupTexts.length > 0) {
+        parts.push(groupTexts.join(" "));
+    }
+
+    // Combine all parts with paragraph breaks
+    const combined = parts.join("\n\n");
 
     return parseComment(
-        combined, 
-        assignment.pupil.firstName, 
-        assignment.pupil.gender,
+        combined,
+        assignment.Pupil.firstName,
+        assignment.Pupil.gender,
         subject.title || '',
         cls?.year,
         assignment.eoyLevel,

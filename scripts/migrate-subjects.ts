@@ -22,13 +22,14 @@ async function main() {
       update: {
         title: sub.subject,
         studiedComment: sub.studiedComment,
-        users: userToConnect // Connect IF we have an owner
+        User: userToConnect // Connect IF we have an owner
       },
       create: {
+        id: sub.name,
         code: sub.name,
         title: sub.subject,
         studiedComment: sub.studiedComment,
-        users: userToConnect
+        User: userToConnect
       }
     });
 
@@ -59,13 +60,14 @@ async function main() {
           update: {
             year: cls.year,
             subjectId: newSubject.id,
-            teachers: { connect: teachersToConnect }
+            User: { connect: teachersToConnect }
           },
           create: {
+            id: `${newSubject.id}-${cls.name}`,
             name: cls.name,
             year: cls.year,
             subjectId: newSubject.id,
-            teachers: { connect: teachersToConnect }
+            User: { connect: teachersToConnect }
           }
         });
       }

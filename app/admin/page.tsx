@@ -7,7 +7,7 @@ export const dynamic = 'force-dynamic'
 export default async function AdminPage() {
   const users = await prisma.user.findMany({
     include: {
-      roles: true
+      Role: true
     },
     orderBy: {
       username: 'asc'
@@ -24,10 +24,10 @@ export default async function AdminPage() {
     orderBy: { code: 'asc' },
     include: {
       _count: {
-        select: { classes: true, commentGroups: true }
+        select: { Class: true, CommentGroup: true }
       },
-      users: {
-        select: { id: true, username: true, roles: { select: { name: true } } }
+      User: {
+        select: { id: true, username: true, Role: { select: { name: true } } }
       }
     }
   })

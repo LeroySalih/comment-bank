@@ -1,8 +1,12 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/navigation';
 import { parseComment, countWords } from '@/lib/utils';
-import { updateAssignmentCode, updateAssignmentCommentText } from '@/app/actions';
+import { updateAssignmentCode, updateAssignmentCommentText, revertAssignmentComment } from '@/app/actions';
+import { reviewComment } from '@/lib/server-actions/comment-check';
+import CommentStatusBadge from './CommentStatusBadge';
+import ConfirmModal from './ConfirmModal';
 
 type CommentOption = {
   id: string;
@@ -13,7 +17,7 @@ type CommentOption = {
 type CommentGroup = {
   id: string;
   name: string;
-  options: CommentOption[];
+  CommentOption: CommentOption[];
 };
 
 type Pupil = {
@@ -30,12 +34,14 @@ type PupilCode = {
 
 type Assignment = {
   id: string;
-  pupil: Pupil;
-  codes: PupilCode[];
+  Pupil: Pupil;
+  PupilCode: PupilCode[];
   finalComment?: string | null;
   eoyLevel?: string | null;
   targetLevel?: string | null;
-  class?: {
+  checkStatus?: string;
+  checkNote?: string | null;
+  Class?: {
     name: string;
     year?: string | null;
   };
@@ -51,21 +57,31 @@ interface CommentEditorProps {
   assignment: Assignment;
   subject: Subject;
   groups: CommentGroup[];
+  isHoD?: boolean;
 }
 
-export default function CommentEditor({ assignment, subject, groups }: CommentEditorProps) {
+export default function CommentEditor({ assignment, subject, groups, isHoD = false }: CommentEditorProps) {
+  const router = useRouter();
   const [selections, setSelections] = useState<Record<string, string>>({}); // groupId -> optionId
   const [preview, setPreview] = useState('');
   const [copied, setCopied] = useState(false);
+  const [checkStatus, setCheckStatus] = useState(assignment.checkStatus || 'not_required');
+  const [isManuallyEdited, setIsManuallyEdited] = useState(false); // Track if user manually edited
+  const [showRevertModal, setShowRevertModal] = useState(false);
+  const [isReverting, setIsReverting] = useState(false);
+
+  // HoD review state
+  const [rejectionNote, setRejectionNote] = useState('');
+  const [isReviewing, setIsReviewing] = useState(false);
 
   // Initialize selections with assignment's pre-assigned codes
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
-    
-    assignment.codes.forEach(pc => {
+
+    assignment.PupilCode.forEach(pc => {
         const group = groups.find(g => g.id === pc.groupId);
         if (group && pc.code) {
-            const option = group.options.find(o => o.code === pc.code);
+            const option = group.CommentOption.find(o => o.code === pc.code);
             if (option) {
                 initialSelections[group.id] = option.id;
             }
@@ -75,19 +91,36 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
     setSelections(initialSelections);
   }, [assignment, groups]);
 
-  const [initialLoad, setInitialLoad] = useState(true);
+  // Track if we've loaded the initial comment and should skip regeneration
+  const hasLoadedInitialComment = useRef(false);
+  const skipRegeneration = useRef(false); // Use ref instead of state to avoid race condition
 
-  // Generate Preview
+  // Initialize preview from finalComment when it becomes available
   useEffect(() => {
-    if (initialLoad) {
-        if (assignment.finalComment) {
-            setPreview(assignment.finalComment);
-            setInitialLoad(false);
-            return;
-        }
-        setInitialLoad(false);
+    if (!hasLoadedInitialComment.current && assignment.finalComment) {
+      setPreview(assignment.finalComment);
+      hasLoadedInitialComment.current = true;
+      skipRegeneration.current = true; // Don't regenerate after loading saved comment
     }
-    
+  }, [assignment.finalComment]); // Run when finalComment changes
+
+  // Generate Preview from selections (only when selections change and not manually edited)
+  useEffect(() => {
+    // Skip if user has manually typed in the textarea
+    if (isManuallyEdited) {
+      return;
+    }
+
+    // Skip if we loaded from a saved comment (check ref immediately)
+    if (skipRegeneration.current) {
+      return;
+    }
+
+    // Skip on first render if we have a saved comment (let the mount effect handle it)
+    if (!hasLoadedInitialComment.current && assignment.finalComment) {
+      return;
+    }
+
     const parts: string[] = [];
 
     // 1. Studied Comment (Subject Intro)
@@ -95,54 +128,42 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
       parts.push(subject.studiedComment);
     }
 
-    // 2. Groups ordered by display order
-    const sortedGroups = [...groups].sort((a,b) => (a as any).displayOrder || 0 - ((b as any).displayOrder || 0));
-    
-    // Formatting logic similar to legacy
-    // Let's identify WP, TH, PS, OA for legacy layout if they exist
-    const wp = sortedGroups.find(g => g.name === 'WP');
-    const th = sortedGroups.find(g => g.name === 'TH');
-    const ps = sortedGroups.find(g => g.name === 'PS');
-    const oa = sortedGroups.find(g => g.name === 'OA');
-    const others = sortedGroups.filter(g => !['WP', 'TH', 'PS', 'OA'].includes(g.name));
+    // 2. Get text for all groups in order
+    const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
 
-    const getOptText = (group?: CommentGroup) => {
-        if (!group) return "";
+    const getOptText = (group: CommentGroup) => {
         const selectedOptionId = selections[group.id];
         if (!selectedOptionId) return "";
-        return group.options.find(o => o.id === selectedOptionId)?.text || "";
+        return group.CommentOption.find(o => o.id === selectedOptionId)?.text || "";
     };
 
-    const wpText = getOptText(wp);
-    const thText = getOptText(th);
-    const psText = getOptText(ps);
-    const oaText = getOptText(oa);
+    const groupTexts: string[] = [];
+    for (const group of sortedGroups) {
+        const text = getOptText(group);
+        if (text) {
+            groupTexts.push(text);
+        }
+    }
 
-    let combined = "";
-    if (subject.studiedComment) combined += subject.studiedComment + "\n\n";
-    
-    const middleBlock = [wpText, thText, psText].filter(Boolean).join(" ");
-    if (middleBlock) combined += middleBlock + "\n\n";
+    // Join all group texts with spaces
+    if (groupTexts.length > 0) {
+        parts.push(groupTexts.join(" "));
+    }
 
-    if (oaText) combined += oaText;
-
-    // Handle unknown groups
-    others.forEach(g => {
-        const t = getOptText(g);
-        if (t) combined += "\n\n" + t;
-    });
+    // Combine all parts with paragraph breaks
+    const combined = parts.join("\n\n");
 
     setPreview(parseComment(
-      combined, 
-      assignment.pupil.firstName, 
-      assignment.pupil.gender,
+      combined,
+      assignment.Pupil.firstName,
+      assignment.Pupil.gender,
       subject.title || '',
-      assignment.class?.year,
+      assignment.Class?.year,
       assignment.eoyLevel,
       assignment.targetLevel
     ));
 
-  }, [selections, subject, groups, assignment, initialLoad]);
+  }, [selections, subject, groups, assignment, isManuallyEdited]);
 
   const handleSelection = async (groupId: string, optionId: string) => {
     setSelections(prev => ({
@@ -151,7 +172,7 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
     }));
     
     const group = groups.find(g => g.id === groupId);
-    const option = group?.options.find(o => o.id === optionId);
+    const option = group?.CommentOption.find(o => o.id === optionId);
     
     if (option) {
         await updateAssignmentCode(assignment.id, groupId, option.code);
@@ -166,37 +187,140 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPreview(e.target.value);
+    setIsManuallyEdited(true); // Mark as manually edited to prevent regeneration
   };
 
   const handleTextBlur = async () => {
-    await updateAssignmentCommentText(assignment.id, preview);
+    // Only save and update status if user manually edited the text
+    // Don't trigger for programmatic changes from code selection
+    if (!isManuallyEdited) {
+      return;
+    }
+
+    // Update local state immediately for responsive UI
+    const previousStatus = checkStatus;
+    setCheckStatus('required_check');
+
+    try {
+      const result = await updateAssignmentCommentText(assignment.id, preview);
+
+      if (!result.success) {
+        console.error('Failed to save comment:', result.error);
+        // Revert local state if save failed
+        setCheckStatus(previousStatus);
+        alert('Failed to save comment: ' + (result.error || 'Unknown error'));
+      }
+      // Don't call router.refresh() - it causes the preview to regenerate from codes
+      // The local state already has the correct values
+    } catch (error) {
+      console.error('Error saving comment:', error);
+      setCheckStatus(previousStatus);
+      alert('Error saving comment. Check console for details.');
+    }
+  };
+
+  const handleRevert = async () => {
+    setIsReverting(true);
+    try {
+      const result = await revertAssignmentComment(assignment.id);
+      if (result.success) {
+        // Reset local state
+        setIsManuallyEdited(false);
+        skipRegeneration.current = false;
+        hasLoadedInitialComment.current = false;
+        setCheckStatus('not_required');
+        setShowRevertModal(false);
+        // Refresh to get fresh data and regenerate comment
+        router.refresh();
+      } else {
+        alert('Failed to revert: ' + result.error);
+      }
+    } catch (error) {
+      alert('Failed to revert comment');
+    }
+    setIsReverting(false);
+  };
+
+  const handleApprove = async () => {
+    setIsReviewing(true);
+    try {
+      const result = await reviewComment(assignment.id, 'checked_ok');
+      if (result.success) {
+        setCheckStatus('checked_ok');
+        router.refresh();
+      } else {
+        alert('Failed to approve: ' + result.error);
+      }
+    } catch (error) {
+      alert('Failed to approve comment');
+    }
+    setIsReviewing(false);
+  };
+
+  const handleReject = async () => {
+    if (!rejectionNote.trim()) {
+      alert('Please provide a reason for rejection');
+      return;
+    }
+    setIsReviewing(true);
+    try {
+      const result = await reviewComment(assignment.id, 'checked_rejected', rejectionNote);
+      if (result.success) {
+        setCheckStatus('checked_rejected');
+        setRejectionNote('');
+        router.refresh();
+      } else {
+        alert('Failed to reject: ' + result.error);
+      }
+    } catch (error) {
+      alert('Failed to reject comment');
+    }
+    setIsReviewing(false);
   };
 
   const wordCount = countWords(preview);
   const targetWordCount = 100; // Configurable or hardcoded for now
   const percent = Math.min(100, Math.round((wordCount / targetWordCount) * 100));
-  const dashArray = 100; 
+  const dashArray = 100;
   const dashOffset = 100 - (percent / 100 * 100); // SVG stroke-dashoffset calculation
+
+  // Disable comment banks if comment has been manually edited
+  const commentBanksDisabled = isManuallyEdited || skipRegeneration.current;
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-8 align-start">
         {/* Sidebar */}
         <aside className="w-full lg:w-80 flex-shrink-0 flex flex-col gap-6">
-            <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-[#f0f2f4] dark:border-gray-800 shadow-sm">
-                <h3 className="text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider mb-4">Report Categories</h3>
+            <div className={`bg-white dark:bg-gray-900 rounded-xl p-6 border border-[#f0f2f4] dark:border-gray-800 shadow-sm ${commentBanksDisabled ? 'opacity-60' : ''}`}>
+                <div className="flex items-center justify-between mb-4">
+                    <h3 className="text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider">Report Categories</h3>
+                    {commentBanksDisabled && (
+                        <span className="text-xs text-amber-600 dark:text-amber-400 flex items-center gap-1">
+                            <span className="material-symbols-outlined text-sm">lock</span>
+                            Locked
+                        </span>
+                    )}
+                </div>
+                {commentBanksDisabled && (
+                    <div className="mb-4 p-3 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                        <p className="text-xs text-amber-700 dark:text-amber-300">
+                            Comment banks are disabled because the comment has been manually edited.
+                        </p>
+                    </div>
+                )}
                 <div className="flex flex-col gap-2">
                     {groups.map(group => {
                         const selectedOptionId = selections[group.id];
-                        const selectedOption = group.options.find(o => o.id === selectedOptionId);
+                        const selectedOption = group.CommentOption.find(o => o.id === selectedOptionId);
                         const isSelected = !!selectedOption;
-                        
+
                         return (
-                            <div key={group.id} className={`flex flex-col gap-2 px-3 py-3 rounded-lg cursor-pointer transition-colors border border-transparent ${isSelected ? 'bg-primary/5 border-primary/10' : 'hover:bg-[#f0f2f4] dark:hover:bg-gray-800'}`}>
+                            <div key={group.id} className={`flex flex-col gap-2 px-3 py-3 rounded-lg transition-colors border border-transparent ${commentBanksDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'bg-primary/5 border-primary/10' : commentBanksDisabled ? '' : 'hover:bg-[#f0f2f4] dark:hover:bg-gray-800'}`}>
                                 <div className="flex items-center justify-between">
                                     <div className="flex items-center gap-3">
                                         <span className={`material-symbols-outlined text-xl ${isSelected ? 'text-primary' : 'text-gray-400'}`}>
-                                            {group.name === 'Attainment' ? 'school' : 
-                                             group.name === 'Effort' ? 'fitness_center' : 
+                                            {group.name === 'Attainment' ? 'school' :
+                                             group.name === 'Effort' ? 'fitness_center' :
                                              group.name === 'Homework' ? 'home_work' : 'article'}
                                         </span>
                                         <p className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-[#111418] dark:text-gray-300'}`}>{group.name}</p>
@@ -205,12 +329,13 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
                                 </div>
                                 {/* Options (Inline for now or Expandable) - Let's keep them inline for quick access as per logic */}
                                 <div className="pl-8 flex flex-wrap gap-2 mt-1">
-                                    {group.options.map(opt => (
-                                        <button 
+                                    {group.CommentOption.map(opt => (
+                                        <button
                                             key={opt.id}
-                                            onClick={() => handleSelection(group.id, opt.id)}
-                                            className={`text-xs px-2 py-1 rounded border ${selections[group.id] === opt.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200 hover:border-gray-300'}`}
-                                            title={opt.text}
+                                            onClick={() => !commentBanksDisabled && handleSelection(group.id, opt.id)}
+                                            disabled={commentBanksDisabled}
+                                            className={`text-xs px-2 py-1 rounded border ${selections[group.id] === opt.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200'} ${commentBanksDisabled ? 'cursor-not-allowed opacity-50' : 'hover:border-gray-300'}`}
+                                            title={commentBanksDisabled ? 'Comment banks are locked' : opt.text}
                                         >
                                             {opt.code}
                                         </button>
@@ -227,7 +352,7 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
                 <div className="flex flex-wrap gap-2">
                      {Object.entries(selections).map(([gid, oid]) => {
                          const group = groups.find(g => g.id === gid);
-                         const option = group?.options.find(o => o.id === oid);
+                         const option = group?.CommentOption.find(o => o.id === oid);
                          if (!group || !option) return null;
                          return (
                             <span key={gid} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium border border-blue-200 dark:border-blue-800">
@@ -243,7 +368,20 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
         {/* Editor Section */}
         <div className="flex-1 flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm overflow-hidden min-h-[500px]">
             <div className="px-8 py-5 border-b border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
-                <h3 className="text-[#111418] dark:text-white text-lg font-bold leading-tight">Report Preview & Editor</h3>
+                <div className="flex items-center gap-3">
+                    <h3 className="text-[#111418] dark:text-white text-lg font-bold leading-tight">Report Preview & Editor</h3>
+                    <CommentStatusBadge status={checkStatus} size="sm" />
+                    {commentBanksDisabled && (
+                        <button
+                            onClick={() => setShowRevertModal(true)}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded transition-colors"
+                            title="Revert to generated comment"
+                        >
+                            <span className="material-symbols-outlined text-sm">undo</span>
+                            Revert
+                        </button>
+                    )}
+                </div>
                 <div className="flex items-center gap-4">
                     {/* Progress Ring and Word Count */}
                     <div className="flex items-center gap-3">
@@ -270,14 +408,34 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
                         </div>
                     </div>
                     <div className="h-8 w-[1px] bg-gray-200 dark:bg-gray-700 mx-2"></div>
-                    <button 
+                    <button
                         onClick={copyToClipboard}
-                        className="text-[#617289] dark:text-gray-400 hover:text-primary transition-colors flex items-center gap-1">
+                        disabled={checkStatus === 'required_check' || checkStatus === 'checked_rejected'}
+                        className={`flex items-center gap-1 transition-colors ${
+                            checkStatus === 'required_check' || checkStatus === 'checked_rejected'
+                                ? 'text-gray-300 dark:text-gray-600 cursor-not-allowed'
+                                : 'text-[#617289] dark:text-gray-400 hover:text-primary'
+                        }`}
+                        title={checkStatus === 'required_check' || checkStatus === 'checked_rejected' ? 'Comment must be approved before copying' : 'Copy to clipboard'}
+                    >
                         <span className="material-symbols-outlined text-lg">{copied ? 'check' : 'content_copy'}</span>
                     </button>
                 </div>
             </div>
-            
+
+            {/* Rejection Feedback Banner */}
+            {checkStatus === 'checked_rejected' && assignment.checkNote && (
+                <div className="mx-8 mt-4 p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                    <div className="flex items-start gap-3">
+                        <span className="material-symbols-outlined text-red-500 mt-0.5">warning</span>
+                        <div>
+                            <p className="text-sm font-bold text-red-700 dark:text-red-400">Changes Requested</p>
+                            <p className="text-sm text-red-600 dark:text-red-300 mt-1">{assignment.checkNote}</p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="flex-1 p-8 relative">
                 <div className="relative h-full flex flex-col">
                     <label className="text-xs font-bold text-primary uppercase mb-2 block">Generated Comment</label>
@@ -289,18 +447,55 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
                         onBlur={handleTextBlur}
                     ></textarea>
                     
-                    {/* Editor Toolbar Floating */}
-                    <div className="absolute bottom-6 right-6 flex gap-2 bg-white dark:bg-gray-800 shadow-xl rounded-lg p-1.5 border border-gray-100 dark:border-gray-700">
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">format_bold</span></button>
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">format_italic</span></button>
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">auto_fix_high</span></button>
-                        <div className="w-px h-6 bg-gray-200 dark:bg-gray-700 my-auto"></div>
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">undo</span></button>
-                        <button className="p-2 hover:bg-gray-100 dark:hover:bg-gray-700 rounded text-gray-600 dark:text-gray-300"><span className="material-symbols-outlined text-lg">redo</span></button>
-                    </div>
                 </div>
             </div>
-            
+
+            {/* HoD Review Panel */}
+            {isHoD && checkStatus === 'required_check' && (
+                <div className="mx-8 mb-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-lg">
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center gap-2">
+                            <span className="material-symbols-outlined text-amber-600">rate_review</span>
+                            <p className="text-sm font-bold text-amber-700 dark:text-amber-400">Review Required</p>
+                        </div>
+                        <p className="text-sm text-amber-600 dark:text-amber-300">
+                            This comment has been manually edited and requires your review before it can be finalized.
+                        </p>
+                        <div className="flex flex-col gap-3">
+                            <textarea
+                                className="w-full p-3 text-sm rounded-lg border border-amber-300 dark:border-amber-700 bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 placeholder-gray-400 focus:ring-2 focus:ring-amber-400 focus:border-transparent resize-none"
+                                placeholder="If rejecting, provide feedback for the teacher..."
+                                rows={2}
+                                value={rejectionNote}
+                                onChange={(e) => setRejectionNote(e.target.value)}
+                                disabled={isReviewing}
+                            />
+                            <div className="flex gap-3">
+                                <button
+                                    onClick={handleApprove}
+                                    disabled={isReviewing}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-green-600 hover:bg-green-700 disabled:bg-green-400 text-white font-medium rounded-lg transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-lg">check_circle</span>
+                                    {isReviewing ? 'Processing...' : 'Approve'}
+                                </button>
+                                <button
+                                    onClick={handleReject}
+                                    disabled={isReviewing || !rejectionNote.trim()}
+                                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2.5 bg-red-600 hover:bg-red-700 disabled:bg-red-400 text-white font-medium rounded-lg transition-colors"
+                                >
+                                    <span className="material-symbols-outlined text-lg">cancel</span>
+                                    {isReviewing ? 'Processing...' : 'Reject'}
+                                </button>
+                            </div>
+                            <p className="text-xs text-amber-500 dark:text-amber-400 italic">
+                                Note: A reason is required when rejecting a comment.
+                            </p>
+                        </div>
+                    </div>
+                </div>
+            )}
+
             <div className="px-8 py-4 bg-primary/5 dark:bg-primary/10 border-t border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center">
                 <div className="flex items-center gap-2 text-primary">
                     <span className="material-symbols-outlined text-base">lightbulb</span>
@@ -309,6 +504,18 @@ export default function CommentEditor({ assignment, subject, groups }: CommentEd
 
             </div>
         </div>
+
+        {/* Revert Confirmation Modal */}
+        <ConfirmModal
+            isOpen={showRevertModal}
+            title="Revert to Generated Comment?"
+            message="This will discard your manual edits and regenerate the comment from the selected codes. This action cannot be undone."
+            confirmLabel={isReverting ? 'Reverting...' : 'Revert Comment'}
+            cancelLabel="Keep Edits"
+            confirmVariant="danger"
+            onConfirm={handleRevert}
+            onCancel={() => setShowRevertModal(false)}
+        />
     </div>
   );
 }

@@ -6,6 +6,7 @@ import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { isAdmin } from "@/lib/access-control"
 import { hash } from "bcryptjs"
 import { revalidatePath } from "next/cache"
+import { createId } from "@paralleldrive/cuid2"
 
 export async function createUser(formData: FormData) {
   const session = await getServerSession(authOptions)
@@ -34,9 +35,10 @@ export async function createUser(formData: FormData) {
 
     await prisma.user.create({
       data: {
+        id: createId(),
         username,
         password: hashedPassword,
-        roles: role ? {
+        Role: role ? {
           connect: { name: role }
         } : undefined
       }

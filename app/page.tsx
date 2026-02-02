@@ -19,12 +19,12 @@ export default async function Home() {
   const subjects = await prisma.subject.findMany({
     where: userIsAdmin ? {} : {
       OR: [
-        { users: { some: { id: userId } } },
-        { classes: { some: { teachers: { some: { id: userId } } } } }
+        { User: { some: { id: userId } } },
+        { Class: { some: { User: { some: { id: userId } } } } }
       ]
     },
     include: {
-      classes: {
+      Class: {
         where: userIsAdmin ? {} : {
           // If assigned to Subject, see all classes.
           // If assigned to Class only, see only that class.
@@ -38,15 +38,15 @@ export default async function Home() {
           // BUT if I am linked to Subject, I see ALL classes.
           // Prisma query for this:
           OR: [
-             { subject: { users: { some: { id: userId } } } },
-             { teachers: { some: { id: userId } } }
+             { Subject: { User: { some: { id: userId } } } },
+             { User: { some: { id: userId } } }
           ]
         },
         orderBy: { name: 'asc' },
         include: {
-          assignments: {
+          Assignment: {
             select: {
-              codes: {
+              PupilCode: {
                 select: { id: true }
               }
             }
@@ -62,11 +62,11 @@ export default async function Home() {
   let totalAssignments = 0;
   let startedAssignments = 0;
 
-  subjects.forEach(sub => {
-    sub.classes.forEach(cls => {
-      totalStudents += cls.assignments.length;
-      totalAssignments += cls.assignments.length;
-      startedAssignments += cls.assignments.filter(a => a.codes.length > 0).length;
+  subjects.forEach((sub: any) => {
+    sub.Class.forEach((cls: any) => {
+      totalStudents += cls.Assignment.length;
+      totalAssignments += cls.Assignment.length;
+      startedAssignments += cls.Assignment.filter((a: any) => a.PupilCode.length > 0).length;
     });
   });
 
@@ -122,12 +122,12 @@ export default async function Home() {
             "from-pink-500 to-rose-600"
           ];
           const gradient = gradients[index % gradients.length];
-          const subjectTotalStudents = subject.classes.reduce((acc, cls) => acc + cls.assignments.length, 0);
+          const subjectTotalStudents = subject.Class.reduce((acc: any, cls: any) => acc + cls.Assignment.length, 0);
 
           return (
             <div key={subject.id} className="bg-white dark:bg-slate-900 rounded-2xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow">
               <div className={`h-32 bg-gradient-to-r ${gradient} relative p-6 flex items-end`}>
-                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full px-3 py-1 text-white text-xs font-bold">{subject.classes.length} Classes</div>
+                <div className="absolute top-4 right-4 bg-white/20 backdrop-blur-md rounded-full px-3 py-1 text-white text-xs font-bold">{subject.Class.length} Classes</div>
                 <div className="flex items-center gap-3">
                   <div className="size-10 bg-white rounded-xl flex items-center justify-center text-slate-700 shadow-lg">
                     <span className="material-symbols-outlined">auto_stories</span>
@@ -141,9 +141,9 @@ export default async function Home() {
               
               <div className="p-5 space-y-4">
                 <div className="space-y-3">
-                  {subject.classes.length > 0 ? subject.classes.map(cls => {
-                     const clsTotal = cls.assignments.length;
-                     const clsStarted = cls.assignments.filter(a => a.codes.length > 0).length;
+                  {subject.Class.length > 0 ? subject.Class.map((cls: any) => {
+                     const clsTotal = cls.Assignment.length;
+                     const clsStarted = cls.Assignment.filter((a: any) => a.PupilCode.length > 0).length;
                      const percent = clsTotal > 0 ? Math.round((clsStarted / clsTotal) * 100) : 0;
                      let statusColor = "text-primary";
                      let statusBg = "bg-primary";
@@ -160,6 +160,27 @@ export default async function Home() {
                         statusBg = "bg-orange-500";
                         statusText = "In Progress";
                         badgeBg = "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
+                     }
+                     
+                     // Only show class links for teachers
+                     if (!userIsTeacher) {
+                       return (
+                         <div key={cls.id} className="block p-2 rounded-lg -mx-2">
+                           <div className="flex flex-col gap-2">
+                             <div className="flex justify-between items-center text-sm">
+                               <span className="font-bold text-slate-700 dark:text-slate-300">{cls.name}</span>
+                               <span className={`${statusColor} font-bold`}>{percent}%</span>
+                             </div>
+                             <div className="w-full bg-slate-100 dark:bg-slate-800 h-2 rounded-full overflow-hidden">
+                               <div className={`${statusBg} h-full rounded-full`} style={{ width: `${percent}%` }}></div>
+                             </div>
+                             <div className="flex justify-between items-center text-[10px] text-slate-500 uppercase tracking-widest font-bold">
+                               <span>{clsStarted}/{clsTotal} Reports Done</span>
+                               <span className={`px-2 py-0.5 rounded-full ${badgeBg}`}>{statusText}</span>
+                             </div>
+                           </div>
+                         </div>
+                       );
                      }
                      
                      return (

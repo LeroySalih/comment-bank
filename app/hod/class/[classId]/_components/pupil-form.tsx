@@ -13,7 +13,7 @@ export function PupilForm({ classId }: { classId: string }) {
     setError(null)
     const result = await createStudent(classId, formData)
     if (!result.success) {
-      setError(result.error || "Failed to create student")
+      setError(('error' in result ? result.error : "Failed to create student") || "Failed to create student")
     } else {
       setOpen(false)
       // reset form manually or just refresh

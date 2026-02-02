@@ -3,13 +3,13 @@ import { generateComment } from './lib/comment-utils';
 // Mock data
 const mockAssignment: any = {
   id: '1',
-  pupil: {
+  Pupil: {
     admissionNumber: '123456',
     firstName: 'John',
     lastName: 'Doe',
     gender: 'Male',
   },
-  codes: [
+  PupilCode: [
     { groupId: 'g1', code: 'H' },
     { groupId: 'g2', code: 'M' },
     { groupId: 'g3', code: 'L' },
@@ -32,22 +32,22 @@ const mockGroups = [
   {
     id: 'g1',
     name: 'WP',
-    options: [{ id: 'o1', code: 'H', text: '<He> has worked hard in Year <Year>.' }]
+    CommentOption: [{ id: 'o1', code: 'H', text: '<He> has worked hard in Year <Year>.' }]
   },
   {
     id: 'g2',
     name: 'TH',
-    options: [{ id: 'o2', code: 'M', text: '<He> shows moderate understanding. Target: <TargetLevel>.' }]
+    CommentOption: [{ id: 'o2', code: 'M', text: '<He> shows moderate understanding. Target: <TargetLevel>.' }]
   },
   {
     id: 'g3',
     name: 'PS',
-    options: [{ id: 'o3', code: 'L', text: '<His> practical skills need improvement. EoY: <EoYLevel>.' }]
+    CommentOption: [{ id: 'o3', code: 'L', text: '<His> practical skills need improvement. EoY: <EoYLevel>.' }]
   },
   {
     id: 'g4',
     name: 'OA',
-    options: [{ id: 'o4', code: 'H', text: 'Overall excellent.' }]
+    CommentOption: [{ id: 'o4', code: 'H', text: 'Overall excellent.' }]
   }
 ];
 
@@ -56,7 +56,7 @@ const result = generateComment(mockAssignment, mockSubject, mockGroups, mockClas
 console.log("Result:");
 console.log(result);
 
-if (result.includes("This term English students studied Shakespeare.") && 
+if (result.includes("This term English students studied Shakespeare.") &&
     result.includes("Overall excellent.") &&
     result.includes("He has worked hard in Year 9") &&
     result.includes("Target: 6B") &&

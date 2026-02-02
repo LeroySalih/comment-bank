@@ -13,7 +13,7 @@ export function GroupForm({ subjectId }: { subjectId: string }) {
     setError(null)
     const result = await createCommentGroup(subjectId, formData)
     if (!result.success) {
-      setError(result.error || "Failed to create group")
+      setError(('error' in result ? result.error : "Failed to create group") || "Failed to create group")
     } else {
       setOpen(false)
       router.refresh()
@@ -32,33 +32,48 @@ export function GroupForm({ subjectId }: { subjectId: string }) {
   }
 
   return (
-    <div className="mt-4 border rounded p-4 bg-gray-50">
-      <h3 className="text-sm font-medium mb-2">Add Comment Group</h3>
-      <form action={handleSubmit} className="flex gap-2 items-end">
-        <div className="flex-1">
-          <label className="block text-xs font-medium text-gray-500">Group Name (e.g. Work Ethic)</label>
-          <input 
-            type="text" 
-            name="name" 
-            required 
-            className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-1 text-sm"
-          />
+    <div className="mt-4 border rounded p-4 bg-gray-50 dark:bg-gray-800 dark:border-gray-700">
+      <h3 className="text-sm font-medium mb-3 text-gray-900 dark:text-white">Add Comment Group</h3>
+      <form action={handleSubmit} className="space-y-3">
+        <div className="grid grid-cols-2 gap-3">
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Code</label>
+            <input
+              type="text"
+              name="name"
+              required
+              placeholder="e.g. WE"
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Title</label>
+            <input
+              type="text"
+              name="title"
+              required
+              placeholder="e.g. Work Ethic"
+              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
+            />
+          </div>
         </div>
-        <button 
-          type="submit" 
-          className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700"
-        >
-          Add
-        </button>
-        <button 
-          type="button" 
-          onClick={() => setOpen(false)}
-          className="bg-gray-200 text-gray-800 px-3 py-1.5 rounded-md text-sm hover:bg-gray-300"
-        >
-          Cancel
-        </button>
+        <div className="flex gap-2 justify-end">
+          <button
+            type="button"
+            onClick={() => setOpen(false)}
+            className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-500"
+          >
+            Cancel
+          </button>
+          <button
+            type="submit"
+            className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700"
+          >
+            Add Group
+          </button>
+        </div>
       </form>
-      {error && <p className="text-red-600 mt-1 text-xs">{error}</p>}
+      {error && <p className="text-red-600 mt-2 text-xs">{error}</p>}
     </div>
   )
 }

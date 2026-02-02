@@ -13,11 +13,13 @@ export function SubjectForm() {
   const [introduction, setIntroduction] = useState("")
   const router = useRouter()
   
-  async function handleSubmit(formData: FormData) {
+  async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
+    e.preventDefault()
+    const formData = new FormData(e.currentTarget)
     setError(null)
     const result = await createSubject(formData)
     if (!result.success) {
-      setError(result.error || "Failed to create subject")
+      setError('error' in result ? result.error : "Failed to create subject")
     } else {
       setOpen(false)
       setCode("")
@@ -41,13 +43,14 @@ export function SubjectForm() {
   return (
     <div className="bg-white shadow rounded-lg p-6 mb-8">
       <h2 className="text-xl font-semibold mb-4">Add New Subject</h2>
-      <form action={handleSubmit} className="flex flex-col gap-4">
+      <form onSubmit={handleSubmit} className="flex flex-col gap-4">
         <div className="flex gap-4">
           <div className="w-1/3">
             <label className="block text-sm font-medium text-gray-700">Code (e.g. 7CS)</label>
             <input 
               type="text" 
-              name="code" 
+              name="code"
+ 
               value={code}
               onChange={(e) => setCode(e.target.value)}
               required 

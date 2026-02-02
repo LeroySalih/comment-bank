@@ -8,6 +8,7 @@ interface Pupil {
   firstName: string
   lastName: string
   gender: string
+  form: string | null
   isActive: boolean
 }
 
@@ -76,10 +77,10 @@ export function PupilManagement() {
       setUploading(false)
       
       if (result.success) {
-        alert(`Successfully synced ${result.count} pupils. Pupils not in file have been marked inactive.`)
+        alert('message' in result ? result.message : 'Successfully synced pupils')
         fetchPupils(query)
       } else {
-        alert(result.error || "Failed to process upload")
+        alert('error' in result ? result.error : "Failed to process upload")
       }
     }
     reader.readAsText(file)
@@ -128,6 +129,7 @@ export function PupilManagement() {
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">First Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Name</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Gender</th>
+                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Form</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
               </tr>
@@ -135,11 +137,11 @@ export function PupilManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
                 </tr>
               ) : pupils.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
                 </tr>
               ) : (
                 pupils.map((pupil) => (
@@ -162,6 +164,7 @@ export function PupilManagement() {
                       />
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pupil.gender}</td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{pupil.form || '-'}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <span className={`px-2 inline-flex text-xs leading-5 font-semibold rounded-full ${pupil.isActive ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'}`}>
                         {pupil.isActive ? 'Active' : 'Inactive'}

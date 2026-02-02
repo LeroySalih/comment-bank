@@ -8,7 +8,7 @@ import { Pencil, Trash2, X, Check } from "lucide-react"
 interface StudentRowProps {
   student: {
     id: string
-    pupil: {
+    Pupil: {
       admissionNumber: string
       firstName: string
       lastName: string
@@ -26,9 +26,9 @@ export function StudentRow({ student, classId }: StudentRowProps) {
   const [error, setError] = useState<string | null>(null)
   
   // Form state
-  const [firstName, setFirstName] = useState(student.pupil.firstName)
-  const [lastName, setLastName] = useState(student.pupil.lastName)
-  const [gender, setGender] = useState(student.pupil.gender)
+  const [firstName, setFirstName] = useState(student.Pupil.firstName)
+  const [lastName, setLastName] = useState(student.Pupil.lastName)
+  const [gender, setGender] = useState(student.Pupil.gender)
   const [targetLevel, setTargetLevel] = useState(student.targetLevel || "")
   const [actualLevel, setActualLevel] = useState(student.actualLevel || "")
 
@@ -50,29 +50,29 @@ export function StudentRow({ student, classId }: StudentRowProps) {
       setIsEditing(false)
       router.refresh()
     } else {
-      setError(result.error || "Failed to update student")
+      setError('error' in result ? result.error : "Failed to update student")
     }
   }
 
   function handleCancel() {
     setIsEditing(false)
-    setFirstName(student.pupil.firstName)
-    setLastName(student.pupil.lastName)
-    setGender(student.pupil.gender)
+    setFirstName(student.Pupil.firstName)
+    setLastName(student.Pupil.lastName)
+    setGender(student.Pupil.gender)
     setTargetLevel(student.targetLevel || "")
     setActualLevel(student.actualLevel || "")
     setError(null)
   }
 
   async function handleDelete() {
-    if (!confirm(`Are you sure you want to delete the assignment for ${student.pupil.firstName} ${student.pupil.lastName}? This will only remove them from this class.`)) return
+    if (!confirm(`Are you sure you want to delete the assignment for ${student.Pupil.firstName} ${student.Pupil.lastName}? This will only remove them from this class.`)) return
 
     setIsDeleting(true)
     const result = await deleteStudent(student.id, classId)
     if (result.success) {
       router.refresh()
     } else {
-      setError(result.error || "Failed to delete student")
+      setError('error' in result ? result.error : "Failed to delete student")
       setIsDeleting(false)
     }
   }
@@ -148,7 +148,7 @@ export function StudentRow({ student, classId }: StudentRowProps) {
   return (
     <tr className="hover:bg-gray-50 group">
       <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 flex items-center gap-2">
-        {student.pupil.lastName}, {student.pupil.firstName}
+        {student.Pupil.lastName}, {student.Pupil.firstName}
         <div className="opacity-0 group-hover:opacity-100 transition-opacity flex gap-1 ml-2">
           <button 
             onClick={() => setIsEditing(true)} 
@@ -168,7 +168,7 @@ export function StudentRow({ student, classId }: StudentRowProps) {
         </div>
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-        {student.pupil.gender}
+        {student.Pupil.gender}
       </td>
       <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
         {student.targetLevel || "-"}

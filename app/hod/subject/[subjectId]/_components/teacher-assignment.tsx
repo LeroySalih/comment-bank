@@ -50,7 +50,7 @@ export function TeacherAssignment({ classId, currentTeachers, availableTeachers,
       setIsOpen(false)
       router.refresh()
     } else {
-      alert(result.error || "Failed to save teachers")
+      alert('error' in result ? result.error : "Failed to save teachers")
     }
   }
 

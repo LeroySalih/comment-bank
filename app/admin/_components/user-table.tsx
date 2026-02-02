@@ -6,7 +6,7 @@ import { updateUserRoles } from "@/lib/server-actions/admin"
 type User = {
   id: string
   username: string
-  roles: { id: string; name: string }[]
+  Role: { id: string; name: string }[]
 }
 
 type Role = {
@@ -22,7 +22,7 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
     const user = users.find(u => u.id === userId)
     if (!user) return
 
-    const currentRoleNames = user.roles.map(r => r.name)
+    const currentRoleNames = user.Role.map(r => r.name)
     let newRoleNames: string[]
 
     if (isChecked) {
@@ -50,7 +50,7 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
             <tr key={user.id}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.username}</td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {user.roles.map(r => r.name).join(", ")}
+                {user.Role.map(r => r.name).join(", ")}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <div className="flex gap-4">
@@ -59,7 +59,7 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
                       <input
                         type="checkbox"
                         disabled={loadingId === user.id}
-                        checked={user.roles.some(r => r.name === role.name)}
+                        checked={user.Role.some(r => r.name === role.name)}
                         onChange={(e) => handleRoleChange(user.id, role.name, e.target.checked)}
                         className="rounded border-gray-300 text-indigo-600 shadow-sm focus:border-indigo-300 focus:ring focus:ring-indigo-200 focus:ring-opacity-50"
                       />

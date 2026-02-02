@@ -23,23 +23,32 @@ interface QuickGroupSelectorProps {
     year?: string | null;
     eoyLevel?: string | null;
     targetLevel?: string | null;
-  }
+  };
+  onSelectionChange?: (groupId: string, code: string | null) => void;
+  disabled?: boolean;
 }
 
-export default function QuickGroupSelector({ 
-  assignmentId, 
-  groupId, 
-  currentCode, 
+export default function QuickGroupSelector({
+  assignmentId,
+  groupId,
+  currentCode,
   options,
-  context
+  context,
+  onSelectionChange,
+  disabled = false
 }: QuickGroupSelectorProps) {
   const [val, setVal] = useState(currentCode || "");
   const [loading, setLoading] = useState(false);
 
   const handleChange = async (newValue: string | null) => {
+    if (disabled) return; // Don't allow changes if disabled
+
     setVal(newValue || "");
     setLoading(true);
-    
+
+    // Notify parent of selection change immediately for UI update
+    onSelectionChange?.(groupId, newValue);
+
     await updateAssignmentCode(assignmentId, groupId, newValue);
     setLoading(false);
   };
@@ -63,12 +72,14 @@ export default function QuickGroupSelector({
   });
 
   return (
-    <div className="flex rounded-lg overflow-hidden border border-[#dbe0e6] dark:border-[#3a4454] w-fit bg-gray-50 dark:bg-[#101822] divide-x divide-[#dbe0e6] dark:divide-[#3a4454]">
+    <div className={`flex rounded-lg overflow-hidden border border-[#dbe0e6] dark:border-[#3a4454] w-fit bg-gray-50 dark:bg-[#101822] divide-x divide-[#dbe0e6] dark:divide-[#3a4454] ${disabled ? 'opacity-50' : ''}`}>
       {sortedOptions.map((opt) => {
         const isActive = val === opt.code;
-        
+
         let tooltipContent = opt.text;
-        if (context) {
+        if (disabled) {
+            tooltipContent = 'Locked - comment has been manually edited';
+        } else if (context) {
             tooltipContent = parseComment(
                 opt.text,
                 context.firstName,
@@ -81,19 +92,19 @@ export default function QuickGroupSelector({
         }
 
         return (
-          <Tooltip 
-            key={opt.id} 
+          <Tooltip
+            key={opt.id}
             content={<div className="font-normal"><span className="font-bold mb-1 block">{opt.code}</span>{tooltipContent}</div>}
             maxWidth="max-w-xs"
           >
             <button
                 onClick={() => val === opt.code ? handleChange("") : handleChange(opt.code)}
-                disabled={loading}
+                disabled={loading || disabled}
                 className={`px-3 py-1.5 text-xs font-bold transition-colors min-w-[32px]
-                ${isActive 
-                    ? 'bg-primary text-white' 
+                ${isActive
+                    ? 'bg-primary text-white'
                     : 'text-[#617289] dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-[#2d3748]'}
-                ${loading ? 'opacity-50 cursor-not-allowed' : ''}
+                ${loading || disabled ? 'opacity-50 cursor-not-allowed' : ''}
                 `}
             >
                 {opt.code}

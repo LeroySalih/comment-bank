@@ -1,40 +1,40 @@
 import { prisma } from '@/lib/prisma';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
-import QuickGroupSelector from '@/components/QuickGroupSelector';
 import Tooltip from '@/components/Tooltip';
-import CopyCommentButton from '@/components/CopyCommentButton';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
 import { decrypt } from '@/lib/encryption';
+import StudentMatrixRow from './_components/StudentMatrixRow';
 
 export default async function ClassPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = await params;
   const session = await getServerSession(authOptions);
 
-  const cls = await (prisma as any).class.findUnique({
+  const cls = await prisma.class.findUnique({
     where: { id: classId },
     include: {
-      teachers: {
+      User: {
         select: { id: true }
       },
-      subject: {
+      Subject: {
         include: {
-            commentGroups: {
+            CommentGroup: {
                 orderBy: { displayOrder: 'asc' },
-                include: { options: true }
+                include: { CommentOption: true }
             }
         }
       },
-      assignments: {
+      Assignment: {
         where: {
-          pupil: { isActive: true }
+          Pupil: { isActive: true }
         },
         include: {
-          pupil: true,
-          codes: true
+          Pupil: true,
+          PupilCode: true
         }
+        // Note: finalComment is automatically included as a base field
       }
     }
   });
@@ -47,29 +47,29 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const userIsAdmin = isAdmin(session?.user);
   const userIsHoD = isHoD(session?.user);
   const userIsTeacher = isTeacher(session?.user);
-  
+
   if (userIsTeacher && !userIsAdmin && !userIsHoD) {
-    const isAssigned = cls.teachers.some((t: any) => t.id === session?.user?.id);
+    const isAssigned = cls.User.some((t) => t.id === session?.user?.id);
     if (!isAssigned) {
       return <div>Class not found or access denied</div>;
     }
   }
 
-  const groups = cls.subject.commentGroups;
+  const groups = cls.Subject.CommentGroup;
 
   // Decrypt pupil names for display
-  cls.assignments = cls.assignments.map((assignment: any) => ({
+  const assignments = cls.Assignment.map((assignment) => ({
     ...assignment,
-    pupil: {
-      ...assignment.pupil,
-      firstName: decrypt(assignment.pupil.firstName),
-      lastName: decrypt(assignment.pupil.lastName)
+    Pupil: {
+      ...assignment.Pupil,
+      firstName: decrypt(assignment.Pupil.firstName),
+      lastName: decrypt(assignment.Pupil.lastName)
     }
   }));
 
   // Re-sort because database sort was on encrypted strings
-  cls.assignments.sort((a: any, b: any) => 
-    a.pupil.lastName.localeCompare(b.pupil.lastName)
+  assignments.sort((a, b) =>
+    a.Pupil.lastName.localeCompare(b.Pupil.lastName)
   );
 
   return (
@@ -86,7 +86,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                     </h1>
                 </div>
                 <p className="text-[#617289] dark:text-gray-400 text-sm font-normal leading-normal">
-                    {cls.subject.code} • {cls.assignments.length} Students
+                    {cls.Subject.code} • {assignments.length} Students
                 </p>
             </div>
             <div className="flex gap-3">
@@ -107,8 +107,11 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 <th scope="col" className="sticky top-0 left-0 z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[240px] min-w-[240px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Student Name
                                 </th>
-                                <th scope="col" className="sticky top-0 left-[240px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[100px] min-w-[100px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+                                <th scope="col" className="sticky top-0 left-[240px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[80px] min-w-[80px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Gender
+                                </th>
+                                <th scope="col" className="sticky top-0 left-[320px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[140px] min-w-[140px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+                                    Status
                                 </th>
                                 {groups.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
@@ -123,52 +126,14 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                             </tr>
                         </thead>
                         <tbody className="divide-y divide-[#e5e7eb] dark:divide-[#2d3748]">
-                            {cls.assignments.sort((a: any, b: any) => a.pupil.lastName.localeCompare(b.pupil.lastName)).map((assignment: any) => (
-                                <tr key={assignment.id} className="group hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
-                                    <td className="sticky left-0 z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-primary/5 dark:group-hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
-                                        <div className="flex flex-col">
-                                            <span className="text-[#111418] dark:text-white text-sm font-semibold">{assignment.pupil.lastName}, {assignment.pupil.firstName}</span>
-                                        </div>
-                                    </td>
-                                    <td className="sticky left-[240px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-primary/5 dark:group-hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
-                                        <span className="text-sm text-[#617289] dark:text-gray-400">{assignment.pupil.gender}</span>
-                                    </td>
-                                    {groups.map((g: any) => {
-                                        const currentCodeObj = assignment.codes.find((c: any) => c.groupId === g.id);
-                                        const currentCode = currentCodeObj?.code || null;
-                                        return (
-                                            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
-                                                <QuickGroupSelector 
-                                                    assignmentId={assignment.id} 
-                                                    groupId={g.id} 
-                                                    currentCode={currentCode}
-                                                    options={g.options} 
-                                                    context={{
-                                                        firstName: assignment.pupil.firstName,
-                                                        gender: assignment.pupil.gender,
-                                                        subjectTitle: cls.subject.title || undefined,
-                                                        year: cls.year || undefined,
-                                                        eoyLevel: assignment.eoyLevel,
-                                                        targetLevel: assignment.targetLevel
-                                                    }}
-                                                />
-                                            </td>
-                                        );
-                                    })}
-                                    <td className="px-6 py-4 whitespace-nowrap text-right">
-                                        <div className="flex items-center justify-end gap-3">
-                                            <CopyCommentButton 
-                                                assignment={assignment} 
-                                                subject={cls.subject} 
-                                                groups={groups} 
-                                            />
-                                            <Link href={`/student/${assignment.id}`} className="text-primary hover:text-blue-700 text-sm font-bold transition-colors inline-flex items-center gap-1">
-                                                <span className="material-symbols-outlined text-lg">visibility</span>
-                                                Preview
-                                            </Link>
-                                        </div>
-                                    </td>
-                                </tr>
+                            {assignments.map((assignment: any) => (
+                                <StudentMatrixRow
+                                    key={assignment.id}
+                                    assignment={assignment}
+                                    groups={groups}
+                                    subject={cls.Subject}
+                                    classYear={cls.year}
+                                />
                             ))}
                         </tbody>
                     </table>

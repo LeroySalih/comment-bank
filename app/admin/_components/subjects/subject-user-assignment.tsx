@@ -8,7 +8,7 @@ import { Users, Check, ChevronDown, X, UserPlus, UserMinus } from "lucide-react"
 interface User {
   id: string
   username: string
-  roles: { name: string }[]
+  Role: { name: string }[]
 }
 
 interface SubjectUserAssignmentProps {
@@ -47,7 +47,7 @@ export function SubjectUserAssignment({ subjectId, assignedUsers, allUsers }: Su
     if (result.success) {
       router.refresh()
     } else {
-      alert(result.error || "Failed to update assignment")
+      alert('error' in result ? result.error : "Failed to update assignment")
     }
   }
 
@@ -56,7 +56,7 @@ export function SubjectUserAssignment({ subjectId, assignedUsers, allUsers }: Su
   )
 
   const usersByRole = filteredUsers.reduce((acc, user) => {
-    const role = user.roles[0]?.name || "user"
+    const role = user.Role[0]?.name || "user"
     if (!acc[role]) acc[role] = []
     acc[role].push(user)
     return acc

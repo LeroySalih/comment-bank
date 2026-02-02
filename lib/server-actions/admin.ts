@@ -1,327 +1,575 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
-import { getServerSession } from "next-auth"
-import { authOptions } from "@/app/api/auth/[...nextauth]/route"
-import { isAdmin } from "@/lib/access-control"
-import { revalidatePath } from "next/cache"
-import { encrypt, decrypt } from "@/lib/encryption"
+import { revalidatePath } from 'next/cache'
+import { withRole } from '@/lib/auth/with-role'
+import { userRepository } from '@/lib/db/repositories/user-repository'
+import { pupilRepository } from '@/lib/db/repositories/pupil-repository'
+import { subjectRepository } from '@/lib/db/repositories/subject-repository'
+import { classRepository } from '@/lib/db/repositories/class-repository'
+import { handleServerActionError } from '@/lib/errors'
+import { logger } from '@/lib/logger'
+import {
+  UpdateUserRolesSchema,
+  UpdatePupilSchema,
+  CreateSubjectSchema,
+  UpdateSubjectSchema,
+  DeleteSubjectSchema,
+  AssignUserToSubjectSchema,
+  AssignTeachersSchema,
+  validateFormData
+} from '@/lib/validation-schemas'
+import * as XLSX from 'xlsx'
 
-export async function updateUserRoles(userId: string, roleNames: string[]) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) { // Casting because session.user might not infer roles correctly here without global type aug pickup
-    throw new Error("Unauthorized")
-  }
-
+/**
+ * Update user roles (Admin only)
+ */
+export const updateUserRoles = withRole('admin', async (
+  userId: string,
+  roleNames: string[]
+) => {
   try {
-    // Get role IDs for the names
-    const roles = await prisma.role.findMany({
-      where: {
-        name: { in: roleNames }
-      }
-    })
-
-    await prisma.user.update({
-      where: { id: userId },
-      data: {
-        roles: {
-          set: [], // Clear existing
-          connect: roles.map(r => ({ id: r.id })) // Connect new
-        }
-      }
-    })
-
-    revalidatePath("/admin")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to update roles:", error)
-    return { success: false, error: "Failed to update roles" }
-  }
-}
-
-export async function updatePupil(admissionNumber: string, data: {
-  firstName?: string
-  lastName?: string
-  gender?: string
-  isActive?: boolean
-}) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
-  try {
-    const updateData: any = { ...data }
-    if (data.firstName) updateData.firstName = encrypt(data.firstName)
-    if (data.lastName) updateData.lastName = encrypt(data.lastName)
-
-    await (prisma as any).pupil.update({
-      where: { admissionNumber },
-      data: updateData
-    })
-
-    revalidatePath("/admin")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to update pupil:", error)
-    return { success: false, error: "Failed to update pupil" }
-  }
-}
-
-export async function getPupils(query: string = "") {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
-  try {
-    const pupils = await (prisma as any).pupil.findMany({
-      orderBy: {
-        lastName: 'asc'
-      }
-    })
-
-    const searchLower = query.toLowerCase()
-    
-    const processedPupils = pupils.map((p: any) => ({
-      ...p,
-      firstName: decrypt(p.firstName),
-      lastName: decrypt(p.lastName)
-    })).filter((p: any) => {
-      if (!query) return true
-      return (
-        p.firstName.toLowerCase().includes(searchLower) ||
-        p.lastName.toLowerCase().includes(searchLower) ||
-        p.admissionNumber.toLowerCase().includes(searchLower)
-      )
-    })
-
-    return { success: true, pupils: processedPupils }
-  } catch (error) {
-    console.error("Failed to fetch pupils:", error)
-    return { success: false, error: "Failed to fetch pupils" }
-  }
-}
-
-export async function processPupilUpload(content: string) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
-  try {
-    const lines = content.split('\n').filter(line => line.trim().startsWith('|'))
-    // Skip header and separator
-    const dataLines = lines.slice(2)
-
-    const uploadedPupils = dataLines.map(line => {
-      const parts = line.split('|').map(p => p.trim()).filter(Boolean)
-      if (parts.length < 4) return null
-      return {
-        admissionNumber: parts[0],
-        lastName: parts[1],
-        firstName: parts[2],
-        gender: parts[3]
-      }
-    }).filter(Boolean) as { admissionNumber: string, lastName: string, firstName: string, gender: string }[]
-
-    if (uploadedPupils.length === 0) {
-      return { success: false, error: "No valid pupil data found" }
+    // Validate input
+    const validation = validateFormData(UpdateUserRolesSchema, { userId, roleNames })
+    if (!validation.success) {
+      return validation
     }
 
-    const uploadedAdmissionNumbers = uploadedPupils.map(p => p.admissionNumber)
+    const { data } = validation
 
-    // Use a transaction for consistency
-    await (prisma as any).$transaction(async (tx: any) => {
-      // Get existing pupils in this batch
-      const existingPupils = await tx.pupil.findMany({
-        where: { admissionNumber: { in: uploadedAdmissionNumbers } },
-        select: { admissionNumber: true }
-      })
-      const existingNumbers = new Set(existingPupils.map((p: any) => p.admissionNumber))
+    // Update roles using repository
+    await userRepository.updateRoles(data.userId, data.roleNames)
 
-      for (const pupil of uploadedPupils) {
-        if (!existingNumbers.has(pupil.admissionNumber)) {
-          // New pupil - Add
-          await tx.pupil.create({
-            data: {
-              admissionNumber: pupil.admissionNumber,
-              firstName: encrypt(pupil.firstName),
-              lastName: encrypt(pupil.lastName),
-              gender: pupil.gender,
-              isActive: true
-            }
-          })
-        } else {
-          // Matching pupil exists - "do nothing" PII-wise, but ensure they are active
-          await tx.pupil.update({
-            where: { admissionNumber: pupil.admissionNumber },
-            data: { isActive: true }
-          })
-        }
-      }
+    logger.info('User roles updated', { userId, roleNames })
+    revalidatePath('/admin')
 
-      // Mark pupils not in upload as inactive
-      await tx.pupil.updateMany({
-        where: {
-          admissionNumber: { notIn: uploadedAdmissionNumbers }
-        },
-        data: {
-          isActive: false
-        }
-      })
-    })
-
-    revalidatePath("/admin")
-    return { success: true, count: uploadedPupils.length }
+    return { success: true as const }
   } catch (error) {
-    console.error("Failed to process pupil upload:", error)
-    return { success: false, error: "Failed to process upload" }
+    logger.error('Failed to update user roles', { error, userId })
+    return handleServerActionError(error)
   }
-}
+})
 
+/**
+ * Update pupil information (Admin only)
+ */
+export const updatePupil = withRole('admin', async (
+  admissionNumber: string,
+  data: {
+    firstName?: string
+    lastName?: string
+    gender?: string
+    isActive?: boolean
+  }
+) => {
+  try {
+    // Validate input
+    const validation = validateFormData(UpdatePupilSchema, { admissionNumber, data })
+    if (!validation.success) {
+      return validation
+    }
+
+    const validated = validation.data
+
+    // Update pupil using repository (handles encryption automatically)
+    await pupilRepository.update(validated.admissionNumber, validated.data)
+
+    logger.info('Pupil updated', { admissionNumber })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to update pupil', { error, admissionNumber })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Get pupils with optional search query (Admin only)
+ */
+export const getPupils = withRole('admin', async (query: string = '') => {
+  try {
+    // Get pupils using repository (handles decryption automatically)
+    const pupils = await pupilRepository.findAll(query)
+
+    return { success: true, pupils }
+  } catch (error) {
+    logger.error('Failed to get pupils', { error, query })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Process pupil upload from Excel/CSV (Admin only)
+ */
+export const processPupilUpload = withRole('admin', async (content: string) => {
+  try {
+    const workbook = XLSX.read(content, { type: 'base64' })
+    const sheetName = workbook.SheetNames[0]
+    const sheet = workbook.Sheets[sheetName]
+    const rows = XLSX.utils.sheet_to_json<any>(sheet)
+
+    const pupils = rows.map((row: any) => ({
+      admissionNumber: String(row.AdmissionNumber || row.admissionNumber || '').trim(),
+      firstName: String(row.FirstName || row.firstName || row.Forename || '').trim(),
+      lastName: String(row.LastName || row.lastName || row.Surname || '').trim(),
+      gender: String(row.Gender || row.gender || 'M').trim().toUpperCase(),
+      isActive: true
+    }))
+
+    // Filter out invalid rows
+    const validPupils = pupils.filter(p => 
+      p.admissionNumber && p.firstName && p.lastName && (p.gender === 'M' || p.gender === 'F')
+    )
+
+    if (validPupils.length === 0) {
+      return {
+        success: false,
+        error: 'No valid pupils found in upload',
+        code: 'VALIDATION_ERROR'
+      }
+    }
+
+    // Bulk create using repository (handles encryption automatically)
+    const count = await pupilRepository.bulkCreate(validPupils)
+
+    logger.info('Pupils uploaded', { count, total: validPupils.length })
+    revalidatePath('/admin')
+
+    return {
+      success: true,
+      message: `Successfully processed ${count} pupils (${validPupils.length - count} duplicates skipped)`
+    }
+  } catch (error) {
+    logger.error('Failed to process pupil upload', { error })
+    return handleServerActionError(error)
+  }
+})
+
+// ============================================================================
 // Subject Management Actions
+// ============================================================================
 
-export async function createSubject(formData: FormData) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
-  const code = formData.get("code") as string
-  const title = formData.get("title") as string
-  const introduction = formData.get("introduction") as string
-
-  if (!code) return { success: false, error: "Code is required" }
-
+/**
+ * Create a new subject (Admin only)
+ */
+export const createSubject = withRole('admin', async (formData: FormData) => {
   try {
-    await (prisma as any).subject.create({
-      data: {
-        code,
-        title,
-        studiedComment: introduction
+    const data = {
+      code: formData.get('code') as string,
+      title: formData.get('title') as string,
+      studiedComment: formData.get('introduction') as string
+    }
+
+    // Validate input
+    const validation = validateFormData(CreateSubjectSchema, data)
+    if (!validation.success) {
+      return validation
+    }
+
+    const validated = validation.data
+
+    // Create subject using repository
+    await subjectRepository.create({
+      code: validated.code,
+      title: validated.title,
+      studiedComment: validated.introduction
+    })
+
+    logger.info('Subject created', { code: validated.code })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to create subject', { error })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Update a subject (Admin only)
+ */
+export const updateSubject = withRole('admin', async (
+  subjectId: string,
+  formData: FormData
+) => {
+  try {
+    const data = {
+      subjectId,
+      code: formData.get('code') as string,
+      title: formData.get('title') as string,
+      studiedComment: formData.get('introduction') as string
+    }
+
+    // Validate input
+    const validation = validateFormData(UpdateSubjectSchema, data)
+    if (!validation.success) {
+      return validation
+    }
+
+    const validated = validation.data
+
+    // Update subject using repository
+    await subjectRepository.update(validated.subjectId, {
+      code: validated.code,
+      title: validated.title,
+      studiedComment: validated.introduction
+    })
+
+    logger.info('Subject updated', { subjectId })
+    revalidatePath('/admin')
+    revalidatePath(`/hod/subject/${subjectId}`)
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to update subject', { error, subjectId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Delete a subject (Admin only)
+ */
+export const deleteSubject = withRole('admin', async (subjectId: string) => {
+  try {
+    // Validate input
+    const validation = validateFormData(DeleteSubjectSchema, { subjectId })
+    if (!validation.success) {
+      return validation
+    }
+
+    // Delete subject using repository
+    await subjectRepository.delete(subjectId)
+
+    logger.info('Subject deleted', { subjectId })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to delete subject', { error, subjectId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Assign a user (HOD) to a subject (Admin only)
+ */
+export const assignUserToSubject = withRole('admin', async (
+  subjectId: string,
+  userId: string
+) => {
+  try {
+    // Validate input
+    const validation = validateFormData(AssignUserToSubjectSchema, { subjectId, userId })
+    if (!validation.success) {
+      return validation
+    }
+
+    // Assign user using repository
+    await subjectRepository.assignUser(subjectId, userId)
+
+    logger.info('User assigned to subject', { subjectId, userId })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to assign user to subject', { error, subjectId, userId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Remove a user from a subject (Admin only)
+ */
+export const removeUserFromSubject = withRole('admin', async (
+  subjectId: string,
+  userId: string
+) => {
+  try {
+    // Validate input
+    const validation = validateFormData(AssignUserToSubjectSchema, { subjectId, userId })
+    if (!validation.success) {
+      return validation
+    }
+
+    // Remove user using repository
+    await subjectRepository.removeUser(subjectId, userId)
+
+    logger.info('User removed from subject', { subjectId, userId })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to remove user from subject', { error, subjectId, userId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Assign teachers to a class (Admin only)
+ */
+export const assignTeachersToClass = withRole('admin', async (
+  classId: string,
+  teacherIds: string[]
+) => {
+  try {
+    // Validate input
+    const validation = validateFormData(AssignTeachersSchema, { classId, teacherIds })
+    if (!validation.success) {
+      return validation
+    }
+
+    // Assign teachers using repository
+    await classRepository.assignTeachers(classId, teacherIds)
+
+    logger.info('Teachers assigned to class', { classId, teacherIds })
+    revalidatePath('/admin')
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to assign teachers to class', { error, classId })
+    return handleServerActionError(error)
+  }
+})
+
+// ============================================================================
+// Class Management Actions
+// ============================================================================
+
+/**
+ * Get all classes (Admin only)
+ */
+export const getClasses = withRole('admin', async () => {
+  try {
+    const classes = await classRepository.findAll()
+
+    return { success: true as const, classes }
+  } catch (error) {
+    logger.error('Failed to get classes', { error })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Create a class from a form (Admin only)
+ * This creates a class and assigns all pupils from the specified form to it
+ */
+export const createClassFromForm = withRole('admin', async (
+  className: string,
+  formName: string,
+  subjectId: string
+) => {
+  try {
+    if (!className || !subjectId) {
+      return {
+        success: false,
+        error: 'Class name and subject are required',
+        code: 'VALIDATION_ERROR'
       }
+    }
+
+    // Extract year from form name or class name (e.g., "7A" -> "7")
+    const year = (formName || className).match(/^\d+/)?.[0] || null
+
+    // Create the class
+    const newClass = await classRepository.create({
+      name: className,
+      year,
+      subjectId
     })
-    revalidatePath("/admin")
-    return { success: true }
-  } catch (error) {
-    console.error("Failed to create subject:", error)
-    return { success: false, error: "Failed to create subject" }
-  }
-}
 
-export async function updateSubject(subjectId: string, formData: FormData) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
-  const code = formData.get("code") as string
-  const title = formData.get("title") as string
-  const introduction = formData.get("introduction") as string
-
-  if (!code) return { success: false, error: "Code is required" }
-
-  try {
-    await (prisma as any).subject.update({
-      where: { id: subjectId },
-      data: {
-        code,
-        title,
-        studiedComment: introduction
+    // If a form name is provided, assign all pupils from that form
+    if (formName) {
+      const pupils = await pupilRepository.findByForm(formName)
+      if (pupils.length > 0) {
+        await classRepository.assignPupils(newClass.id, pupils.map(p => p.admissionNumber))
       }
-    })
-    revalidatePath("/admin")
-    return { success: true }
+    }
+
+    logger.info('Class created', { className, formName, subjectId, hasFormPupils: !!formName })
+    revalidatePath('/admin')
+
+    return { success: true as const }
   } catch (error) {
-    console.error("Failed to update subject:", error)
-    return { success: false, error: "Failed to update subject" }
+    logger.error('Failed to create class', { error, className, formName, subjectId })
+    return handleServerActionError(error)
   }
-}
+})
 
-export async function deleteSubject(subjectId: string) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
+/**
+ * Delete a class (Admin only)
+ */
+export const deleteClass = withRole('admin', async (classId: string) => {
   try {
-    await (prisma as any).subject.delete({
-      where: { id: subjectId }
-    })
-    revalidatePath("/admin")
-    return { success: true }
+    if (!classId) {
+      return {
+        success: false,
+        error: 'Class ID is required',
+        code: 'VALIDATION_ERROR'
+      }
+    }
+
+    await classRepository.delete(classId)
+
+    logger.info('Class deleted', { classId })
+    revalidatePath('/admin')
+
+    return { success: true as const }
   } catch (error) {
-    console.error("Failed to delete subject:", error)
-    return { success: false, error: "Failed to delete subject" }
+    logger.error('Failed to delete class', { error, classId })
+    return handleServerActionError(error)
   }
-}
+})
 
-export async function assignUserToSubject(subjectId: string, userId: string) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
+/**
+ * Update a class (Admin only)
+ */
+export const updateClass = withRole('admin', async (
+  classId: string,
+  data: { name?: string; year?: string | null; subjectId?: string; teacherIds?: string[] }
+) => {
   try {
-    await (prisma as any).subject.update({
-      where: { id: subjectId },
-      data: {
-        users: {
-          connect: { id: userId }
+    if (!classId) {
+      return {
+        success: false,
+        error: 'Class ID is required',
+        code: 'VALIDATION_ERROR'
+      }
+    }
+
+    const { teacherIds, ...classData } = data
+
+    // Update class details if any provided
+    if (Object.keys(classData).length > 0) {
+      await classRepository.update(classId, classData)
+    }
+
+    // Update teacher assignments if provided
+    if (teacherIds !== undefined) {
+      await classRepository.assignTeachers(classId, teacherIds)
+    }
+
+    logger.info('Class updated', { classId, data })
+    revalidatePath('/admin')
+
+    return { success: true as const }
+  } catch (error) {
+    logger.error('Failed to update class', { error, classId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Get all users (Admin only) - for assignment dropdowns
+ */
+export const getAllUsers = withRole('admin', async () => {
+  try {
+    const users = await prisma.user.findMany({
+      select: {
+        id: true,
+        username: true,
+        Role: {
+          select: { name: true }
         }
-      }
+      },
+      orderBy: { username: 'asc' }
     })
-    revalidatePath("/admin")
-    return { success: true }
+
+    return { success: true as const, users }
   } catch (error) {
-    console.error("Failed to assign user:", error)
-    return { success: false, error: "Failed to assign user" }
+    logger.error('Failed to get users', { error })
+    return handleServerActionError(error)
   }
-}
+})
 
-export async function removeUserFromSubject(subjectId: string, userId: string) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
+/**
+ * Get pupils for a class (Admin only)
+ */
+export const getClassPupils = withRole('admin', async (classId: string) => {
   try {
-    await (prisma as any).subject.update({
-      where: { id: subjectId },
-      data: {
-        users: {
-          disconnect: { id: userId }
-        }
+    if (!classId) {
+      return {
+        success: false,
+        error: 'Class ID is required',
+        code: 'VALIDATION_ERROR'
       }
-    })
-    revalidatePath("/admin")
-    return { success: true }
+    }
+
+    const pupils = await classRepository.getPupils(classId)
+    return { success: true as const, pupils }
   } catch (error) {
-    console.error("Failed to remove user:", error)
-    return { success: false, error: "Failed to remove user" }
+    logger.error('Failed to get class pupils', { error, classId })
+    return handleServerActionError(error)
   }
-}
+})
 
-export async function assignTeachersToClass(classId: string, teacherIds: string[]) {
-  const session = await getServerSession(authOptions)
-  if (!isAdmin(session?.user as any)) {
-    throw new Error("Unauthorized")
-  }
-
+/**
+ * Get all forms (distinct form values from pupils)
+ */
+export const getAllForms = withRole('admin', async () => {
   try {
-    await prisma.class.update({
-      where: { id: classId },
-      data: {
-        teachers: {
-          set: teacherIds.map(id => ({ id }))
-        }
-      }
+    const forms = await prisma.pupil.findMany({
+      where: {
+        form: { not: null },
+        isActive: true
+      },
+      select: { form: true },
+      distinct: ['form'],
+      orderBy: { form: 'asc' }
     })
-    revalidatePath(`/hod/subject`)
-    return { success: true }
+
+    return { success: true as const, forms: forms.map((f: { form: string | null }) => f.form).filter(Boolean) as string[] }
   } catch (error) {
-    console.error("Failed to assign teachers:", error)
-    return { success: false, error: "Failed to assign teachers" }
+    logger.error('Failed to get forms', { error })
+    return handleServerActionError(error)
   }
-}
+})
+
+/**
+ * Add pupils to a class (Admin only)
+ */
+export const addPupilsToClass = withRole('admin', async (classId: string, pupilAdmissionNumbers: string[]) => {
+  try {
+    if (!classId) {
+      return {
+        success: false,
+        error: 'Class ID is required',
+        code: 'VALIDATION_ERROR'
+      }
+    }
+
+    await classRepository.assignPupils(classId, pupilAdmissionNumbers)
+
+    logger.info('Pupils added to class', { classId, count: pupilAdmissionNumbers.length })
+    revalidatePath('/admin')
+
+    return { success: true as const }
+  } catch (error) {
+    logger.error('Failed to add pupils to class', { error, classId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Remove pupils from a class (Admin only)
+ */
+export const removePupilsFromClass = withRole('admin', async (classId: string, pupilAdmissionNumbers: string[]) => {
+  try {
+    if (!classId) {
+      return {
+        success: false,
+        error: 'Class ID is required',
+        code: 'VALIDATION_ERROR'
+      }
+    }
+
+    await classRepository.removePupils(classId, pupilAdmissionNumbers)
+
+    logger.info('Pupils removed from class', { classId, count: pupilAdmissionNumbers.length })
+    revalidatePath('/admin')
+
+    return { success: true as const }
+  } catch (error) {
+    logger.error('Failed to remove pupils from class', { error, classId })
+    return handleServerActionError(error)
+  }
+})

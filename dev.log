@@ -1,0 +1,820 @@
+
+> web-app@0.1.0 dev
+> next dev -p 3001
+
+▲ Next.js 16.1.2 (Turbopack)
+- Local:         http://localhost:3001
+- Network:       http://192.168.68.116:3001
+- Environments: .env
+
+✓ Starting...
+⚠ The "middleware" file convention is deprecated. Please use "proxy" instead. Learn more: https://nextjs.org/docs/messages/middleware-to-proxy
+✓ Ready in 1002ms
+ GET / 200 in 654ms (compile: 247ms, proxy.ts: 84ms, render: 323ms)
+Raw SQL result: Isabella is having an OK year. Isabella Isabella. Changed
+
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. ',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 411ms (compile: 313ms, proxy.ts: 13ms, render: 85ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 57 }
+Comment to save: Isabella is having an OK year. Isabella Isabella.changes
+
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella.changes\n',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella.changes
+
+ POST /student/DTKS3-25-7A-DT-12355 200 in 107ms (compile: 16ms, proxy.ts: 14ms, render: 77ms)
+✓ Compiled in 775ms
+ GET / 200 in 315ms (compile: 12ms, proxy.ts: 23ms, render: 279ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella.c',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 375ms (compile: 174ms, proxy.ts: 20ms, render: 181ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella.c',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 211ms (compile: 26ms, proxy.ts: 17ms, render: 169ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 57 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 75ms (compile: 10ms, proxy.ts: 14ms, render: 50ms)
+✓ Compiled in 111ms
+ GET / 200 in 593ms (compile: 17ms, proxy.ts: 27ms, render: 550ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 634ms (compile: 308ms, proxy.ts: 12ms, render: 314ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 317ms (compile: 37ms, proxy.ts: 35ms, render: 245ms)
+✓ Compiled in 178ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 385ms (compile: 79ms, proxy.ts: 34ms, render: 273ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 58 }
+Comment to save: Isabella is having an OK year. Isabella Isabella, changed
+
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella, changed\n',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella, changed
+
+ POST /student/DTKS3-25-7A-DT-12355 200 in 71ms (compile: 12ms, proxy.ts: 16ms, render: 43ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella, changed\n',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 140ms (compile: 12ms, proxy.ts: 7ms, render: 121ms)
+✓ Compiled in 264ms
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 51ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella, changed\n',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 555ms (compile: 172ms, proxy.ts: 56ms, render: 327ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 57 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 117ms (compile: -24310µs, proxy.ts: 92ms, render: 50ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 158ms (compile: 11ms, proxy.ts: 26ms, render: 121ms)
+✓ Compiled in 73ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 320ms (compile: 79ms, proxy.ts: 16ms, render: 225ms)
+✓ Compiled in 46ms
+✓ Compiled in 52ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 407ms (compile: 99ms, proxy.ts: 29ms, render: 279ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 187ms (compile: 17ms, proxy.ts: 33ms, render: 137ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 89ms (compile: 9ms, proxy.ts: 6ms, render: 74ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 86ms (compile: 8ms, proxy.ts: 6ms, render: 73ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 60 }
+Comment to save: Isabella is having a great year. Isabella Isabella. changerd
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella. changerd',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having a great year. Isabella Isabella. changerd
+ POST /student/DTKS3-25-7A-DT-12355 200 in 73ms (compile: 13ms, proxy.ts: 26ms, render: 34ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella. changerd',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 117ms (compile: 6ms, proxy.ts: 6ms, render: 105ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 59 }
+Comment to save: Isabella is having a great year. Isabella Isabella. changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having a great year. Isabella Isabella. changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 105ms (compile: 11ms, proxy.ts: 51ms, render: 43ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 268ms (compile: 19ms, proxy.ts: 13ms, render: 236ms)
+✓ Compiled in 97ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 501ms (compile: 89ms, proxy.ts: 12ms, render: 400ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 59 }
+Comment to save: Isabella is having a great year. Isabella Isabella, changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella, changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having a great year. Isabella Isabella, changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 53ms (compile: 11ms, proxy.ts: 11ms, render: 32ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella, changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 105ms (compile: 7ms, proxy.ts: 4ms, render: 93ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 58 }
+Comment to save: Isabella is having a great year. Isabella Isabella changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having a great year. Isabella Isabella changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 68ms (compile: 14ms, proxy.ts: 17ms, render: 37ms)
+✓ Compiled in 66ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 393ms (compile: 84ms, proxy.ts: 20ms, render: 289ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having a great year. Isabella Isabella changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 1428ms (compile: 286ms, proxy.ts: 355ms, render: 787ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 0 }
+Comment to save: 
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+Verified in DB: 
+ POST /student/DTKS3-25-7A-DT-12355 200 in 107ms (compile: 19ms, proxy.ts: 28ms, render: 61ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 109ms (compile: 7ms, proxy.ts: 3ms, render: 99ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 91ms (compile: 10ms, proxy.ts: 6ms, render: 75ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 129ms (compile: 14ms, proxy.ts: 24ms, render: 91ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 126ms (compile: 11ms, proxy.ts: 9ms, render: 106ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: '',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 84ms (compile: 9ms, proxy.ts: 7ms, render: 68ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 48 }
+Comment to save: Isabella is having an OK year. Isabella Isabella
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella
+ POST /student/DTKS3-25-7A-DT-12355 200 in 126ms (compile: 49ms, proxy.ts: 7ms, render: 71ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 48 }
+Comment to save: Isabella is having an OK year. Isabella Isabella
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella
+ POST /student/DTKS3-25-7A-DT-12355 200 in 118ms (compile: 13ms, proxy.ts: 43ms, render: 62ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 57 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed
+ POST /student/DTKS3-25-7A-DT-12355 200 in 92ms (compile: 9ms, proxy.ts: 47ms, render: 36ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 133ms (compile: 16ms, proxy.ts: 12ms, render: 105ms)
+✓ Compiled in 201ms
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 459ms (compile: 122ms, proxy.ts: 43ms, render: 295ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 70 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS
+ POST /student/DTKS3-25-7A-DT-12355 200 in 300ms (compile: 67ms, proxy.ts: 57ms, render: 176ms)
+ GET / 200 in 298ms (compile: 147ms, proxy.ts: 12ms, render: 139ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 291ms (compile: 28ms, proxy.ts: 8ms, render: 255ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 70 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS
+ POST /student/DTKS3-25-7A-DT-12355 200 in 145ms (compile: 31ms, proxy.ts: 46ms, render: 68ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 99ms (compile: 2ms, proxy.ts: 3ms, render: 94ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 93ms (compile: 7ms, proxy.ts: 6ms, render: 80ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 149ms (compile: 15ms, proxy.ts: 18ms, render: 116ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 98ms (compile: 12ms, proxy.ts: 12ms, render: 74ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 90ms (compile: 9ms, proxy.ts: 6ms, render: 75ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 89ms (compile: 9ms, proxy.ts: 6ms, render: 74ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS',
+  checkStatus: 'required_check'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 73ms (compile: 8ms, proxy.ts: 4ms, render: 61ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 80 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text
+ POST /student/DTKS3-25-7A-DT-12355 200 in 36ms (compile: 11ms, proxy.ts: 7ms, render: 19ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 150ms (compile: 24ms, proxy.ts: 22ms, render: 104ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 80 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text
+ POST /student/DTKS3-25-7A-DT-12355 200 in 85ms (compile: 15ms, proxy.ts: 35ms, render: 36ms)
+ GET /class/DTKS3-25-7A-DT 200 in 443ms (compile: 403ms, proxy.ts: 2ms, render: 38ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 93ms (compile: 8ms, proxy.ts: 15ms, render: 70ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 104 }
+Comment to save: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comment.
+
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comme',
+  checkStatus: 'required_check'
+}
+Verified in DB: Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comme
+ POST /student/DTKS3-25-7A-DT-12355 200 in 86ms (compile: 13ms, proxy.ts: 29ms, render: 44ms)
+ GET /class/DTKS3-25-7A-DT 200 in 68ms (compile: 26ms, proxy.ts: 3ms, render: 39ms)
+ GET /class/DTKS3-25-7A-DT 200 in 190ms (compile: 18ms, proxy.ts: 13ms, render: 160ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comment.\n',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 279ms (compile: 33ms, proxy.ts: 49ms, render: 197ms)
+ GET /class/DTKS3-25-7A-DT 200 in 113ms (compile: 19ms, proxy.ts: 38ms, render: 56ms)
+ GET /class/DTKS3-25-7A-DT 200 in 104ms (compile: 8ms, proxy.ts: 5ms, render: 91ms)
+✓ Compiled in 443ms
+⨯ Error [PrismaClientValidationError]: 
+Invalid `{imported module ./lib/prisma.ts}["prisma"].class.findUnique()` invocation in
+/Users/leroysalih/nodejs/comment-bank-claude/.next/dev/server/chunks/ssr/[root-of-the-server]__dc04d789._.js:184:149
+
+  181 async function ClassPage({ params }) {
+  182     const { classId } = await params;
+  183     const session = await (0, {imported module ./nodemodules/next-auth/index.js}["getServerSession"])({imported module ./app/api/auth/[...nextauth]/route.ts}["authOptions"]);
+→ 184     const cls = await {imported module ./lib/prisma.ts}["prisma"].class.findUnique({
+            where: {
+              id: "DTKS3-25-7A-DT"
+            },
+            include: {
+              User: {
+                select: {
+                  id: true
+                }
+              },
+              Subject: {
+                include: {
+                  CommentGroup: {
+                    orderBy: {
+                      displayOrder: "asc"
+                    },
+                    include: {
+                      CommentOption: true
+                    }
+                  }
+                }
+              },
+              Assignment: {
+                where: {
+                  Pupil: {
+                    isActive: true
+                  }
+                },
+                include: {
+                ~~~~~~~
+                  Pupil: true,
+                  PupilCode: true
+                },
+                select: {
+                ~~~~~~
+                  id: true,
+                  classId: true,
+                  pupilId: true,
+                  eoyLevel: true,
+                  targetLevel: true,
+                  checkStatus: true,
+                  checkNote: true,
+                  finalComment: true,
+                  Pupil: true,
+                  PupilCode: true
+                }
+              }
+            }
+          })
+
+Please either use `include` or `select`, but not both at the same time.
+    at <unknown> (app/class/[classId]/page.tsx:15:34)
+  13 |   const session = await getServerSession(authOptions);
+  14 |
+> 15 |   const cls = await prisma.class.findUnique({
+     |                                  ^
+  16 |     where: { id: classId },
+  17 |     include: {
+  18 |       User: { {
+  clientVersion: '6.19.2',
+  digest: '2583177482'
+}
+ GET /class/DTKS3-25-7A-DT 200 in 612ms (compile: 216ms, proxy.ts: 51ms, render: 346ms)
+ GET / 200 in 570ms (compile: 41ms, proxy.ts: 14ms, render: 515ms)
+⚠ Fast Refresh had to perform a full reload due to a runtime error.
+✓ Compiled in 156ms
+⨯ Error [PrismaClientValidationError]: 
+Invalid `{imported module ./lib/prisma.ts}["prisma"].class.findUnique()` invocation in
+/Users/leroysalih/nodejs/comment-bank-claude/.next/dev/server/chunks/ssr/[root-of-the-server]__dc04d789._.js:184:149
+
+  181 async function ClassPage({ params }) {
+  182     const { classId } = await params;
+  183     const session = await (0, {imported module ./nodemodules/next-auth/index.js}["getServerSession"])({imported module ./app/api/auth/[...nextauth]/route.ts}["authOptions"]);
+→ 184     const cls = await {imported module ./lib/prisma.ts}["prisma"].class.findUnique({
+            where: {
+              id: "DTKS3-25-7A-DT"
+            },
+            include: {
+              User: {
+                select: {
+                  id: true
+                }
+              },
+              Subject: {
+                include: {
+                  CommentGroup: {
+                    orderBy: {
+                      displayOrder: "asc"
+                    },
+                    include: {
+                      CommentOption: true
+                    }
+                  }
+                }
+              },
+              Assignment: {
+                where: {
+                  Pupil: {
+                    isActive: true
+                  }
+                },
+                include: {
+                ~~~~~~~
+                  Pupil: true,
+                  PupilCode: true
+                },
+                select: {
+                ~~~~~~
+                  id: true,
+                  classId: true,
+                  pupilId: true,
+                  eoyLevel: true,
+                  targetLevel: true,
+                  checkStatus: true,
+                  checkNote: true,
+                  finalComment: true,
+                  Pupil: true,
+                  PupilCode: true
+                }
+              }
+            }
+          })
+
+Please either use `include` or `select`, but not both at the same time.
+    at <unknown> (app/class/[classId]/page.tsx:15:34)
+  13 |   const session = await getServerSession(authOptions);
+  14 |
+> 15 |   const cls = await prisma.class.findUnique({
+     |                                  ^
+  16 |     where: { id: classId },
+  17 |     include: {
+  18 |       User: { {
+  clientVersion: '6.19.2',
+  digest: '2583177482'
+}
+ GET /class/DTKS3-25-7A-DT 500 in 395ms (compile: 79ms, proxy.ts: 35ms, render: 282ms)
+✓ Compiled in 65ms
+ GET / 200 in 646ms (compile: 26ms, proxy.ts: 37ms, render: 583ms)
+ GET /class/DTKS3-25-7A-DT 200 in 730ms (compile: 161ms, proxy.ts: 4ms, render: 565ms)
+ GET /class/DTKS3-25-7A-DT 200 in 212ms (compile: 16ms, proxy.ts: 19ms, render: 176ms)
+ POST /class/DTKS3-25-7A-DT 200 in 378ms (compile: 35ms, proxy.ts: 88ms, render: 255ms)
+ POST /class/DTKS3-25-7A-DT 200 in 61ms (compile: 4ms, proxy.ts: 3ms, render: 54ms)
+ POST /class/DTKS3-25-7A-DT 200 in 67ms (compile: 5ms, proxy.ts: 4ms, render: 58ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comment.\n',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 138ms (compile: 14ms, proxy.ts: 22ms, render: 102ms)
+✓ Compiled in 155ms
+✓ Compiled in 181ms
+✓ Compiled in 62ms
+✓ Compiled in 53ms
+✓ Compiled in 47ms
+✓ Compiled in 28ms
+✓ Compiled in 44ms
+ GET /class/DTKS3-25-7A-DT 200 in 307ms (compile: 96ms, proxy.ts: 31ms, render: 179ms)
+StudentPage fetched assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'Isabella is having an OK year. Isabella Isabella. changed - TEST WORKS. New Text.  Another new comment.\n',
+  checkStatus: 'required_check'
+}
+ GET /student/DTKS3-25-7A-DT-12355 200 in 170ms (compile: 75ms, proxy.ts: 5ms, render: 90ms)
+updateAssignmentCommentText called: { assignmentId: 'DTKS3-25-7A-DT-12355', commentLength: 23 }
+Comment to save: This is a new comment.
+
+currentAssignment: { checkStatus: 'required_check', classId: 'DTKS3-25-7A-DT' }
+Status transition: { currentStatus: 'required_check', newStatus: 'required_check' }
+Updated assignment: {
+  id: 'DTKS3-25-7A-DT-12355',
+  finalComment: 'This is a new comment.\n',
+  checkStatus: 'required_check'
+}
+Verified in DB: This is a new comment.
+
+ POST /student/DTKS3-25-7A-DT-12355 200 in 92ms (compile: 11ms, proxy.ts: 36ms, render: 46ms)
+ GET /class/DTKS3-25-7A-DT 200 in 94ms (compile: 15ms, proxy.ts: 16ms, render: 63ms)
+✓ Compiled in 748ms
+ GET / 200 in 876ms (compile: 26ms, proxy.ts: 84ms, render: 766ms)
+ GET /class/DTKS3-25-7A-DT 200 in 837ms (compile: 199ms, proxy.ts: 47ms, render: 591ms)
+ GET /class/DTKS3-25-7A-DT 200 in 897ms (compile: 312ms, proxy.ts: 103ms, render: 482ms)
+ GET / 200 in 709ms (compile: 93ms, proxy.ts: 299ms, render: 316ms)
+ GET /class/DTKS3-25-7A-DT 200 in 383ms (compile: 179ms, proxy.ts: 56ms, render: 147ms)
+ GET /class/DTKS3-25-7A-DT 200 in 422ms (compile: 155ms, proxy.ts: 83ms, render: 184ms)
+✓ Compiled in 124ms
+✓ Compiled in 239ms
+✓ Compiled in 217ms
+ GET / 200 in 387ms (compile: 16ms, proxy.ts: 25ms, render: 346ms)
+ GET /class/DTKS3-25-7A-DT 200 in 400ms (compile: 169ms, proxy.ts: 15ms, render: 215ms)
+ GET /class/DTKS3-25-7A-DT 200 in 408ms (compile: 238ms, proxy.ts: 16ms, render: 154ms)
+✓ Compiled in 79ms
+✓ Compiled in 87ms
+✓ Compiled in 57ms
+✓ Compiled in 58ms
+✓ Compiled in 59ms
+✓ Compiled in 39ms
+✓ Compiled in 56ms
+✓ Compiled in 46ms
+✓ Compiled in 53ms
+✓ Compiled in 105ms
+ GET / 200 in 272ms (compile: 26ms, proxy.ts: 33ms, render: 213ms)
+ GET /class/DTKS3-25-7A-DT 200 in 282ms (compile: 149ms, proxy.ts: 17ms, render: 117ms)
+ GET /class/DTKS3-25-7A-DT 200 in 297ms (compile: 183ms, proxy.ts: 17ms, render: 96ms)
+✓ Compiled in 55ms
+✓ Compiled in 112ms
+✓ Compiled in 60ms
+✓ Compiled in 57ms
+✓ Compiled in 93ms
+ GET / 200 in 735ms (compile: 17ms, proxy.ts: 20ms, render: 698ms)
+ GET /class/DTKS3-25-7A-DT 200 in 752ms (compile: 164ms, proxy.ts: 28ms, render: 560ms)
+ GET /class/DTKS3-25-7A-DT 200 in 733ms (compile: 247ms, proxy.ts: 11ms, render: 475ms)
+ GET / 200 in 656ms (compile: 96ms, proxy.ts: 166ms, render: 395ms)
+ GET /class/DTKS3-25-7A-DT 200 in 504ms (compile: 220ms, proxy.ts: 54ms, render: 230ms)
+ GET /class/DTKS3-25-7A-DT 200 in 434ms (compile: 148ms, proxy.ts: 149ms, render: 137ms)
+✓ Compiled in 157ms
+ GET / 200 in 519ms (compile: 14ms, proxy.ts: 14ms, render: 490ms)
+ GET /class/DTKS3-25-7A-DT 200 in 562ms (compile: 137ms, proxy.ts: 45ms, render: 379ms)
+ GET /class/DTKS3-25-7A-DT 200 in 523ms (compile: 188ms, proxy.ts: 12ms, render: 323ms)
+ GET / 200 in 459ms (compile: 89ms, proxy.ts: 124ms, render: 245ms)
+ GET /class/DTKS3-25-7A-DT 200 in 306ms (compile: 115ms, proxy.ts: 41ms, render: 150ms)
+ GET /class/DTKS3-25-7A-DT 200 in 270ms (compile: 72ms, proxy.ts: 79ms, render: 119ms)
+✓ Compiled in 100ms
+ GET / 200 in 405ms (compile: 8ms, proxy.ts: 11ms, render: 385ms)
+ GET /class/DTKS3-25-7A-DT 200 in 419ms (compile: 104ms, proxy.ts: 18ms, render: 297ms)
+ GET /class/DTKS3-25-7A-DT 200 in 416ms (compile: 150ms, proxy.ts: 10ms, render: 256ms)
+ GET / 200 in 277ms (compile: 54ms, proxy.ts: 15ms, render: 209ms)
+ GET /class/DTKS3-25-7A-DT 200 in 283ms (compile: 46ms, proxy.ts: 52ms, render: 185ms)
+ GET /class/DTKS3-25-7A-DT 200 in 249ms (compile: 49ms, proxy.ts: 35ms, render: 165ms)
+✓ Compiled in 110ms
+ GET / 200 in 333ms (compile: 9ms, proxy.ts: 12ms, render: 312ms)
+ GET /class/DTKS3-25-7A-DT 200 in 354ms (compile: 117ms, proxy.ts: 19ms, render: 219ms)
+ GET /class/DTKS3-25-7A-DT 200 in 346ms (compile: 177ms, proxy.ts: 7ms, render: 162ms)
+ GET / 200 in 185ms (compile: 38ms, proxy.ts: 15ms, render: 132ms)
+ GET /class/DTKS3-25-7A-DT 200 in 180ms (compile: 26ms, proxy.ts: 37ms, render: 117ms)
+ GET /class/DTKS3-25-7A-DT 200 in 147ms (compile: 35ms, proxy.ts: 18ms, render: 95ms)
+✓ Compiled in 78ms
+ GET / 200 in 138ms (compile: 15ms, proxy.ts: 17ms, render: 106ms)
+ GET /class/DTKS3-25-7A-DT 200 in 164ms (compile: 44ms, proxy.ts: 25ms, render: 95ms)
+ GET /class/DTKS3-25-7A-DT 200 in 156ms (compile: 64ms, proxy.ts: 15ms, render: 77ms)
+ POST /class/DTKS3-25-7A-DT 200 in 92ms (compile: 18ms, proxy.ts: 21ms, render: 53ms)
+ GET /class/DTKS3-25-7A-DT 200 in 73ms (compile: 22ms, proxy.ts: 3ms, render: 48ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 159ms (compile: 68ms, proxy.ts: 4ms, render: 87ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 54ms (compile: 12ms, proxy.ts: 12ms, render: 30ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 25ms (compile: 7ms, proxy.ts: 5ms, render: 14ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 84ms (compile: 4ms, proxy.ts: 4ms, render: 76ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 39ms (compile: 9ms, proxy.ts: 11ms, render: 19ms)
+ GET /class/DTKS3-25-7A-DT 200 in 92ms (compile: 13ms, proxy.ts: 6ms, render: 73ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 206ms (compile: 36ms, proxy.ts: 42ms, render: 128ms)
+✓ Compiled in 146ms
+✓ Compiled in 53ms
+✓ Compiled in 49ms
+✓ Compiled in 793ms
+ GET /class/DTKS3-25-7A-DT 200 in 524ms (compile: 245ms, proxy.ts: 42ms, render: 237ms)
+ GET / 200 in 518ms (compile: 12ms, proxy.ts: 33ms, render: 474ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 557ms (compile: 188ms, proxy.ts: 15ms, render: 354ms)
+✓ Compiled in 114ms
+✓ Compiled in 58ms
+ GET / 200 in 921ms (compile: 7ms, proxy.ts: 46ms, render: 868ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 878ms (compile: 133ms, proxy.ts: 30ms, render: 716ms)
+ GET /class/DTKS3-25-7A-DT 200 in 898ms (compile: 70ms, proxy.ts: 6ms, render: 822ms)
+✓ Compiled in 48ms
+ GET / 200 in 313ms (compile: 10ms, proxy.ts: 16ms, render: 287ms)
+ GET /class/DTKS3-25-7A-DT 200 in 323ms (compile: 73ms, proxy.ts: 12ms, render: 238ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 380ms (compile: 166ms, proxy.ts: 12ms, render: 202ms)
+✓ Compiled in 82ms
+✓ Compiled in 70ms
+ POST /student/DTKS3-25-7A-DT-12355 200 in 211ms (compile: 124ms, proxy.ts: 23ms, render: 64ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 107ms (compile: 8ms, proxy.ts: 3ms, render: 96ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 78ms (compile: 5ms, proxy.ts: 4ms, render: 68ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 68ms (compile: 5ms, proxy.ts: 3ms, render: 60ms)
+ POST /student/DTKS3-25-7A-DT-12355 200 in 25ms (compile: 6ms, proxy.ts: 4ms, render: 15ms)
+[2026-02-02T00:47:15.260Z] [DEBUG] Authorization successful {
+  userId: 'nqf5l4wh4twd32v2yaic64qi',
+  requiredRoles: [ 'admin', 'hod' ]
+}
+[2026-02-02T00:47:15.271Z] [INFO] Comment reviewed {
+  assignmentId: 'DTKS3-25-7A-DT-12355',
+  status: 'checked_ok',
+  reviewerId: 'nqf5l4wh4twd32v2yaic64qi'
+}
+ POST /student/DTKS3-25-7A-DT-12355 200 in 110ms (compile: 7ms, proxy.ts: 7ms, render: 96ms)
+ GET /student/DTKS3-25-7A-DT-12355 200 in 59ms (compile: 4ms, proxy.ts: 4ms, render: 51ms)
+ GET /class/DTKS3-25-7A-DT 200 in 49ms (compile: 5ms, proxy.ts: 3ms, render: 41ms)
+ POST /class/DTKS3-25-7A-DT 200 in 63ms (compile: 6ms, proxy.ts: 4ms, render: 52ms)
+ POST /class/DTKS3-25-7A-DT 200 in 56ms (compile: 7ms, proxy.ts: 12ms, render: 36ms)
+ POST /class/DTKS3-25-7A-DT 200 in 40ms (compile: 4ms, proxy.ts: 3ms, render: 33ms)
+ GET /student/DTKS3-25-7A-DT-12350 200 in 70ms (compile: 7ms, proxy.ts: 5ms, render: 57ms)
+ POST /student/DTKS3-25-7A-DT-12350 200 in 34ms (compile: 6ms, proxy.ts: 7ms, render: 20ms)
+[2026-02-02T00:47:44.433Z] [DEBUG] Authorization successful {
+  userId: 'nqf5l4wh4twd32v2yaic64qi',
+  requiredRoles: [ 'admin', 'hod' ]
+}
+[2026-02-02T00:47:44.444Z] [INFO] Comment reviewed {
+  assignmentId: 'DTKS3-25-7A-DT-12350',
+  status: 'checked_rejected',
+  reviewerId: 'nqf5l4wh4twd32v2yaic64qi'
+}
+ POST /student/DTKS3-25-7A-DT-12350 200 in 100ms (compile: 9ms, proxy.ts: 4ms, render: 87ms)
+ GET /student/DTKS3-25-7A-DT-12350 200 in 58ms (compile: 4ms, proxy.ts: 7ms, render: 47ms)
+ GET /class/DTKS3-25-7A-DT 200 in 69ms (compile: 14ms, proxy.ts: 4ms, render: 51ms)
+✓ Compiled in 63ms
+✓ Compiled in 69ms
+✓ Compiled in 60ms
+✓ Compiled in 58ms
+✓ Compiled in 61ms
+✓ Compiled in 51ms
+ GET /student/DTKS3-25-7A-DT-12350 200 in 378ms (compile: 180ms, proxy.ts: 22ms, render: 176ms)
+ POST /student/DTKS3-25-7A-DT-12350 200 in 100ms (compile: 16ms, proxy.ts: 27ms, render: 56ms)
+[2026-02-02T00:51:23.811Z] [DEBUG] Authorization successful {
+  userId: 'nqf5l4wh4twd32v2yaic64qi',
+  requiredRoles: [ 'admin', 'hod' ]
+}
+[2026-02-02T00:51:23.823Z] [INFO] Comment reviewed {
+  assignmentId: 'DTKS3-25-7A-DT-12350',
+  status: 'checked_ok',
+  reviewerId: 'nqf5l4wh4twd32v2yaic64qi'
+}
+ POST /student/DTKS3-25-7A-DT-12350 200 in 145ms (compile: 9ms, proxy.ts: 9ms, render: 127ms)
+ GET /student/DTKS3-25-7A-DT-12350 200 in 73ms (compile: 5ms, proxy.ts: 5ms, render: 64ms)
+ GET /class/DTKS3-25-7A-DT 200 in 162ms (compile: 102ms, proxy.ts: 9ms, render: 52ms)
+ GET /student/DTKS3-25-7A-DT-12346 200 in 87ms (compile: 17ms, proxy.ts: 6ms, render: 64ms)
+ POST /student/DTKS3-25-7A-DT-12346 200 in 32ms (compile: 10ms, proxy.ts: 6ms, render: 16ms)
+ POST /student/DTKS3-25-7A-DT-12346 200 in 78ms (compile: 4ms, proxy.ts: 3ms, render: 71ms)
+ POST /student/DTKS3-25-7A-DT-12346 200 in 92ms (compile: 10ms, proxy.ts: 7ms, render: 75ms)
+ POST /student/DTKS3-25-7A-DT-12346 200 in 102ms (compile: 11ms, proxy.ts: 6ms, render: 85ms)
+✓ Compiled in 74ms
+ GET /student/DTKS3-25-7A-DT-12346 200 in 605ms (compile: 132ms, proxy.ts: 31ms, render: 442ms)
+ GET /class/DTKS3-25-7A-DT 200 in 103ms (compile: 9ms, proxy.ts: 35ms, render: 59ms)
+ POST /class/DTKS3-25-7A-DT 200 in 154ms (compile: 12ms, proxy.ts: 63ms, render: 79ms)
+ GET /student/DTKS3-25-7A-DT-12346 200 in 115ms (compile: 32ms, proxy.ts: 3ms, render: 80ms)
+ GET /hod 200 in 325ms (compile: 218ms, proxy.ts: 25ms, render: 82ms)
+ GET /hod/subject/DTKS3 200 in 862ms (compile: 817ms, proxy.ts: 4ms, render: 41ms)
+ GET / 200 in 83ms (compile: 10ms, proxy.ts: 14ms, render: 59ms)
+ GET /class/DTKS3-25-7A-DT 200 in 144ms (compile: 12ms, proxy.ts: 6ms, render: 125ms)
+ GET /student/DTKS3-25-7A-DT-12351 200 in 91ms (compile: 7ms, proxy.ts: 3ms, render: 81ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 156ms (compile: 9ms, proxy.ts: 25ms, render: 122ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 70ms (compile: 4ms, proxy.ts: 3ms, render: 63ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 66ms (compile: 5ms, proxy.ts: 3ms, render: 58ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 61ms (compile: 4ms, proxy.ts: 3ms, render: 55ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 69ms (compile: 17ms, proxy.ts: 23ms, render: 29ms)
+ GET /class/DTKS3-25-7A-DT 200 in 73ms (compile: 7ms, proxy.ts: 2ms, render: 64ms)
+ GET /student/DTKS3-25-7A-DT-12351 200 in 108ms (compile: 13ms, proxy.ts: 15ms, render: 80ms)
+[2026-02-02T00:57:08.295Z] [DEBUG] Authorization successful {
+  userId: 'nqf5l4wh4twd32v2yaic64qi',
+  requiredRoles: [ 'admin', 'hod' ]
+}
+[2026-02-02T00:57:08.307Z] [INFO] Comment reviewed {
+  assignmentId: 'DTKS3-25-7A-DT-12351',
+  status: 'checked_ok',
+  reviewerId: 'nqf5l4wh4twd32v2yaic64qi'
+}
+ POST /student/DTKS3-25-7A-DT-12351 200 in 104ms (compile: 6ms, proxy.ts: 7ms, render: 91ms)
+ GET /student/DTKS3-25-7A-DT-12351 200 in 62ms (compile: 4ms, proxy.ts: 4ms, render: 54ms)
+ GET /class/DTKS3-25-7A-DT 200 in 93ms (compile: 17ms, proxy.ts: 16ms, render: 60ms)
+ GET /student/DTKS3-25-7A-DT-12351 200 in 60ms (compile: 4ms, proxy.ts: 2ms, render: 53ms)
+ POST /student/DTKS3-25-7A-DT-12351 200 in 74ms (compile: 17ms, proxy.ts: 22ms, render: 35ms)
+ GET /class/DTKS3-25-7A-DT 200 in 54ms (compile: 9ms, proxy.ts: 4ms, render: 42ms)

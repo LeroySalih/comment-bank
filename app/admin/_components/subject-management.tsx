@@ -33,17 +33,17 @@ export function SubjectManagement({ subjects, users }: SubjectManagementProps) {
                 
                 <div className="flex justify-between items-center text-sm text-gray-500 mt-auto pt-4 border-t">
                   <div className="flex gap-4">
-                     <span>{subject._count.classes} Classes</span>
-                     <span>{subject._count.commentGroups} Groups</span>
+                     <span>{subject._count.Class} Classes</span>
+                     <span>{subject._count.CommentGroup} Groups</span>
                   </div>
                 </div>
               </div>
             </Link>
             <div className="absolute bottom-4 right-4 z-10 flex gap-2">
-               <SubjectUserAssignment 
-                 subjectId={subject.id} 
-                 assignedUsers={subject.users} 
-                 allUsers={users} 
+               <SubjectUserAssignment
+                 subjectId={subject.id}
+                 assignedUsers={subject.User}
+                 allUsers={users}
                />
                <EditSubjectForm subject={subject} />
             </div>

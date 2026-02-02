@@ -13,7 +13,7 @@ export function ClassForm({ subjectId }: { subjectId: string }) {
     setError(null)
     const result = await createClass(subjectId, formData)
     if (!result.success) {
-      setError(result.error || "Failed to create class")
+      setError(('error' in result ? result.error : "Failed to create class") || "Failed to create class")
     } else {
       setOpen(false)
       router.refresh()

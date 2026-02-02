@@ -26,7 +26,16 @@ export function encrypt(text: string): string {
 }
 
 /**
+ * Check if a string is encrypted (has the expected format)
+ */
+export function isEncrypted(text: string): boolean {
+  const parts = text.split(':')
+  return parts.length === 3 && parts.every(part => part.length > 0)
+}
+
+/**
  * Decrypts a string using AES-256-GCM
+ * Throws an error if decryption fails
  */
 export function decrypt(encryptedText: string): string {
   const key = process.env.PUPIL_ENCRYPTION_KEY
@@ -34,11 +43,15 @@ export function decrypt(encryptedText: string): string {
     throw new Error('PUPIL_ENCRYPTION_KEY must be a 64-character (32-byte) hex string')
   }
 
+  // If the text doesn't look encrypted, it might be legacy unencrypted data
+  if (!isEncrypted(encryptedText)) {
+    // For now, return as-is to support migration
+    // TODO: Remove this once all data is encrypted
+    return encryptedText
+  }
+
   try {
     const [ivHex, authTagHex, encryptedData] = encryptedText.split(':')
-    if (!ivHex || !authTagHex || !encryptedData) {
-      return encryptedText // Not encrypted or invalid format
-    }
 
     const iv = Buffer.from(ivHex, 'hex')
     const authTag = Buffer.from(authTagHex, 'hex')
@@ -51,7 +64,8 @@ export function decrypt(encryptedText: string): string {
     
     return decrypted
   } catch (error) {
-    console.error('Decryption failed:', error)
-    return encryptedText // Fallback to raw text if decryption fails
+    // Log the error but don't expose sensitive details
+    const errorMessage = error instanceof Error ? error.message : 'Unknown error'
+    throw new Error(`Decryption failed: ${errorMessage}`)
   }
 }

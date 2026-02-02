@@ -3,100 +3,117 @@ generator client {
 }
 
 datasource db {
-  provider = "sqlite"
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
-model User {
-  id       String @id @default(cuid())
-  username String @unique
-  password String
-  roles    Role[]
-  subjects Subject[]
-  classes  Class[]
-}
+model Assignment {
+  id           String      @id
+  pupilId      String
+  classId      String
+  eoyLevel     String?
+  targetLevel  String?
+  actualLevel  String?
+  finalComment String?
 
-model Role {
-  id    String @id @default(cuid())
-  name  String @unique // "admin", "hod", "teacher"
-  users User[]
-}
+  // Comment Check Status
+  checkStatus   String    @default("not_required")  // not_required | required_check | checked_ok | checked_rejected
+  checkNote     String?                              // Feedback note from HoD (for rejections)
+  checkedAt     DateTime?                            // When check decision was made
+  checkedById   String?                              // User ID of HoD who checked
 
-model Subject {
-  id             String         @id @default(cuid())
-  code           String         @unique // e.g. "11CS", "CP"
-  title          String?        // e.g. "Computer Science"
-  studiedComment String? // Intro text
-  classes        Class[]
-  commentGroups  CommentGroup[]
-  users          User[]
+  Class        Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
+  Pupil        Pupil       @relation(fields: [pupilId], references: [admissionNumber], onDelete: Cascade)
+  PupilCode    PupilCode[]
+  CheckedBy    User?       @relation("CheckedAssignments", fields: [checkedById], references: [id])
+
+  @@index([classId])
+  @@index([pupilId])
+  @@index([checkStatus])
 }
 
 model Class {
-  id          String       @id @default(cuid())
-  name        String       @unique // e.g. "7CP"
-  year        String?      // e.g. "7", "8"
-  subjectId   String
-  subject     Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  assignments Assignment[]
-  teachers    User[]
+  id         String       @id
+  name       String       @unique
+  year       String?
+  subjectId  String
+  Assignment Assignment[]
+  Subject    Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  User       User[]
+
+  @@index([subjectId])
+}
+
+model CommentGroup {
+  id            String          @id
+  name          String
+  displayOrder  Int             @default(0)
+  subjectId     String
+  title         String          @default("")
+  Subject       Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
+  CommentOption CommentOption[]
+  PupilCode     PupilCode[]
+
+  @@unique([subjectId, name])
+}
+
+model CommentOption {
+  id           String       @id
+  code         String
+  text         String
+  displayOrder Int          @default(0)
+  groupId      String
+  CommentGroup CommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, code])
+  @@index([groupId])
 }
 
 model Pupil {
   admissionNumber String       @id
   firstName       String
   lastName        String
-  gender          String       // "Male", "Female"
+  gender          String
   isActive        Boolean      @default(true)
-  assignments     Assignment[]
-}
-
-model Assignment {
-  id        String @id @default(cuid())
-  pupilId   String
-  pupil     Pupil  @relation(fields: [pupilId], references: [admissionNumber], onDelete: Cascade)
-  classId   String
-  class     Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
-
-  // Levels
-  eoyLevel    String?
-  targetLevel String?
-  actualLevel String?
-
-  finalComment String? // The final editable comment text
-  codes        PupilCode[]
+  form            String?
+  Assignment      Assignment[]
 }
 
 model PupilCode {
-  id           String       @id @default(cuid())
+  id           String       @id
   assignmentId String
-  assignment   Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
   groupId      String
-  group        CommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
-  code         String?      // The selected code (e.g. "H", "M", "L")
+  code         String?
+  Assignment   Assignment   @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  CommentGroup CommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
 
   @@unique([assignmentId, groupId])
+  @@index([assignmentId])
+  @@index([groupId])
 }
 
-model CommentGroup {
-  id           String          @id @default(cuid())
-  name         String // "WP", "TH", "PS", "OA"
-  displayOrder Int             @default(0)
-  subjectId    String
-  subject      Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
-  options      CommentOption[]
-  pupilCodes   PupilCode[]
-
-  @@unique([subjectId, name])
+model Role {
+  id   String @id
+  name String @unique
+  User User[]
 }
 
-model CommentOption {
-  id           String       @id @default(cuid())
-  code         String // "H", "M", "L"
-  text         String
-  displayOrder Int          @default(0)
-  groupId      String
-  group        CommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+model Subject {
+  id             String         @id
+  code           String         @unique
+  title          String?
+  studiedComment String?
+  Class          Class[]
+  CommentGroup   CommentGroup[]
+  User           User[]
+}
 
-  @@unique([groupId, code])
+model User {
+  id                  String       @id
+  username            String       @unique
+  password            String
+  Class               Class[]
+  Role                Role[]
+  Subject             Subject[]
+  CheckedAssignments  Assignment[] @relation("CheckedAssignments")
 }

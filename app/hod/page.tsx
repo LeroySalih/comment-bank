@@ -20,14 +20,14 @@ export default async function HoDDashboard() {
   
   const allowAll = session.user.roles?.some((r: any) => r.name === 'admin');
   
-  const subjects = await (prisma as any).subject.findMany({
+  const subjects = await prisma.subject.findMany({
     where: allowAll ? {} : {
-      users: { some: { id: session.user.id } }
+      User: { some: { id: session.user.id } }
     },
     orderBy: { code: 'asc' },
     include: {
       _count: {
-        select: { classes: true, commentGroups: true }
+        select: { Class: true, CommentGroup: true }
       }
     }
   })
@@ -37,7 +37,7 @@ export default async function HoDDashboard() {
       {/* Page Heading */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-8 border-b border-[#f0f2f4] dark:border-gray-800 bg-white dark:bg-gray-900">
         <div className="flex min-w-72 flex-col gap-1">
-          <h1 className="text-[#111418] dark:text-white text-3xl font-black leading-tight tracking-[-0.033em]">Department Management</h1>
+          <h1 className="text-[#111418] dark:text-white text-3xl font-black leading-tight tracking-[-0.033em]">Head of Department Dashboard</h1>
           <p className="text-[#617289] dark:text-gray-400 text-base font-normal leading-normal">Manage subjects, classes, and comment banks.</p>
         </div>
         <div className="flex gap-3">
@@ -74,11 +74,11 @@ export default async function HoDDashboard() {
                     <div className="flex gap-4 pt-4 border-t border-[#f0f2f4] dark:border-gray-800">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-[#617289] dark:text-gray-500 uppercase tracking-wider">Classes</span>
-                            <span className="text-lg font-bold text-[#111418] dark:text-white">{subject._count.classes}</span>
+                            <span className="text-lg font-bold text-[#111418] dark:text-white">{subject._count.Class}</span>
                         </div>
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-[#617289] dark:text-gray-500 uppercase tracking-wider">Groups</span>
-                            <span className="text-lg font-bold text-[#111418] dark:text-white">{subject._count.commentGroups}</span>
+                            <span className="text-lg font-bold text-[#111418] dark:text-white">{subject._count.CommentGroup}</span>
                         </div>
                     </div>
                 </div>

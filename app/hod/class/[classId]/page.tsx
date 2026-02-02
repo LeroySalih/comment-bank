@@ -16,32 +16,32 @@ interface Props {
 export default async function ClassPage({ params }: Props) {
   const { classId } = await params
   
-  const classData = await (prisma as any).class.findUnique({
+  const classData = await prisma.class.findUnique({
     where: { id: classId },
     include: {
-      assignments: {
-        include: { pupil: true },
-        orderBy: { pupil: { lastName: 'asc' } }
+      Assignment: {
+        include: { Pupil: true },
+        orderBy: { Pupil: { lastName: 'asc' } }
       },
-      subject: true
+      Subject: true
     }
   })
 
   if (!classData) notFound()
 
   // Decrypt pupil names
-  classData.assignments = classData.assignments.map((assignment: any) => ({
+  const assignments = classData.Assignment.map((assignment: any) => ({
     ...assignment,
-    pupil: {
-      ...assignment.pupil,
-      firstName: decrypt(assignment.pupil.firstName),
-      lastName: decrypt(assignment.pupil.lastName)
+    Pupil: {
+      ...assignment.Pupil,
+      firstName: decrypt(assignment.Pupil.firstName),
+      lastName: decrypt(assignment.Pupil.lastName)
     }
   }))
 
   // Re-sort because database sort was on encrypted strings
-  classData.assignments.sort((a: any, b: any) => 
-    a.pupil.lastName.localeCompare(b.pupil.lastName)
+  assignments.sort((a: any, b: any) =>
+    a.Pupil.lastName.localeCompare(b.Pupil.lastName)
   )
 
   return (
@@ -50,7 +50,7 @@ export default async function ClassPage({ params }: Props) {
         <div className="flex items-center gap-2 text-sm text-gray-500">
            <Link href="/hod" className="hover:text-indigo-600">Dashboard</Link>
            <span>/</span>
-           <Link href={`/hod/subject/${classData.subjectId}`} className="hover:text-indigo-600">{classData.subject.code}</Link>
+           <Link href={`/hod/subject/${classData.subjectId}`} className="hover:text-indigo-600">{classData.Subject.code}</Link>
            <span>/</span>
            <span>{classData.name}</span>
         </div>
@@ -74,14 +74,14 @@ export default async function ClassPage({ params }: Props) {
               </tr>
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
-              {classData.assignments.map((assignment: any) => (
-                <StudentRow 
-                  key={assignment.id} 
-                  student={assignment} 
-                  classId={classData.id} 
+              {assignments.map((assignment: any) => (
+                <StudentRow
+                  key={assignment.id}
+                  student={assignment}
+                  classId={classData.id}
                 />
               ))}
-              {classData.assignments.length === 0 && (
+              {assignments.length === 0 && (
                 <tr>
                   <td colSpan={4} className="px-6 py-10 text-center text-sm text-gray-500">
                     No pupils added to this class yet.

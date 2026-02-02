@@ -14,7 +14,7 @@ type MinimalOption = {
 type MinimalGroup = {
   id: string;
   name: string;
-  options: MinimalOption[];
+  CommentOption: MinimalOption[];
 };
 
 type MinimalPupil = {
@@ -30,10 +30,12 @@ type MinimalPupilCode = {
 
 type MinimalAssignment = {
   id: string;
-  pupil: MinimalPupil;
-  codes: MinimalPupilCode[];
+  Pupil: MinimalPupil;
+  PupilCode: MinimalPupilCode[];
   eoyLevel?: string | null;
   targetLevel?: string | null;
+  finalComment?: string | null;
+  checkStatus?: string;
 };
 
 type MinimalSubject = {
@@ -49,19 +51,26 @@ interface CopyCommentButtonProps {
 
 export default function CopyCommentButton({ assignment, subject, groups }: CopyCommentButtonProps) {
   const [copied, setCopied] = useState(false);
-  
+
   // Check if all groups have a selected code
-  const isComplete = groups.every(g => 
-    assignment.codes.some(c => c.groupId === g.id && c.code)
+  const isComplete = groups.every(g =>
+    assignment.PupilCode?.some(c => c.groupId === g.id && c.code)
   );
+
+  // Check if comment needs review or is rejected
+  const isPendingReview = assignment.checkStatus === 'required_check' || assignment.checkStatus === 'checked_rejected';
+
+  // Button is disabled if incomplete OR pending review
+  const isDisabled = !isComplete || isPendingReview;
 
   const handleCopy = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
 
-    if (!isComplete) return;
+    if (isDisabled) return;
 
-    const comment = generateComment(assignment, subject, groups);
+    // Use saved finalComment if available, otherwise generate from codes
+    const comment = assignment.finalComment || generateComment(assignment, subject, groups);
     
     if (!comment) return;
 
@@ -77,14 +86,19 @@ export default function CopyCommentButton({ assignment, subject, groups }: CopyC
       setPreview("Please select options for all groups first");
       return;
     }
-    const comment = generateComment(assignment, subject, groups);
+    if (isPendingReview) {
+      setPreview("Comment must be approved before copying");
+      return;
+    }
+    // Use saved finalComment if available, otherwise generate from codes
+    const comment = assignment.finalComment || generateComment(assignment, subject, groups);
     setPreview(comment || "No comment generated");
   };
 
   return (
-    <Tooltip 
+    <Tooltip
         content={
-          <div className={`font-normal whitespace-pre-wrap ${!isComplete ? 'text-red-500' : ''}`}>
+          <div className={`font-normal whitespace-pre-wrap ${isDisabled ? 'text-red-500' : ''}`}>
             {preview}
           </div>
         }
@@ -93,17 +107,19 @@ export default function CopyCommentButton({ assignment, subject, groups }: CopyC
         <button
         onMouseEnter={handleMouseEnter}
         onClick={handleCopy}
-        disabled={!isComplete}
+        disabled={isDisabled}
         className={`
             p-2 rounded-full transition-all duration-200
             ${!isComplete
               ? 'bg-red-50 text-red-500 cursor-not-allowed'
-              : copied 
-                ? 'bg-green-100 text-green-600 hover:bg-green-200' 
-                : 'text-green-600 hover:bg-green-50'
+              : isPendingReview
+                ? 'bg-amber-50 text-amber-500 cursor-not-allowed'
+                : copied
+                  ? 'bg-green-100 text-green-600 hover:bg-green-200'
+                  : 'text-green-600 hover:bg-green-50'
             }
         `}
-        title={!isComplete ? "Incomplete selection" : "Copy Comment"}
+        title={!isComplete ? "Incomplete selection" : isPendingReview ? "Comment must be approved" : "Copy Comment"}
         >
         {copied ? (
             <Check className="w-4 h-4" />

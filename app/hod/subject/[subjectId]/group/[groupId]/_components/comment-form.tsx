@@ -16,7 +16,7 @@ export function CommentForm({ groupId, subjectId }: { groupId: string, subjectId
     setError(null)
     const result = await createComment(groupId, subjectId, formData)
     if (!result.success) {
-      setError(result.error || "Failed to create comment")
+      setError(('error' in result ? result.error : "Failed to create comment") || "Failed to create comment")
     } else {
       setOpen(false)
       setText("")

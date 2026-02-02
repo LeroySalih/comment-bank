@@ -40,9 +40,10 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
       setIsEditing(false)
       router.refresh()
     } else {
-      setError(result.error || "Failed to update subject")
+      setError('error' in result ? result.error : "Failed to update subject")
     }
   }
+
 
   async function handleDelete(e: React.MouseEvent) {
     e.preventDefault()
@@ -55,10 +56,11 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
     if (result.success) {
       router.refresh()
     } else {
-      setError(result.error || "Failed to delete subject")
+      setError(('error' in result ? result.error : "Failed to delete subject") || "Failed to delete subject")
       setIsDeleting(false)
     }
   }
+
 
   if (isEditing) {
     return (
