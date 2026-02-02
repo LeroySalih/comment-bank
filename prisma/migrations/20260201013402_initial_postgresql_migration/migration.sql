@@ -200,3 +200,17 @@ ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_A_fkey" FOREIGN KEY ("A"
 
 -- AddForeignKey
 ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+
+-- Seed: Create roles
+INSERT INTO "Role" ("id", "name") VALUES
+  ('role_admin_001', 'admin'),
+  ('role_hod_001', 'hod'),
+  ('role_teacher_001', 'teacher');
+
+-- Seed: Create admin user (password: 'password')
+INSERT INTO "User" ("id", "username", "password") VALUES
+  ('user_admin_001', 'admin', '$2b$10$Gu0rCLBDr8RikhF26aGhguJMpOgjOlyQ7JGCHwRJVpUOFKfanFPtG');
+
+-- Seed: Assign admin role to admin user
+INSERT INTO "_RoleToUser" ("A", "B") VALUES
+  ('role_admin_001', 'user_admin_001');

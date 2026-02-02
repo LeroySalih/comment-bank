@@ -4,6 +4,7 @@ import Link from "next/link"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { redirect } from "next/navigation"
+import { decrypt } from "@/lib/encryption"
 
 export const dynamic = 'force-dynamic'
 
@@ -17,9 +18,9 @@ export default async function HoDDashboard() {
   // Ideally Admin goes to Admin panel. HoD dashboard is for their assigned work.
   // But Admin might want quick access here too.
   // Let's show ALL for Admin, and ASSIGNED for others.
-  
+
   const allowAll = session.user.roles?.some((r: any) => r.name === 'admin');
-  
+
   const subjects = await prisma.subject.findMany({
     where: allowAll ? {} : {
       User: { some: { id: session.user.id } }
@@ -30,6 +31,36 @@ export default async function HoDDashboard() {
         select: { Class: true, CommentGroup: true }
       }
     }
+  })
+
+  // Get classes with assignments needing review
+  const subjectIds = subjects.map(s => s.id)
+
+  const classesWithPendingReviews = await prisma.class.findMany({
+    where: {
+      subjectId: { in: subjectIds },
+      Assignment: {
+        some: { checkStatus: 'required_check' }
+      }
+    },
+    include: {
+      Subject: true,
+      Assignment: {
+        where: { checkStatus: 'required_check' },
+        include: {
+          Pupil: true
+        },
+        take: 5 // Show up to 5 pending assignments per class
+      },
+      _count: {
+        select: {
+          Assignment: {
+            where: { checkStatus: 'required_check' }
+          }
+        }
+      }
+    },
+    orderBy: { name: 'asc' }
   })
 
   return (
@@ -49,8 +80,87 @@ export default async function HoDDashboard() {
             )}
         </div>
       </div>
-      
+
+      {/* Pending Reviews Section */}
+      {classesWithPendingReviews.length > 0 && (
+        <div className="p-8 border-b border-[#f0f2f4] dark:border-gray-800">
+          <div className="flex items-center gap-3 mb-6">
+            <div className="size-10 rounded-lg bg-amber-100 dark:bg-amber-900/30 flex items-center justify-center">
+              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-2xl">rate_review</span>
+            </div>
+            <div>
+              <h2 className="text-xl font-bold text-[#111418] dark:text-white">Comments Needing Review</h2>
+              <p className="text-sm text-[#617289] dark:text-gray-400">
+                {classesWithPendingReviews.reduce((sum, c) => sum + c._count.Assignment, 0)} comments across {classesWithPendingReviews.length} {classesWithPendingReviews.length === 1 ? 'class' : 'classes'}
+              </p>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+            {classesWithPendingReviews.map((cls: any) => (
+              <div
+                key={cls.id}
+                className="bg-white dark:bg-gray-900 rounded-xl border border-amber-200 dark:border-amber-800 shadow-sm overflow-hidden"
+              >
+                <div className="p-4 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h3 className="font-bold text-[#111418] dark:text-white">{cls.name}</h3>
+                      <p className="text-xs text-[#617289] dark:text-gray-400">{cls.Subject.title}</p>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <span className="bg-amber-500 text-white text-xs font-bold px-2 py-1 rounded-full">
+                        {cls._count.Assignment} pending
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <div className="p-4">
+                  <p className="text-xs font-medium text-[#617289] dark:text-gray-500 uppercase tracking-wider mb-2">Students awaiting review:</p>
+                  <ul className="space-y-1 mb-4">
+                    {cls.Assignment.slice(0, 5).map((assignment: any) => (
+                      <li key={assignment.id}>
+                        <Link
+                          href={`/student/${assignment.id}`}
+                          className="flex items-center justify-between text-sm text-[#111418] dark:text-gray-300 hover:text-primary transition-colors group/link"
+                        >
+                          <span>{decrypt(assignment.Pupil.firstName)} {decrypt(assignment.Pupil.lastName)}</span>
+                          <span className="material-symbols-outlined text-gray-300 dark:text-gray-600 group-hover/link:text-primary text-sm transition-colors">chevron_right</span>
+                        </Link>
+                      </li>
+                    ))}
+                    {cls._count.Assignment > 5 && (
+                      <li className="text-xs text-[#617289] dark:text-gray-500 italic">
+                        +{cls._count.Assignment - 5} more...
+                      </li>
+                    )}
+                  </ul>
+                  <Link
+                    href={`/class/${cls.id}`}
+                    className="flex items-center justify-center gap-2 w-full py-2 bg-amber-100 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 rounded-lg text-sm font-medium hover:bg-amber-200 dark:hover:bg-amber-900/50 transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-lg">visibility</span>
+                    View Class
+                  </Link>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Subjects Section */}
       <div className="p-8">
+        <div className="flex items-center gap-3 mb-6">
+          <div className="size-10 rounded-lg bg-blue-50 dark:bg-blue-900/20 flex items-center justify-center">
+            <span className="material-symbols-outlined text-primary text-2xl">folder</span>
+          </div>
+          <div>
+            <h2 className="text-xl font-bold text-[#111418] dark:text-white">Your Subjects</h2>
+            <p className="text-sm text-[#617289] dark:text-gray-400">Manage classes and comment banks</p>
+          </div>
+        </div>
+
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {subjects.map((subject: any) => (
              <Link 
