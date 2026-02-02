@@ -13,6 +13,48 @@ export default async function Home() {
   const userIsTeacher = isTeacher(session?.user);
   const userId = session?.user?.id;
 
+  // Get distinct forms for pupils the user has access to
+  const formsData = await prisma.pupil.findMany({
+    where: {
+      form: { not: null },
+      isActive: true,
+      Assignment: {
+        some: userIsAdmin ? {} : {
+          Class: userIsHoD
+            ? { Subject: { User: { some: { id: userId } } } }
+            : { User: { some: { id: userId } } }
+        }
+      }
+    },
+    select: {
+      form: true,
+    },
+    distinct: ['form'],
+    orderBy: { form: 'asc' }
+  });
+
+  // Get pupil counts per form
+  const formCounts = await prisma.pupil.groupBy({
+    by: ['form'],
+    where: {
+      form: { not: null },
+      isActive: true,
+      Assignment: {
+        some: userIsAdmin ? {} : {
+          Class: userIsHoD
+            ? { Subject: { User: { some: { id: userId } } } }
+            : { User: { some: { id: userId } } }
+        }
+      }
+    },
+    _count: { admissionNumber: true }
+  });
+
+  const forms = formsData.map(f => ({
+    form: f.form!,
+    pupilCount: formCounts.find(fc => fc.form === f.form)?._count.admissionNumber || 0
+  }));
+
   // Filter logic:
   // Admin sees all subjects.
   // Others see subjects they are assigned to (via Subject or Class).
@@ -112,7 +154,7 @@ export default async function Home() {
 
       {/* ImageGrid / Subjects Cards */}
       <div className="grid grid-cols-1 lg:grid-cols-2 2xl:grid-cols-3 gap-6 p-8">
-        {subjects.map((subject, index) => {
+{subjects.map((subject, index) => {
           // Generate a gradient based on index to vary the look
           const gradients = [
             "from-blue-600 to-indigo-700",
@@ -209,6 +251,46 @@ export default async function Home() {
           );
         })}
       </div>
+
+      {/* Forms Section Header */}
+      {forms.length > 0 && (
+        <>
+          <div className="px-8 pt-4">
+            <h2 className="text-slate-900 dark:text-white text-xl font-bold leading-tight tracking-tight border-b border-slate-200 dark:border-slate-800 pb-3">My Forms</h2>
+          </div>
+
+          {/* Forms Cards */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6 gap-4 p-8">
+            {forms.map((form, index) => {
+              const formGradients = [
+                "from-cyan-500 to-blue-600",
+                "from-violet-500 to-purple-600",
+                "from-amber-500 to-orange-600",
+                "from-rose-500 to-pink-600",
+                "from-teal-500 to-emerald-600",
+                "from-indigo-500 to-blue-600"
+              ];
+              const formGradient = formGradients[index % formGradients.length];
+
+              return (
+                <Link
+                  key={form.form}
+                  href={`/forms/${encodeURIComponent(form.form)}`}
+                  className="bg-white dark:bg-slate-900 rounded-xl border border-slate-200 dark:border-slate-800 overflow-hidden shadow-sm hover:shadow-md transition-shadow group"
+                >
+                  <div className={`h-16 bg-gradient-to-r ${formGradient} flex items-center justify-center`}>
+                    <span className="material-symbols-outlined text-white text-3xl group-hover:scale-110 transition-transform">groups</span>
+                  </div>
+                  <div className="p-4 text-center">
+                    <h3 className="text-lg font-bold text-slate-900 dark:text-white">{form.form}</h3>
+                    <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">{form.pupilCount} Pupils</p>
+                  </div>
+                </Link>
+              );
+            })}
+          </div>
+        </>
+      )}
     </main>
   );
 }
