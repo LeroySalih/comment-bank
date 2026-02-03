@@ -6,6 +6,7 @@ import { PupilManagement } from "./pupil-management"
 import { SubjectManagement } from "./subject-management"
 import { ClassManagement } from "./class-management"
 import { DeadlineManagement } from "./deadline-management"
+import { ActivityLog } from "./activity-log"
 
 interface AdminTabsProps {
   users: any[]
@@ -15,7 +16,7 @@ interface AdminTabsProps {
 }
 
 export function AdminTabs({ users, roles, subjects, deadlines }: AdminTabsProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects' | 'classes' | 'deadlines'>('users')
+  const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects' | 'classes' | 'deadlines' | 'activity'>('users')
 
   return (
     <div className="space-y-6">
@@ -70,6 +71,16 @@ export function AdminTabs({ users, roles, subjects, deadlines }: AdminTabsProps)
         >
           Deadlines
         </button>
+        <button
+          className={`px-4 py-2 font-medium text-sm transition-colors ${
+            activeTab === 'activity'
+              ? "border-b-2 border-blue-500 text-blue-600"
+              : "text-gray-500 hover:text-gray-700"
+          }`}
+          onClick={() => setActiveTab('activity')}
+        >
+          Activity Log
+        </button>
       </div>
 
       <div className="mt-6">
@@ -81,8 +92,10 @@ export function AdminTabs({ users, roles, subjects, deadlines }: AdminTabsProps)
           <SubjectManagement subjects={subjects} users={users} />
         ) : activeTab === 'classes' ? (
           <ClassManagement subjects={subjects} />
-        ) : (
+        ) : activeTab === 'deadlines' ? (
           <DeadlineManagement deadlines={deadlines} />
+        ) : (
+          <ActivityLog />
         )}
       </div>
     </div>

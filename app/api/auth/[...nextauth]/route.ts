@@ -2,6 +2,7 @@ import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
 import { prisma } from "@/lib/prisma"
 import { compare } from "bcryptjs"
+import { logAuthEvent } from "@/lib/audit-log"
 
 import { NextAuthOptions } from "next-auth"
 
@@ -35,14 +36,27 @@ export const authOptions: NextAuthOptions = {
         })
 
         if (!user) {
+          // Log failed sign-in attempt - user not found
+          logAuthEvent('sign_in_failed', undefined, credentials.username, {
+            reason: 'user_not_found'
+          })
           return null
         }
 
         const isPasswordValid = await compare(credentials.password, user.password)
 
         if (!isPasswordValid) {
+          // Log failed sign-in attempt
+          logAuthEvent('sign_in_failed', user.id, credentials.username, {
+            reason: 'invalid_password'
+          })
           return null
         }
+
+        // Log successful sign-in
+        logAuthEvent('sign_in', user.id, user.username, {
+          roles: user.Role.map((r: any) => r.name)
+        })
 
         return {
           id: user.id,
@@ -53,6 +67,14 @@ export const authOptions: NextAuthOptions = {
       }
     })
   ],
+  events: {
+    async signOut({ token }) {
+      // Log sign-out
+      if (token?.id) {
+        logAuthEvent('sign_out', token.id as string, token.username as string)
+      }
+    }
+  },
   callbacks: {
     async jwt({ token, user }) {
       if (user) {

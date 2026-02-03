@@ -8,6 +8,7 @@ import { subjectRepository } from '@/lib/db/repositories/subject-repository'
 import { classRepository } from '@/lib/db/repositories/class-repository'
 import { handleServerActionError, ForbiddenError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
+import { createAuditLog, logDataChange } from '@/lib/audit-log'
 import {
   CreateCommentGroupSchema,
   UpdateCommentGroupSchema,
@@ -76,13 +77,21 @@ export const createClass = withRole(['admin', 'hod'], async (
       }
     }
 
-    await prisma.class.create({
+    const newClass = await prisma.class.create({
       data: {
         id: createId(),
         name,
         year,
         subjectId
       }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_class',
+      entityType: 'class',
+      entityId: newClass.id,
+      details: { after: { name, year, subjectId } }
     })
 
     logger.info('Class created', { subjectId, name })
@@ -109,10 +118,22 @@ export const updateClass = withRole(['admin', 'hod'], async (
     const name = formData.get('name') as string
     const year = formData.get('year') as string
 
+    // Get current class for audit log
+    const currentClass = await prisma.class.findUnique({ where: { id: classId } })
+
     await prisma.class.update({
       where: { id: classId },
       data: { name, year }
     })
+
+    // Audit log
+    await logDataChange(
+      'update_class',
+      'class',
+      classId,
+      currentClass ? { name: currentClass.name, year: currentClass.year } : null,
+      { name, year }
+    )
 
     logger.info('Class updated', { classId })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -134,8 +155,19 @@ export const deleteClass = withRole(['admin', 'hod'], async (
   try {
     await checkSubjectAccess(subjectId)
 
+    // Get current class for audit log
+    const currentClass = await prisma.class.findUnique({ where: { id: classId } })
+
     await prisma.class.delete({
       where: { id: classId }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_class',
+      entityType: 'class',
+      entityId: classId,
+      details: { before: currentClass ? { name: currentClass.name, year: currentClass.year } : null }
     })
 
     logger.info('Class deleted', { classId })
@@ -181,7 +213,7 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
       _max: { displayOrder: true }
     })
 
-    await prisma.commentGroup.create({
+    const commentGroup = await prisma.commentGroup.create({
       data: {
         id: createId(),
         name: validated.name,
@@ -189,6 +221,14 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
         subjectId: validated.subjectId,
         displayOrder: (maxOrder._max.displayOrder || 0) + 1
       }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_comment_group',
+      entityType: 'comment_group',
+      entityId: commentGroup.id,
+      details: { after: { name: validated.name, title: validated.title, subjectId } }
     })
 
     logger.info('Comment group created', { subjectId, name: validated.name })
@@ -225,6 +265,9 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
 
     const validated = validation.data
 
+    // Get current group for audit log
+    const currentGroup = await prisma.commentGroup.findUnique({ where: { id: groupId } })
+
     await prisma.commentGroup.update({
       where: { id: groupId },
       data: {
@@ -232,6 +275,15 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
         title: validated.title
       }
     })
+
+    // Audit log
+    await logDataChange(
+      'update_comment_group',
+      'comment_group',
+      groupId,
+      currentGroup ? { name: currentGroup.name, title: currentGroup.title } : null,
+      { name: validated.name, title: validated.title }
+    )
 
     logger.info('Comment group updated', { groupId })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -258,8 +310,19 @@ export const deleteCommentGroup = withRole(['admin', 'hod'], async (
       return validation
     }
 
+    // Get current group for audit log
+    const currentGroup = await prisma.commentGroup.findUnique({ where: { id: groupId } })
+
     await prisma.commentGroup.delete({
       where: { id: groupId }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_comment_group',
+      entityType: 'comment_group',
+      entityId: groupId,
+      details: { before: currentGroup ? { name: currentGroup.name, title: currentGroup.title } : null }
     })
 
     logger.info('Comment group deleted', { groupId })
@@ -299,6 +362,13 @@ export const reorderCommentGroups = withRole(['admin', 'hod'], async (
         })
       )
     )
+
+    // Audit log
+    await createAuditLog({
+      action: 'reorder_comment_groups',
+      entityType: 'comment_group',
+      details: { subjectId, newOrder: items }
+    })
 
     logger.info('Comment groups reordered', { subjectId, count: items.length })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -344,7 +414,7 @@ export const createComment = withRole(['admin', 'hod'], async (
       _max: { displayOrder: true }
     })
 
-    await prisma.commentOption.create({
+    const commentOption = await prisma.commentOption.create({
       data: {
         id: createId(),
         code: validated.code,
@@ -352,6 +422,14 @@ export const createComment = withRole(['admin', 'hod'], async (
         groupId: validated.groupId,
         displayOrder: (maxOrder._max.displayOrder || 0) + 1
       }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_comment_option',
+      entityType: 'comment_option',
+      entityId: commentOption.id,
+      details: { after: { code: validated.code, text: validated.text, groupId } }
     })
 
     logger.info('Comment option created', { groupId, code: validated.code })
@@ -389,6 +467,9 @@ export const updateComment = withRole(['admin', 'hod'], async (
 
     const validated = validation.data
 
+    // Get current option for audit log
+    const currentOption = await prisma.commentOption.findUnique({ where: { id: commentId } })
+
     await prisma.commentOption.update({
       where: { id: commentId },
       data: {
@@ -396,6 +477,15 @@ export const updateComment = withRole(['admin', 'hod'], async (
         text: validated.text
       }
     })
+
+    // Audit log
+    await logDataChange(
+      'update_comment_option',
+      'comment_option',
+      commentId,
+      currentOption ? { code: currentOption.code, text: currentOption.text } : null,
+      { code: validated.code, text: validated.text }
+    )
 
     logger.info('Comment option updated', { commentId })
     revalidatePath(`/hod/subject/${subjectId}`)
@@ -423,8 +513,19 @@ export const deleteComment = withRole(['admin', 'hod'], async (
       return validation
     }
 
+    // Get current option for audit log
+    const currentOption = await prisma.commentOption.findUnique({ where: { id: commentId } })
+
     await prisma.commentOption.delete({
       where: { id: commentId }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_comment_option',
+      entityType: 'comment_option',
+      entityId: commentId,
+      details: { before: currentOption ? { code: currentOption.code, text: currentOption.text } : null }
     })
 
     logger.info('Comment option deleted', { commentId })
@@ -462,6 +563,13 @@ export const reorderComments = withRole(['admin', 'hod'], async (
         })
       )
     )
+
+    // Audit log
+    await createAuditLog({
+      action: 'reorder_comment_options',
+      entityType: 'comment_option',
+      details: { groupId, newOrder: items }
+    })
 
     logger.info('Comment options reordered', { groupId, count: items.length })
 
@@ -505,7 +613,7 @@ export const createAssignment = withRole(['admin', 'hod'], async (
       }
     }
 
-    await prisma.assignment.create({
+    const assignment = await prisma.assignment.create({
       data: {
         id: createId(),
         pupilId,
@@ -513,6 +621,14 @@ export const createAssignment = withRole(['admin', 'hod'], async (
         eoyLevel,
         targetLevel
       }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_assignment',
+      entityType: 'assignment',
+      entityId: assignment.id,
+      details: { after: { pupilId, classId, eoyLevel, targetLevel } }
     })
 
     logger.info('Assignment created', { classId, pupilId })
@@ -538,6 +654,9 @@ export const updateAssignment = withRole(['admin', 'hod'], async (
     const targetLevel = formData.get('targetLevel') as string
     const actualLevel = formData.get('actualLevel') as string
 
+    // Get current assignment for audit log
+    const currentAssignment = await prisma.assignment.findUnique({ where: { id: assignmentId } })
+
     await prisma.assignment.update({
       where: { id: assignmentId },
       data: {
@@ -546,6 +665,15 @@ export const updateAssignment = withRole(['admin', 'hod'], async (
         actualLevel
       }
     })
+
+    // Audit log
+    await logDataChange(
+      'update_assignment',
+      'assignment',
+      assignmentId,
+      currentAssignment ? { eoyLevel: currentAssignment.eoyLevel, targetLevel: currentAssignment.targetLevel, actualLevel: currentAssignment.actualLevel } : null,
+      { eoyLevel, targetLevel, actualLevel }
+    )
 
     logger.info('Assignment updated', { assignmentId })
     revalidatePath(`/class/${classId}`)
@@ -565,8 +693,22 @@ export const deleteAssignment = withRole(['admin', 'hod'], async (
   classId: string
 ) => {
   try {
+    // Get current assignment for audit log
+    const currentAssignment = await prisma.assignment.findUnique({
+      where: { id: assignmentId },
+      select: { pupilId: true, classId: true }
+    })
+
     await prisma.assignment.delete({
       where: { id: assignmentId }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_assignment',
+      entityType: 'assignment',
+      entityId: assignmentId,
+      details: { before: currentAssignment }
     })
 
     logger.info('Assignment deleted', { assignmentId })

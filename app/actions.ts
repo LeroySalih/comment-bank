@@ -3,6 +3,7 @@
 import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { createId } from '@paralleldrive/cuid2'
+import { createAuditLog, logDataChange } from '@/lib/audit-log'
 
 export async function updateAssignmentCode(
   assignmentId: string,
@@ -10,6 +11,12 @@ export async function updateAssignmentCode(
   code: string | null
 ) {
   try {
+    // Get current code for audit log
+    const currentPupilCode = await (prisma as any).pupilCode.findUnique({
+      where: { assignmentId_groupId: { assignmentId, groupId } }
+    })
+    const oldCode = currentPupilCode?.code || null
+
     if (code === null || code === '') {
       await (prisma as any).pupilCode.delete({
         where: { assignmentId_groupId: { assignmentId, groupId } }
@@ -21,10 +28,21 @@ export async function updateAssignmentCode(
         create: { id: createId(), assignmentId, groupId, code }
       })
     }
-    
+
+    // Audit log - only log if code actually changed
+    if (oldCode !== code) {
+      await logDataChange(
+        'update_assignment_code',
+        'assignment',
+        assignmentId,
+        { groupId, code: oldCode },
+        { groupId, code }
+      )
+    }
+
     revalidatePath(`/student/${assignmentId}`)
     revalidatePath('/')
-    
+
     // Also revalidate the class page
     const assignment = await (prisma as any).assignment.findUnique({
       where: { id: assignmentId },
@@ -80,6 +98,15 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
       }
     })
 
+    // Audit log - log the comment text change
+    await logDataChange(
+      'update_assignment_comment',
+      'assignment',
+      assignmentId,
+      { finalComment: currentAssignment.checkStatus === 'not_required' ? null : '(previous comment)', checkStatus: currentStatus },
+      { finalComment: '(comment updated)', checkStatus: newStatus }
+    )
+
     // Don't call revalidatePath here - it causes stale data to be fetched
     // The client has the correct data in local state
     return { success: true, finalComment: updated.finalComment }
@@ -112,6 +139,14 @@ export async function revertAssignmentComment(assignmentId: string) {
         checkedById: null
       }
     });
+
+    // Audit log
+    await createAuditLog({
+      action: 'revert_assignment_comment',
+      entityType: 'assignment',
+      entityId: assignmentId,
+      details: { note: 'Comment reverted to auto-generated' }
+    })
 
     return { success: true }
   } catch (error) {

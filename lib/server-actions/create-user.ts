@@ -7,6 +7,7 @@ import { isAdmin } from "@/lib/access-control"
 import { hash } from "bcryptjs"
 import { revalidatePath } from "next/cache"
 import { createId } from "@paralleldrive/cuid2"
+import { createAuditLog } from "@/lib/audit-log"
 
 export async function createUser(formData: FormData) {
   const session = await getServerSession(authOptions)
@@ -33,7 +34,7 @@ export async function createUser(formData: FormData) {
 
     const hashedPassword = await hash(password, 12)
 
-    await prisma.user.create({
+    const newUser = await prisma.user.create({
       data: {
         id: createId(),
         username,
@@ -41,6 +42,16 @@ export async function createUser(formData: FormData) {
         Role: role ? {
           connect: { name: role }
         } : undefined
+      }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_user',
+      entityType: 'user',
+      entityId: newUser.id,
+      details: {
+        after: { username, role: role || null }
       }
     })
 

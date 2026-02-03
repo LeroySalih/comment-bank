@@ -7,6 +7,7 @@ import { handleServerActionError, ForbiddenError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
+import { createAuditLog } from '@/lib/audit-log'
 
 // Comment check status types
 export type CheckStatus = 'not_required' | 'required_check' | 'checked_ok' | 'checked_rejected'
@@ -82,6 +83,20 @@ export const reviewComment = withRole(['admin', 'hod'], async (
       }
     })
 
+    // Audit log
+    await createAuditLog({
+      action: status === 'checked_ok' ? 'review_comment_approved' : 'review_comment_rejected',
+      entityType: 'assignment',
+      entityId: assignmentId,
+      details: {
+        className: assignment.Class.name,
+        subjectCode: assignment.Class.Subject?.code,
+        previousStatus: assignment.checkStatus,
+        newStatus: status,
+        note: note?.trim() || null
+      }
+    })
+
     logger.info('Comment reviewed', { assignmentId, status, reviewerId: session?.user?.id })
 
     revalidatePath(`/student/${assignmentId}`)
@@ -126,6 +141,18 @@ export const resetCommentStatus = withRole(['admin', 'hod', 'teacher'], async (
         checkNote: null,
         checkedAt: null,
         checkedById: null
+      }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'reset_comment_status',
+      entityType: 'assignment',
+      entityId: assignmentId,
+      details: {
+        className: assignment.Class.name,
+        previousStatus: assignment.checkStatus,
+        newStatus: 'required_check'
       }
     })
 

@@ -126,3 +126,21 @@ model Deadline {
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
 }
+
+model AuditLog {
+  id          String   @id
+  userId      String?
+  username    String?
+  action      String   // e.g., "sign_in", "sign_out", "update_pupil", "update_comment"
+  entityType  String?  // e.g., "user", "pupil", "assignment", "comment"
+  entityId    String?  // ID of the affected entity
+  details     String?  // JSON string with before/after values and additional context
+  ipAddress   String?
+  userAgent   String?
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([action])
+  @@index([entityType])
+  @@index([createdAt])
+}

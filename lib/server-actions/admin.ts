@@ -9,6 +9,7 @@ import { subjectRepository } from '@/lib/db/repositories/subject-repository'
 import { classRepository } from '@/lib/db/repositories/class-repository'
 import { handleServerActionError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
+import { createAuditLog, logDataChange } from '@/lib/audit-log'
 import {
   UpdateUserRolesSchema,
   UpdatePupilSchema,
@@ -41,8 +42,25 @@ export const updateUserRoles = withRole('admin', async (
 
     const { data } = validation
 
+    // Get current roles for audit log
+    const currentUser = await prisma.user.findUnique({
+      where: { id: data.userId },
+      include: { Role: { select: { name: true } } }
+    })
+    const oldRoles = currentUser?.Role.map(r => r.name) || []
+
     // Update roles using repository
     await userRepository.updateRoles(data.userId, data.roleNames)
+
+    // Audit log
+    await logDataChange(
+      'update_user_roles',
+      'user',
+      data.userId,
+      { roles: oldRoles },
+      { roles: data.roleNames },
+      { username: currentUser?.username }
+    )
 
     logger.info('User roles updated', { userId, roleNames })
     revalidatePath('/admin')
@@ -75,8 +93,20 @@ export const updatePupil = withRole('admin', async (
 
     const validated = validation.data
 
+    // Get current pupil for audit log
+    const currentPupil = await pupilRepository.findByAdmissionNumber(validated.admissionNumber)
+
     // Update pupil using repository (handles encryption automatically)
     await pupilRepository.update(validated.admissionNumber, validated.data)
+
+    // Audit log
+    await logDataChange(
+      'update_pupil',
+      'pupil',
+      validated.admissionNumber,
+      currentPupil ? { firstName: currentPupil.firstName, lastName: currentPupil.lastName, gender: currentPupil.gender, isActive: currentPupil.isActive } : null,
+      validated.data
+    )
 
     logger.info('Pupil updated', { admissionNumber })
     revalidatePath('/admin')
@@ -138,6 +168,17 @@ export const processPupilUpload = withRole('admin', async (content: string) => {
     // Bulk create using repository (handles encryption automatically)
     const count = await pupilRepository.bulkCreate(validPupils)
 
+    // Audit log
+    await createAuditLog({
+      action: 'upload_pupils',
+      entityType: 'pupil',
+      details: {
+        totalInFile: validPupils.length,
+        created: count,
+        duplicatesSkipped: validPupils.length - count
+      }
+    })
+
     logger.info('Pupils uploaded', { count, total: validPupils.length })
     revalidatePath('/admin')
 
@@ -175,10 +216,20 @@ export const createSubject = withRole('admin', async (formData: FormData) => {
     const validated = validation.data
 
     // Create subject using repository
-    await subjectRepository.create({
+    const subject = await subjectRepository.create({
       code: validated.code,
       title: validated.title,
       studiedComment: validated.introduction
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_subject',
+      entityType: 'subject',
+      entityId: subject.id,
+      details: {
+        after: { code: validated.code, title: validated.title }
+      }
     })
 
     logger.info('Subject created', { code: validated.code })
@@ -214,12 +265,26 @@ export const updateSubject = withRole('admin', async (
 
     const validated = validation.data
 
+    // Get current subject for audit log
+    const currentSubject = await prisma.subject.findUnique({
+      where: { id: validated.subjectId }
+    })
+
     // Update subject using repository
     await subjectRepository.update(validated.subjectId, {
       code: validated.code,
       title: validated.title,
       studiedComment: validated.introduction
     })
+
+    // Audit log
+    await logDataChange(
+      'update_subject',
+      'subject',
+      validated.subjectId,
+      currentSubject ? { code: currentSubject.code, title: currentSubject.title } : null,
+      { code: validated.code, title: validated.title }
+    )
 
     logger.info('Subject updated', { subjectId })
     revalidatePath('/admin')
@@ -243,8 +308,23 @@ export const deleteSubject = withRole('admin', async (subjectId: string) => {
       return validation
     }
 
+    // Get current subject for audit log
+    const currentSubject = await prisma.subject.findUnique({
+      where: { id: subjectId }
+    })
+
     // Delete subject using repository
     await subjectRepository.delete(subjectId)
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_subject',
+      entityType: 'subject',
+      entityId: subjectId,
+      details: {
+        before: currentSubject ? { code: currentSubject.code, title: currentSubject.title } : null
+      }
+    })
 
     logger.info('Subject deleted', { subjectId })
     revalidatePath('/admin')
@@ -270,8 +350,27 @@ export const assignUserToSubject = withRole('admin', async (
       return validation
     }
 
+    // Get user and subject names for audit log
+    const [user, subject] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { username: true } }),
+      prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, title: true } })
+    ])
+
     // Assign user using repository
     await subjectRepository.assignUser(subjectId, userId)
+
+    // Audit log
+    await createAuditLog({
+      action: 'assign_user_to_subject',
+      entityType: 'subject',
+      entityId: subjectId,
+      details: {
+        userId,
+        username: user?.username,
+        subjectCode: subject?.code,
+        subjectTitle: subject?.title
+      }
+    })
 
     logger.info('User assigned to subject', { subjectId, userId })
     revalidatePath('/admin')
@@ -297,8 +396,27 @@ export const removeUserFromSubject = withRole('admin', async (
       return validation
     }
 
+    // Get user and subject names for audit log
+    const [user, subject] = await Promise.all([
+      prisma.user.findUnique({ where: { id: userId }, select: { username: true } }),
+      prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, title: true } })
+    ])
+
     // Remove user using repository
     await subjectRepository.removeUser(subjectId, userId)
+
+    // Audit log
+    await createAuditLog({
+      action: 'remove_user_from_subject',
+      entityType: 'subject',
+      entityId: subjectId,
+      details: {
+        userId,
+        username: user?.username,
+        subjectCode: subject?.code,
+        subjectTitle: subject?.title
+      }
+    })
 
     logger.info('User removed from subject', { subjectId, userId })
     revalidatePath('/admin')
@@ -324,8 +442,31 @@ export const assignTeachersToClass = withRole('admin', async (
       return validation
     }
 
+    // Get class info and current teachers for audit log
+    const classInfo = await prisma.class.findUnique({
+      where: { id: classId },
+      include: { User: { select: { id: true, username: true } } }
+    })
+    const oldTeacherIds = classInfo?.User.map(u => u.id) || []
+
+    // Get new teacher usernames
+    const newTeachers = await prisma.user.findMany({
+      where: { id: { in: teacherIds } },
+      select: { id: true, username: true }
+    })
+
     // Assign teachers using repository
     await classRepository.assignTeachers(classId, teacherIds)
+
+    // Audit log
+    await logDataChange(
+      'assign_teachers_to_class',
+      'class',
+      classId,
+      { teacherIds: oldTeacherIds },
+      { teacherIds },
+      { className: classInfo?.name, teacherUsernames: newTeachers.map(t => t.username) }
+    )
 
     logger.info('Teachers assigned to class', { classId, teacherIds })
     revalidatePath('/admin')
@@ -384,12 +525,32 @@ export const createClassFromForm = withRole('admin', async (
     })
 
     // If a form name is provided, assign all pupils from that form
+    let pupilCount = 0
     if (formName) {
       const pupils = await pupilRepository.findByForm(formName)
       if (pupils.length > 0) {
         await classRepository.assignPupils(newClass.id, pupils.map(p => p.admissionNumber))
+        pupilCount = pupils.length
       }
     }
+
+    // Get subject info for audit log
+    const subject = await prisma.subject.findUnique({
+      where: { id: subjectId },
+      select: { code: true }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_class',
+      entityType: 'class',
+      entityId: newClass.id,
+      details: {
+        after: { name: className, year, subjectCode: subject?.code },
+        formName,
+        pupilsAssigned: pupilCount
+      }
+    })
 
     logger.info('Class created', { className, formName, subjectId, hasFormPupils: !!formName })
     revalidatePath('/admin')
@@ -414,7 +575,23 @@ export const deleteClass = withRole('admin', async (classId: string) => {
       }
     }
 
+    // Get class info for audit log
+    const classInfo = await prisma.class.findUnique({
+      where: { id: classId },
+      include: { Subject: { select: { code: true } } }
+    })
+
     await classRepository.delete(classId)
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_class',
+      entityType: 'class',
+      entityId: classId,
+      details: {
+        before: classInfo ? { name: classInfo.name, year: classInfo.year, subjectCode: classInfo.Subject?.code } : null
+      }
+    })
 
     logger.info('Class deleted', { classId })
     revalidatePath('/admin')
@@ -442,6 +619,12 @@ export const updateClass = withRole('admin', async (
       }
     }
 
+    // Get current class info for audit log
+    const currentClass = await prisma.class.findUnique({
+      where: { id: classId },
+      include: { User: { select: { id: true } } }
+    })
+
     const { teacherIds, ...classData } = data
 
     // Update class details if any provided
@@ -453,6 +636,15 @@ export const updateClass = withRole('admin', async (
     if (teacherIds !== undefined) {
       await classRepository.assignTeachers(classId, teacherIds)
     }
+
+    // Audit log
+    await logDataChange(
+      'update_class',
+      'class',
+      classId,
+      currentClass ? { name: currentClass.name, year: currentClass.year, teacherIds: currentClass.User.map(u => u.id) } : null,
+      { ...classData, ...(teacherIds !== undefined ? { teacherIds } : {}) }
+    )
 
     logger.info('Class updated', { classId, data })
     revalidatePath('/admin')
@@ -547,7 +739,25 @@ export const addPupilsToClass = withRole('admin', async (classId: string, pupilA
       }
     }
 
+    // Get class info for audit log
+    const classInfo = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { name: true }
+    })
+
     await classRepository.assignPupils(classId, pupilAdmissionNumbers)
+
+    // Audit log
+    await createAuditLog({
+      action: 'add_pupils_to_class',
+      entityType: 'class',
+      entityId: classId,
+      details: {
+        className: classInfo?.name,
+        pupilCount: pupilAdmissionNumbers.length,
+        pupilAdmissionNumbers
+      }
+    })
 
     logger.info('Pupils added to class', { classId, count: pupilAdmissionNumbers.length })
     revalidatePath('/admin')
@@ -572,7 +782,25 @@ export const removePupilsFromClass = withRole('admin', async (classId: string, p
       }
     }
 
+    // Get class info for audit log
+    const classInfo = await prisma.class.findUnique({
+      where: { id: classId },
+      select: { name: true }
+    })
+
     await classRepository.removePupils(classId, pupilAdmissionNumbers)
+
+    // Audit log
+    await createAuditLog({
+      action: 'remove_pupils_from_class',
+      entityType: 'class',
+      entityId: classId,
+      details: {
+        className: classInfo?.name,
+        pupilCount: pupilAdmissionNumbers.length,
+        pupilAdmissionNumbers
+      }
+    })
 
     logger.info('Pupils removed from class', { classId, count: pupilAdmissionNumbers.length })
     revalidatePath('/admin')
@@ -622,12 +850,22 @@ export const createDeadline = withRole('admin', async (formData: FormData) => {
     }
 
     const validated = validation.data
-    await prisma.deadline.create({
+    const deadline = await prisma.deadline.create({
       data: {
         id: createId(),
         title: validated.title,
         date: new Date(validated.date),
         description: validated.description || null
+      }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'create_deadline',
+      entityType: 'deadline',
+      entityId: deadline.id,
+      details: {
+        after: { title: validated.title, date: validated.date }
       }
     })
 
@@ -664,6 +902,12 @@ export const updateDeadline = withRole('admin', async (
     }
 
     const validated = validation.data
+
+    // Get current deadline for audit log
+    const currentDeadline = await prisma.deadline.findUnique({
+      where: { id: validated.deadlineId }
+    })
+
     await prisma.deadline.update({
       where: { id: validated.deadlineId },
       data: {
@@ -673,6 +917,15 @@ export const updateDeadline = withRole('admin', async (
         isActive: validated.isActive
       }
     })
+
+    // Audit log
+    await logDataChange(
+      'update_deadline',
+      'deadline',
+      validated.deadlineId,
+      currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString(), isActive: currentDeadline.isActive } : null,
+      { title: validated.title, date: validated.date, isActive: validated.isActive }
+    )
 
     logger.info('Deadline updated', { deadlineId })
     revalidatePath('/admin')
@@ -695,8 +948,23 @@ export const deleteDeadline = withRole('admin', async (deadlineId: string) => {
       return validation
     }
 
+    // Get current deadline for audit log
+    const currentDeadline = await prisma.deadline.findUnique({
+      where: { id: deadlineId }
+    })
+
     await prisma.deadline.delete({
       where: { id: deadlineId }
+    })
+
+    // Audit log
+    await createAuditLog({
+      action: 'delete_deadline',
+      entityType: 'deadline',
+      entityId: deadlineId,
+      details: {
+        before: currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString() } : null
+      }
     })
 
     logger.info('Deadline deleted', { deadlineId })
