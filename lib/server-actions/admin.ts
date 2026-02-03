@@ -321,9 +321,9 @@ export const deleteSubject = withRole('admin', async (subjectId: string) => {
       action: 'delete_subject',
       entityType: 'subject',
       entityId: subjectId,
-      details: {
-        before: currentSubject ? { code: currentSubject.code, title: currentSubject.title } : null
-      }
+      details: currentSubject ? {
+        before: { code: currentSubject.code, title: currentSubject.title }
+      } : undefined
     })
 
     logger.info('Subject deleted', { subjectId })
@@ -588,9 +588,9 @@ export const deleteClass = withRole('admin', async (classId: string) => {
       action: 'delete_class',
       entityType: 'class',
       entityId: classId,
-      details: {
-        before: classInfo ? { name: classInfo.name, year: classInfo.year, subjectCode: classInfo.Subject?.code } : null
-      }
+      details: classInfo ? {
+        before: { name: classInfo.name, year: classInfo.year, subjectCode: classInfo.Subject?.code }
+      } : undefined
     })
 
     logger.info('Class deleted', { classId })
@@ -963,7 +963,7 @@ export const deleteDeadline = withRole('admin', async (deadlineId: string) => {
       entityType: 'deadline',
       entityId: deadlineId,
       details: {
-        before: currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString() } : null
+        before: currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString() } : undefined
       }
     })
 

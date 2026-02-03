@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect, useCallback } from "react"
+import { useState, useEffect, useCallback, Fragment } from "react"
 import { getAuditLogs, getAuditLogActions, getAuditLogEntityTypes, getAuditLogStats, type AuditLogEntry } from "@/lib/server-actions/audit-log"
 
 // Action display names and categories
@@ -350,9 +350,8 @@ export function ActivityLog() {
                   const changesSummary = formatChanges(log.details)
 
                   return (
-                    <>
+                    <Fragment key={log.id}>
                       <tr
-                        key={log.id}
                         className="hover:bg-gray-50 cursor-pointer"
                         onClick={() => toggleRow(log.id)}
                       >
@@ -379,7 +378,7 @@ export function ActivityLog() {
                         </td>
                       </tr>
                       {isExpanded && log.details && (
-                        <tr key={`${log.id}-details`}>
+                        <tr>
                           <td colSpan={5} className="px-4 py-3 bg-gray-50">
                             <div className="text-sm">
                               <div className="font-medium text-gray-700 mb-2">Full Details:</div>
@@ -395,7 +394,7 @@ export function ActivityLog() {
                           </td>
                         </tr>
                       )}
-                    </>
+                    </Fragment>
                   )
                 })
               )}

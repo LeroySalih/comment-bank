@@ -167,7 +167,7 @@ export const deleteClass = withRole(['admin', 'hod'], async (
       action: 'delete_class',
       entityType: 'class',
       entityId: classId,
-      details: { before: currentClass ? { name: currentClass.name, year: currentClass.year } : null }
+      details: currentClass ? { before: { name: currentClass.name, year: currentClass.year } } : undefined
     })
 
     logger.info('Class deleted', { classId })
@@ -322,7 +322,7 @@ export const deleteCommentGroup = withRole(['admin', 'hod'], async (
       action: 'delete_comment_group',
       entityType: 'comment_group',
       entityId: groupId,
-      details: { before: currentGroup ? { name: currentGroup.name, title: currentGroup.title } : null }
+      details: currentGroup ? { before: { name: currentGroup.name, title: currentGroup.title } } : undefined
     })
 
     logger.info('Comment group deleted', { groupId })
@@ -525,7 +525,7 @@ export const deleteComment = withRole(['admin', 'hod'], async (
       action: 'delete_comment_option',
       entityType: 'comment_option',
       entityId: commentId,
-      details: { before: currentOption ? { code: currentOption.code, text: currentOption.text } : null }
+      details: currentOption ? { before: { code: currentOption.code, text: currentOption.text } } : undefined
     })
 
     logger.info('Comment option deleted', { commentId })
@@ -708,7 +708,7 @@ export const deleteAssignment = withRole(['admin', 'hod'], async (
       action: 'delete_assignment',
       entityType: 'assignment',
       entityId: assignmentId,
-      details: { before: currentAssignment }
+      details: currentAssignment ? { before: currentAssignment } : undefined
     })
 
     logger.info('Assignment deleted', { assignmentId })
