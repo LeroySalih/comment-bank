@@ -12,6 +12,7 @@ export type AuditAction =
   // User management
   | 'create_user'
   | 'update_user_roles'
+  | 'update_user_active_status'
   | 'delete_user'
   // Pupil management
   | 'create_pupil'

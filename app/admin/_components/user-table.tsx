@@ -1,11 +1,12 @@
 "use client"
 
 import { useState } from "react"
-import { updateUserRoles } from "@/lib/server-actions/admin"
+import { updateUserRoles, updateUserActiveStatus } from "@/lib/server-actions/admin"
 
 type User = {
   id: string
   username: string
+  isActive: boolean
   Role: { id: string; name: string }[]
 }
 
@@ -35,22 +36,44 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
     setLoadingId(null)
   }
 
+  const handleActiveStatusChange = async (userId: string, isActive: boolean) => {
+    setLoadingId(userId)
+    await updateUserActiveStatus(userId, isActive)
+    setLoadingId(null)
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
           <tr>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Username</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
             <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Roles</th>
-            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manage</th>
+            <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Manage Roles</th>
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
           {users.map((user) => (
-            <tr key={user.id}>
-              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{user.username}</td>
+            <tr key={user.id} className={!user.isActive ? "bg-gray-50" : ""}>
+              <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
+                {user.username}
+              </td>
+              <td className="px-6 py-4 whitespace-nowrap text-sm">
+                <button
+                  onClick={() => handleActiveStatusChange(user.id, !user.isActive)}
+                  disabled={loadingId === user.id}
+                  className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                    user.isActive
+                      ? "bg-green-100 text-green-800 hover:bg-green-200"
+                      : "bg-red-100 text-red-800 hover:bg-red-200"
+                  } ${loadingId === user.id ? "opacity-50 cursor-not-allowed" : "cursor-pointer"}`}
+                >
+                  {user.isActive ? "Active" : "Inactive"}
+                </button>
+              </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                {user.Role.map(r => r.name).join(", ")}
+                {user.Role.map(r => r.name).join(", ") || "No roles"}
               </td>
               <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                 <div className="flex gap-4">

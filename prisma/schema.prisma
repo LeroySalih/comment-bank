@@ -112,6 +112,7 @@ model User {
   id                  String       @id
   username            String       @unique
   password            String
+  isActive            Boolean      @default(true)
   Class               Class[]
   Role                Role[]
   Subject             Subject[]

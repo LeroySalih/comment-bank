@@ -12,6 +12,7 @@ import { logger } from '@/lib/logger'
 import { createAuditLog, logDataChange } from '@/lib/audit-log'
 import {
   UpdateUserRolesSchema,
+  UpdateUserActiveStatusSchema,
   UpdatePupilSchema,
   CreateSubjectSchema,
   UpdateSubjectSchema,
@@ -68,6 +69,63 @@ export const updateUserRoles = withRole('admin', async (
     return { success: true as const }
   } catch (error) {
     logger.error('Failed to update user roles', { error, userId })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Update user active status (Admin only)
+ * Inactive users cannot sign in or access the site
+ */
+export const updateUserActiveStatus = withRole('admin', async (
+  userId: string,
+  isActive: boolean
+) => {
+  try {
+    // Validate input
+    const validation = validateFormData(UpdateUserActiveStatusSchema, { userId, isActive })
+    if (!validation.success) {
+      return validation
+    }
+
+    const { data } = validation
+
+    // Get current user for audit log
+    const currentUser = await prisma.user.findUnique({
+      where: { id: data.userId },
+      select: { username: true, isActive: true }
+    })
+
+    if (!currentUser) {
+      return {
+        success: false,
+        error: 'User not found',
+        code: 'NOT_FOUND'
+      }
+    }
+
+    // Update user active status
+    await prisma.user.update({
+      where: { id: data.userId },
+      data: { isActive: data.isActive }
+    })
+
+    // Audit log
+    await logDataChange(
+      'update_user_active_status',
+      'user',
+      data.userId,
+      { isActive: currentUser.isActive },
+      { isActive: data.isActive },
+      { username: currentUser.username }
+    )
+
+    logger.info('User active status updated', { userId, isActive })
+    revalidatePath('/admin')
+
+    return { success: true as const }
+  } catch (error) {
+    logger.error('Failed to update user active status', { error, userId })
     return handleServerActionError(error)
   }
 })

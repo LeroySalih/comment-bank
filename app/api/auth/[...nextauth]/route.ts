@@ -43,6 +43,14 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
+        // Check if user is active
+        if (!user.isActive) {
+          logAuthEvent('sign_in_failed', user.id, credentials.username, {
+            reason: 'user_inactive'
+          })
+          return null
+        }
+
         const isPasswordValid = await compare(credentials.password, user.password)
 
         if (!isPasswordValid) {

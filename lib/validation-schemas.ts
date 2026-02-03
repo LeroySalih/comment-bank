@@ -17,6 +17,11 @@ export const UpdateUserRolesSchema = z.object({
   roleNames: z.array(z.string()).min(1, 'At least one role is required')
 })
 
+export const UpdateUserActiveStatusSchema = z.object({
+  userId: z.string().min(1, 'User ID is required'),
+  isActive: z.boolean()
+})
+
 // Pupil Management Schemas
 export const UpdatePupilSchema = z.object({
   admissionNumber: z.string().min(1, 'Admission number is required'),

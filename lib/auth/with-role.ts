@@ -2,20 +2,21 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { AuthError, ForbiddenError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
+import { prisma } from '@/lib/prisma'
 
 /**
  * Higher-order function to wrap server actions with role-based authorization
- * 
+ *
  * @param roles - Single role or array of roles required to execute the action
  * @param handler - The server action handler function
  * @returns Wrapped handler with authorization check
- * 
+ *
  * @example
  * export const deleteUser = withRole('admin', async (userId: string) => {
  *   // Only admins can execute this
  *   await prisma.user.delete({ where: { id: userId } })
  * })
- * 
+ *
  * @example
  * export const updateSubject = withRole(['admin', 'hod'], async (subjectId: string, data: any) => {
  *   // Both admins and HODs can execute this
@@ -29,17 +30,30 @@ export function withRole<T extends any[], R>(
   return async (...args: T): Promise<R> => {
     const session = await getServerSession(authOptions)
     const roleArray = Array.isArray(roles) ? roles : [roles]
-    
+
     if (!session?.user) {
       logger.warn('Unauthorized access attempt - no session', {
         requiredRoles: roleArray
       })
       throw new AuthError('Not authenticated')
     }
-    
+
+    // Check if user is still active in the database
+    const user = await prisma.user.findUnique({
+      where: { id: session.user.id },
+      select: { isActive: true }
+    })
+
+    if (!user || !user.isActive) {
+      logger.warn('Forbidden access attempt - user is inactive', {
+        userId: session.user.id
+      })
+      throw new ForbiddenError('Account is inactive')
+    }
+
     const userRoles = session.user.roles || []
     const hasRequiredRole = roleArray.some(role => userRoles.includes(role))
-    
+
     if (!hasRequiredRole) {
       logger.warn('Forbidden access attempt - insufficient permissions', {
         userId: session.user.id,
@@ -48,12 +62,12 @@ export function withRole<T extends any[], R>(
       })
       throw new ForbiddenError('Insufficient permissions')
     }
-    
+
     logger.debug('Authorization successful', {
       userId: session.user.id,
       requiredRoles: roleArray
     })
-    
+
     return handler(...args)
   }
 }
