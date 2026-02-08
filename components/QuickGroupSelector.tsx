@@ -25,6 +25,7 @@ interface QuickGroupSelectorProps {
     targetLevel?: string | null;
   };
   onSelectionChange?: (groupId: string, code: string | null) => void;
+  onCodeUpdate?: (assignmentId: string, groupId: string, code: string | null) => Promise<any>;
   disabled?: boolean;
 }
 
@@ -35,32 +36,26 @@ export default function QuickGroupSelector({
   options,
   context,
   onSelectionChange,
+  onCodeUpdate,
   disabled = false
 }: QuickGroupSelectorProps) {
   const [val, setVal] = useState(currentCode || "");
   const [loading, setLoading] = useState(false);
 
+  const updateFn = onCodeUpdate || updateAssignmentCode;
+
   const handleChange = async (newValue: string | null) => {
-    if (disabled) return; // Don't allow changes if disabled
+    if (disabled) return;
 
     setVal(newValue || "");
     setLoading(true);
 
-    // Notify parent of selection change immediately for UI update
     onSelectionChange?.(groupId, newValue);
 
-    await updateAssignmentCode(assignmentId, groupId, newValue);
+    await updateFn(assignmentId, groupId, newValue);
     setLoading(false);
   };
 
-  // Sort options alphabetically by code? or generic order?
-  // Usually H, M, L. Let's leave them as passed (assuming passed sorted or we sort them)
-  // Options usually come unsorted from DB?
-  // Let's sort simply by code length then alpha? or just alpha.
-  // Actually commonly H, M, L.
-  // Let's just sort by ID or insert order or Code?
-  // Let's sort by code.
-  // Sort options: H, M, L
   const order = ['H', 'M', 'L'];
   const sortedOptions = [...options].sort((a,b) => {
     const indexA = order.indexOf(a.code);

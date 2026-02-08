@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma"
+import Link from "next/link"
 import { AdminTabs } from "./_components/admin-tabs"
 import SignOutButton from "@/components/SignOutButton"
 
@@ -39,6 +40,11 @@ export default async function AdminPage() {
     orderBy: { date: 'asc' }
   })
 
+  const classes = await prisma.class.findMany({
+    select: { id: true, name: true },
+    orderBy: { name: 'asc' }
+  })
+
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-8">
@@ -46,7 +52,21 @@ export default async function AdminPage() {
         <SignOutButton />
       </div>
       
-      <AdminTabs users={users} roles={roles} subjects={subjects} deadlines={deadlines} />
+      <div className="mb-6">
+        <Link
+          href="/admin/ccg"
+          className="inline-flex items-center gap-3 px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
+        >
+          <span className="material-symbols-outlined text-2xl text-primary">comment</span>
+          <div>
+            <span className="text-sm font-bold text-gray-900 block">Common Comment Groups</span>
+            <span className="text-xs text-gray-500">Manage global comment groups for all subjects</span>
+          </div>
+          <span className="material-symbols-outlined text-gray-400 ml-4">chevron_right</span>
+        </Link>
+      </div>
+
+      <AdminTabs users={users} roles={roles} subjects={subjects} deadlines={deadlines} classes={classes} />
     </div>
   )
 }

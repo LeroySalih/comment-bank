@@ -14,6 +14,8 @@ type MinimalOption = {
 type MinimalGroup = {
   id: string;
   name: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
   CommentOption: MinimalOption[];
 };
 
@@ -28,6 +30,20 @@ type MinimalPupilCode = {
   code: string | null;
 };
 
+type MinimalCommonPupilCode = {
+  commonGroupId: string;
+  code: string | null;
+};
+
+type MinimalCommonGroup = {
+  id: string;
+  name: string;
+  paragraphPosition: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
+  CommonCommentOption: MinimalOption[];
+};
+
 type MinimalAssignment = {
   id: string;
   Pupil: MinimalPupil;
@@ -36,6 +52,7 @@ type MinimalAssignment = {
   targetLevel?: string | null;
   finalComment?: string | null;
   checkStatus?: string;
+  linkedData?: any;
 };
 
 type MinimalSubject = {
@@ -47,20 +64,37 @@ interface CopyCommentButtonProps {
   assignment: MinimalAssignment;
   subject: MinimalSubject;
   groups: MinimalGroup[];
+  commonGroups?: MinimalCommonGroup[];
+  commonPupilCodes?: MinimalCommonPupilCode[];
+  wrapperTemplate?: string;
 }
 
-export default function CopyCommentButton({ assignment, subject, groups }: CopyCommentButtonProps) {
+export default function CopyCommentButton({ assignment, subject, groups, commonGroups, commonPupilCodes, wrapperTemplate }: CopyCommentButtonProps) {
   const [copied, setCopied] = useState(false);
 
-  // Check if all groups have a selected code
-  const isComplete = groups.every(g =>
-    assignment.PupilCode?.some(c => c.groupId === g.id && c.code)
-  );
+  // Check if all subject groups have a selected code
+  const subjectComplete = groups.every(g => {
+    if (g.isLinked && g.linkedField) {
+      const code = (assignment.linkedData as Record<string, string> | null)?.[g.linkedField];
+      return code && g.CommentOption.some(o => o.code === code);
+    }
+    return assignment.PupilCode?.some(c => c.groupId === g.id && c.code);
+  });
+
+  // Check if all CCGs have a selected code
+  const ccgComplete = !commonGroups || commonGroups.length === 0 || commonGroups.every(g => {
+    if (g.isLinked && g.linkedField) {
+      const code = (assignment.linkedData as Record<string, string> | null)?.[g.linkedField];
+      return code && g.CommonCommentOption.some(o => o.code === code);
+    }
+    return commonPupilCodes?.some(c => c.commonGroupId === g.id && c.code);
+  });
+
+  const isComplete = subjectComplete && ccgComplete;
 
   // Check if comment needs review or is rejected
   const isPendingReview = assignment.checkStatus === 'required_check' || assignment.checkStatus === 'checked_rejected';
 
-  // Button is disabled if incomplete OR pending review
   const isDisabled = !isComplete || isPendingReview;
 
   const handleCopy = (e: React.MouseEvent) => {
@@ -69,9 +103,11 @@ export default function CopyCommentButton({ assignment, subject, groups }: CopyC
 
     if (isDisabled) return;
 
-    // Use saved finalComment if available, otherwise generate from codes
-    const comment = assignment.finalComment || generateComment(assignment, subject, groups);
-    
+    const comment = assignment.finalComment || generateComment(
+      assignment, subject, groups, undefined,
+      commonGroups, commonPupilCodes, wrapperTemplate
+    );
+
     if (!comment) return;
 
     navigator.clipboard.writeText(comment);
@@ -90,8 +126,10 @@ export default function CopyCommentButton({ assignment, subject, groups }: CopyC
       setPreview("Comment must be approved before copying");
       return;
     }
-    // Use saved finalComment if available, otherwise generate from codes
-    const comment = assignment.finalComment || generateComment(assignment, subject, groups);
+    const comment = assignment.finalComment || generateComment(
+      assignment, subject, groups, undefined,
+      commonGroups, commonPupilCodes, wrapperTemplate
+    );
     setPreview(comment || "No comment generated");
   };
 

@@ -194,10 +194,19 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
   try {
     await checkSubjectAccess(subjectId)
 
+    // Only admins can set isLinked
+    const session = await getServerSession(authOptions)
+    const isAdmin = session?.user?.roles?.includes('admin')
+    const isLinkedRaw = formData.get('isLinked')
+    const isLinked = isAdmin && (isLinkedRaw === 'true' || isLinkedRaw === '1')
+    const linkedField = isLinked ? (formData.get('linkedField') as string || null) : null
+
     const data = {
       subjectId,
       name: formData.get('name') as string,
-      title: formData.get('title') as string
+      title: formData.get('title') as string,
+      isLinked,
+      linkedField
     }
 
     const validation = validateFormData(CreateCommentGroupSchema, data)
@@ -219,7 +228,9 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
         name: validated.name,
         title: validated.title,
         subjectId: validated.subjectId,
-        displayOrder: (maxOrder._max.displayOrder || 0) + 1
+        displayOrder: (maxOrder._max.displayOrder || 0) + 1,
+        isLinked: validated.isLinked,
+        linkedField: validated.isLinked ? validated.linkedField : null
       }
     })
 
@@ -228,7 +239,7 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
       action: 'create_comment_group',
       entityType: 'comment_group',
       entityId: commentGroup.id,
-      details: { after: { name: validated.name, title: validated.title, subjectId } }
+      details: { after: { name: validated.name, title: validated.title, subjectId, isLinked: validated.isLinked, linkedField: validated.linkedField } }
     })
 
     logger.info('Comment group created', { subjectId, name: validated.name })
@@ -252,10 +263,19 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
   try {
     await checkSubjectAccess(subjectId)
 
+    // Only admins can set isLinked
+    const session = await getServerSession(authOptions)
+    const isAdmin = session?.user?.roles?.includes('admin')
+    const isLinkedRaw = formData.get('isLinked')
+    const isLinked = isAdmin && (isLinkedRaw === 'true' || isLinkedRaw === '1')
+    const linkedField = isLinked ? (formData.get('linkedField') as string || null) : null
+
     const data = {
       groupId,
       name: formData.get('name') as string,
-      title: formData.get('title') as string
+      title: formData.get('title') as string,
+      isLinked,
+      linkedField
     }
 
     const validation = validateFormData(UpdateCommentGroupSchema, data)
@@ -272,7 +292,9 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
       where: { id: groupId },
       data: {
         name: validated.name,
-        title: validated.title
+        title: validated.title,
+        isLinked: validated.isLinked ?? false,
+        linkedField: validated.isLinked ? validated.linkedField : null
       }
     })
 
@@ -281,8 +303,8 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
       'update_comment_group',
       'comment_group',
       groupId,
-      currentGroup ? { name: currentGroup.name, title: currentGroup.title } : null,
-      { name: validated.name, title: validated.title }
+      currentGroup ? { name: currentGroup.name, title: currentGroup.title, isLinked: (currentGroup as any).isLinked, linkedField: (currentGroup as any).linkedField } : null,
+      { name: validated.name, title: validated.title, isLinked: validated.isLinked, linkedField: validated.linkedField }
     )
 
     logger.info('Comment group updated', { groupId })

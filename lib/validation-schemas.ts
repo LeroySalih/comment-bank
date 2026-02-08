@@ -88,14 +88,24 @@ export const AssignTeachersSchema = z.object({
 export const CreateCommentGroupSchema = z.object({
   subjectId: z.string().min(1, 'Subject ID is required'),
   name: z.string().min(1, 'Group name is required').max(100),
-  title: z.string().min(1, 'Group title is required').max(200)
+  title: z.string().min(1, 'Group title is required').max(200),
+  isLinked: z.boolean().optional().default(false),
+  linkedField: z.string().max(100).nullable().optional()
+}).refine(data => !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
+  message: 'Linked field is required when group is linked',
+  path: ['linkedField']
 })
 
 export const UpdateCommentGroupSchema = z.object({
   groupId: z.string().min(1, 'Group ID is required'),
   name: z.string().min(1).max(100).optional(),
   title: z.string().min(1).max(200).optional(),
-  displayOrder: z.number().int().min(0).optional()
+  displayOrder: z.number().int().min(0).optional(),
+  isLinked: z.boolean().optional(),
+  linkedField: z.string().max(100).nullable().optional()
+}).refine(data => data.isLinked === undefined || !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
+  message: 'Linked field is required when group is linked',
+  path: ['linkedField']
 })
 
 export const DeleteCommentGroupSchema = z.object({
@@ -147,6 +157,63 @@ export const UpdateDeadlineSchema = z.object({
 
 export const DeleteDeadlineSchema = z.object({
   deadlineId: z.string().min(1, 'Deadline ID is required')
+})
+
+// Common Comment Group Schemas
+export const CreateCommonCommentGroupSchema = z.object({
+  name: z.string().min(1, 'Group name is required').max(100),
+  title: z.string().min(1, 'Group title is required').max(200),
+  paragraphPosition: z.enum(['p1', 'p2', 'p4'], { message: 'Paragraph position must be p1, p2, or p4' }),
+  isLinked: z.boolean().optional().default(false),
+  linkedField: z.string().max(100).nullable().optional()
+}).refine(data => !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
+  message: 'Linked field is required when group is linked',
+  path: ['linkedField']
+})
+
+export const UpdateCommonCommentGroupSchema = z.object({
+  groupId: z.string().min(1, 'Group ID is required'),
+  name: z.string().min(1).max(100).optional(),
+  title: z.string().min(1).max(200).optional(),
+  paragraphPosition: z.enum(['p1', 'p2', 'p4']).optional(),
+  isLinked: z.boolean().optional(),
+  linkedField: z.string().max(100).nullable().optional()
+}).refine(data => data.isLinked === undefined || !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
+  message: 'Linked field is required when group is linked',
+  path: ['linkedField']
+})
+
+export const DeleteCommonCommentGroupSchema = z.object({
+  groupId: z.string().min(1, 'Group ID is required')
+})
+
+export const CreateCommonCommentOptionSchema = z.object({
+  groupId: z.string().min(1, 'Group ID is required'),
+  code: z.string().min(1, 'Code is required').max(20),
+  text: z.string().min(1, 'Comment text is required').max(1000)
+})
+
+export const UpdateCommonCommentOptionSchema = z.object({
+  optionId: z.string().min(1, 'Option ID is required'),
+  code: z.string().min(1).max(20).optional(),
+  text: z.string().min(1).max(1000).optional()
+})
+
+export const DeleteCommonCommentOptionSchema = z.object({
+  optionId: z.string().min(1, 'Option ID is required')
+})
+
+export const ReorderCommonCommentGroupsSchema = z.object({
+  groupIds: z.array(z.string()).min(1, 'At least one group is required')
+})
+
+export const ReorderCommonCommentOptionsSchema = z.object({
+  groupId: z.string().min(1, 'Group ID is required'),
+  optionIds: z.array(z.string()).min(1, 'At least one option is required')
+})
+
+export const UpdateWrapperTemplateSchema = z.object({
+  value: z.string().min(1, 'Template value is required').max(1000)
 })
 
 /**

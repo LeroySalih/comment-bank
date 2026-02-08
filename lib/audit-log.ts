@@ -3,6 +3,7 @@ import { createId } from '@paralleldrive/cuid2'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { headers } from 'next/headers'
+import { encrypt } from '@/lib/encryption'
 
 export type AuditAction =
   // Authentication
@@ -42,17 +43,32 @@ export type AuditAction =
   | 'update_comment_option'
   | 'delete_comment_option'
   | 'reorder_comment_options'
+  // Common Comment Group management
+  | 'create_common_comment_group'
+  | 'update_common_comment_group'
+  | 'delete_common_comment_group'
+  | 'reorder_common_comment_groups'
+  // Common Comment Option management
+  | 'create_common_comment_option'
+  | 'update_common_comment_option'
+  | 'delete_common_comment_option'
+  | 'reorder_common_comment_options'
+  // Wrapper template
+  | 'update_wrapper_template'
   // Assignment/Report management
   | 'create_assignment'
   | 'update_assignment'
   | 'delete_assignment'
   | 'update_assignment_code'
+  | 'update_common_assignment_code'
   | 'update_assignment_comment'
   | 'revert_assignment_comment'
   // Comment review
   | 'review_comment_approved'
   | 'review_comment_rejected'
   | 'reset_comment_status'
+  // Linked data
+  | 'upload_linked_data'
   // Deadline management
   | 'create_deadline'
   | 'update_deadline'
@@ -66,6 +82,9 @@ export type EntityType =
   | 'comment_group'
   | 'comment_option'
   | 'assignment'
+  | 'common_comment_group'
+  | 'common_comment_option'
+  | 'app_setting'
   | 'deadline'
 
 export interface AuditLogDetails {
@@ -124,7 +143,7 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
         action: params.action,
         entityType: params.entityType,
         entityId: params.entityId,
-        details: params.details ? JSON.stringify(params.details) : null,
+        details: params.details ? encrypt(JSON.stringify(params.details)) : null,
         ipAddress,
         userAgent
       }

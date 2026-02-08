@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseComment, countWords } from '@/lib/utils';
-import { updateAssignmentCode, updateAssignmentCommentText, revertAssignmentComment } from '@/app/actions';
+import { updateAssignmentCode, updateCommonAssignmentCode, updateAssignmentCommentText, revertAssignmentComment } from '@/app/actions';
 import { reviewComment } from '@/lib/server-actions/comment-check';
 import CommentStatusBadge from './CommentStatusBadge';
 import ConfirmModal from './ConfirmModal';
@@ -17,7 +17,25 @@ type CommentOption = {
 type CommentGroup = {
   id: string;
   name: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
   CommentOption: CommentOption[];
+};
+
+type CommonCommentOption = {
+  id: string;
+  code: string;
+  text: string;
+};
+
+type CommonCommentGroup = {
+  id: string;
+  name: string;
+  title: string;
+  paragraphPosition: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
+  CommonCommentOption: CommonCommentOption[];
 };
 
 type Pupil = {
@@ -32,15 +50,22 @@ type PupilCode = {
   code: string | null;
 };
 
+type CommonPupilCode = {
+  commonGroupId: string;
+  code: string | null;
+};
+
 type Assignment = {
   id: string;
   Pupil: Pupil;
   PupilCode: PupilCode[];
+  CommonPupilCode?: CommonPupilCode[];
   finalComment?: string | null;
   eoyLevel?: string | null;
   targetLevel?: string | null;
   checkStatus?: string;
   checkNote?: string | null;
+  linkedData?: any;
   Class?: {
     name: string;
     year?: string | null;
@@ -58,15 +83,18 @@ interface CommentEditorProps {
   subject: Subject;
   groups: CommentGroup[];
   isHoD?: boolean;
+  commonGroups?: CommonCommentGroup[];
+  wrapperTemplate?: string;
 }
 
-export default function CommentEditor({ assignment, subject, groups, isHoD = false }: CommentEditorProps) {
+export default function CommentEditor({ assignment, subject, groups, isHoD = false, commonGroups, wrapperTemplate }: CommentEditorProps) {
   const router = useRouter();
   const [selections, setSelections] = useState<Record<string, string>>({}); // groupId -> optionId
+  const [commonSelections, setCommonSelections] = useState<Record<string, string>>({}); // commonGroupId -> optionId
   const [preview, setPreview] = useState('');
   const [copied, setCopied] = useState(false);
   const [checkStatus, setCheckStatus] = useState(assignment.checkStatus || 'not_required');
-  const [isManuallyEdited, setIsManuallyEdited] = useState(false); // Track if user manually edited
+  const [isManuallyEdited, setIsManuallyEdited] = useState(false);
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
 
@@ -77,105 +105,168 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   // Initialize selections with assignment's pre-assigned codes
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
+    const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
 
-    assignment.PupilCode.forEach(pc => {
-        const group = groups.find(g => g.id === pc.groupId);
-        if (group && pc.code) {
-            const option = group.CommentOption.find(o => o.code === pc.code);
-            if (option) {
-                initialSelections[group.id] = option.id;
-            }
+    // Subject-specific groups
+    for (const group of groups) {
+      if (group.isLinked && group.linkedField && linkedData) {
+        const code = linkedData[group.linkedField];
+        if (code) {
+          const option = group.CommentOption.find(o => o.code === code);
+          if (option) initialSelections[group.id] = option.id;
         }
-    });
-
+      } else {
+        const pc = assignment.PupilCode.find(p => p.groupId === group.id);
+        if (pc?.code) {
+          const option = group.CommentOption.find(o => o.code === pc.code);
+          if (option) initialSelections[group.id] = option.id;
+        }
+      }
+    }
     setSelections(initialSelections);
-  }, [assignment, groups]);
+
+    // Initialize common selections
+    if (commonGroups) {
+      const initialCommon: Record<string, string> = {};
+      for (const cg of commonGroups) {
+        if (cg.isLinked && cg.linkedField && linkedData) {
+          const code = linkedData[cg.linkedField];
+          if (code) {
+            const option = cg.CommonCommentOption.find(o => o.code === code);
+            if (option) initialCommon[cg.id] = option.id;
+          }
+        } else {
+          const cpc = (assignment.CommonPupilCode || []).find(c => c.commonGroupId === cg.id);
+          if (cpc?.code) {
+            const option = cg.CommonCommentOption.find(o => o.code === cpc.code);
+            if (option) initialCommon[cg.id] = option.id;
+          }
+        }
+      }
+      setCommonSelections(initialCommon);
+    }
+  }, [assignment, groups, commonGroups]);
 
   // Track if we've loaded the initial comment and should skip regeneration
   const hasLoadedInitialComment = useRef(false);
-  const skipRegeneration = useRef(false); // Use ref instead of state to avoid race condition
+  const skipRegeneration = useRef(false);
 
   // Initialize preview from finalComment when it becomes available
   useEffect(() => {
     if (!hasLoadedInitialComment.current && assignment.finalComment) {
       setPreview(assignment.finalComment);
       hasLoadedInitialComment.current = true;
-      skipRegeneration.current = true; // Don't regenerate after loading saved comment
+      skipRegeneration.current = true;
     }
-  }, [assignment.finalComment]); // Run when finalComment changes
+  }, [assignment.finalComment]);
 
   // Generate Preview from selections (only when selections change and not manually edited)
   useEffect(() => {
-    // Skip if user has manually typed in the textarea
-    if (isManuallyEdited) {
-      return;
-    }
+    if (isManuallyEdited) return;
+    if (skipRegeneration.current) return;
+    if (!hasLoadedInitialComment.current && assignment.finalComment) return;
 
-    // Skip if we loaded from a saved comment (check ref immediately)
-    if (skipRegeneration.current) {
-      return;
-    }
-
-    // Skip on first render if we have a saved comment (let the mount effect handle it)
-    if (!hasLoadedInitialComment.current && assignment.finalComment) {
-      return;
-    }
-
-    const parts: string[] = [];
-
-    // 1. Studied Comment (Subject Intro)
-    if (subject.studiedComment) {
-      parts.push(subject.studiedComment);
-    }
-
-    // 2. Get text for all groups in order
-    const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
-
+    // Helper to get option text for subject-specific groups
     const getOptText = (group: CommentGroup) => {
         const selectedOptionId = selections[group.id];
         if (!selectedOptionId) return "";
         return group.CommentOption.find(o => o.id === selectedOptionId)?.text || "";
     };
 
-    const groupTexts: string[] = [];
-    for (const group of sortedGroups) {
+    // Helper to get option text for common groups
+    const getCommonOptText = (group: CommonCommentGroup) => {
+        const selectedOptionId = commonSelections[group.id];
+        if (!selectedOptionId) return "";
+        return group.CommonCommentOption.find(o => o.id === selectedOptionId)?.text || "";
+    };
+
+    if (!commonGroups || commonGroups.length === 0) {
+      // Legacy single-paragraph behavior
+      const parts: string[] = [];
+      if (subject.studiedComment) {
+        parts.push(subject.studiedComment);
+      }
+      const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
+      const groupTexts: string[] = [];
+      for (const group of sortedGroups) {
         const text = getOptText(group);
-        if (text) {
-            groupTexts.push(text);
+        if (text) groupTexts.push(text);
+      }
+      if (groupTexts.length > 0) parts.push(groupTexts.join(" "));
+      const combined = parts.join("\n\n");
+      setPreview(parseComment(combined, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
+    } else {
+      // 4-paragraph layout
+      const paragraphs: string[] = [];
+
+      // P1: CCGs with paragraphPosition "p1"
+      const p1Groups = commonGroups.filter(g => g.paragraphPosition === 'p1');
+      const p1Texts = p1Groups.map(g => getCommonOptText(g)).filter(Boolean);
+      if (p1Texts.length > 0) paragraphs.push(p1Texts.join(" "));
+
+      // P2: CCGs with paragraphPosition "p2" — use wrapper template
+      const p2Groups = commonGroups.filter(g => g.paragraphPosition === 'p2');
+      if (p2Groups.length > 0 && wrapperTemplate) {
+        let p2Text = wrapperTemplate;
+        for (const group of p2Groups) {
+          const text = getCommonOptText(group);
+          p2Text = p2Text.replaceAll(`<${group.name}>`, text);
         }
+        p2Text = p2Text.replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim();
+        if (p2Text) paragraphs.push(p2Text);
+      } else if (p2Groups.length > 0) {
+        const p2Texts = p2Groups.map(g => getCommonOptText(g)).filter(Boolean);
+        if (p2Texts.length > 0) paragraphs.push(p2Texts.join(" "));
+      }
+
+      // P3: Subject studiedComment + subject-specific groups
+      const p3Parts: string[] = [];
+      if (subject.studiedComment) p3Parts.push(subject.studiedComment);
+      const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
+      const groupTexts: string[] = [];
+      for (const group of sortedGroups) {
+        const text = getOptText(group);
+        if (text) groupTexts.push(text);
+      }
+      if (groupTexts.length > 0) p3Parts.push(groupTexts.join(" "));
+      if (p3Parts.length > 0) paragraphs.push(p3Parts.join(" "));
+
+      // P4: CCGs with paragraphPosition "p4"
+      const p4Groups = commonGroups.filter(g => g.paragraphPosition === 'p4');
+      const p4Texts = p4Groups.map(g => getCommonOptText(g)).filter(Boolean);
+      if (p4Texts.length > 0) paragraphs.push(p4Texts.join(" "));
+
+      const combined = paragraphs.join("\n\n");
+      setPreview(parseComment(combined, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
     }
 
-    // Join all group texts with spaces
-    if (groupTexts.length > 0) {
-        parts.push(groupTexts.join(" "));
-    }
-
-    // Combine all parts with paragraph breaks
-    const combined = parts.join("\n\n");
-
-    setPreview(parseComment(
-      combined,
-      assignment.Pupil.firstName,
-      assignment.Pupil.gender,
-      subject.title || '',
-      assignment.Class?.year,
-      assignment.eoyLevel,
-      assignment.targetLevel
-    ));
-
-  }, [selections, subject, groups, assignment, isManuallyEdited]);
+  }, [selections, commonSelections, subject, groups, assignment, isManuallyEdited, commonGroups, wrapperTemplate]);
 
   const handleSelection = async (groupId: string, optionId: string) => {
     setSelections(prev => ({
       ...prev,
       [groupId]: optionId
     }));
-    
+
     const group = groups.find(g => g.id === groupId);
     const option = group?.CommentOption.find(o => o.id === optionId);
-    
+
     if (option) {
         await updateAssignmentCode(assignment.id, groupId, option.code);
+    }
+  };
+
+  const handleCommonSelection = async (commonGroupId: string, optionId: string) => {
+    setCommonSelections(prev => ({
+      ...prev,
+      [commonGroupId]: optionId
+    }));
+
+    const group = commonGroups?.find(g => g.id === commonGroupId);
+    const option = group?.CommonCommentOption.find(o => o.id === optionId);
+
+    if (option) {
+      await updateCommonAssignmentCode(assignment.id, commonGroupId, option.code);
     }
   };
 
@@ -187,31 +278,22 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
 
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPreview(e.target.value);
-    setIsManuallyEdited(true); // Mark as manually edited to prevent regeneration
+    setIsManuallyEdited(true);
   };
 
   const handleTextBlur = async () => {
-    // Only save and update status if user manually edited the text
-    // Don't trigger for programmatic changes from code selection
-    if (!isManuallyEdited) {
-      return;
-    }
+    if (!isManuallyEdited) return;
 
-    // Update local state immediately for responsive UI
     const previousStatus = checkStatus;
     setCheckStatus('required_check');
 
     try {
       const result = await updateAssignmentCommentText(assignment.id, preview);
-
       if (!result.success) {
         console.error('Failed to save comment:', result.error);
-        // Revert local state if save failed
         setCheckStatus(previousStatus);
         alert('Failed to save comment: ' + (result.error || 'Unknown error'));
       }
-      // Don't call router.refresh() - it causes the preview to regenerate from codes
-      // The local state already has the correct values
     } catch (error) {
       console.error('Error saving comment:', error);
       setCheckStatus(previousStatus);
@@ -224,13 +306,11 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     try {
       const result = await revertAssignmentComment(assignment.id);
       if (result.success) {
-        // Reset local state
         setIsManuallyEdited(false);
         skipRegeneration.current = false;
         hasLoadedInitialComment.current = false;
         setCheckStatus('not_required');
         setShowRevertModal(false);
-        // Refresh to get fresh data and regenerate comment
         router.refresh();
       } else {
         alert('Failed to revert: ' + result.error);
@@ -279,13 +359,86 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   };
 
   const wordCount = countWords(preview);
-  const targetWordCount = 100; // Configurable or hardcoded for now
+  const targetWordCount = 100;
   const percent = Math.min(100, Math.round((wordCount / targetWordCount) * 100));
-  const dashArray = 100;
-  const dashOffset = 100 - (percent / 100 * 100); // SVG stroke-dashoffset calculation
 
-  // Disable comment banks if comment has been manually edited
   const commentBanksDisabled = isManuallyEdited || skipRegeneration.current;
+
+  // Check linked data mismatch for a group
+  const getLinkedMismatch = (groupId: string, linkedField: string | null | undefined, options: { code: string }[]): string | null => {
+    if (!linkedField) return null;
+    const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
+    const code = linkedData?.[linkedField];
+    if (!code) return `No data for "${linkedField}"`;
+    if (!options.some(o => o.code === code)) return `Value "${code}" has no matching option`;
+    return null;
+  };
+
+  // Build ordered sections for sidebar
+  const renderGroupSection = (
+    sectionLabel: string,
+    sectionGroups: { id: string; name: string; isLinked?: boolean; linkedField?: string | null; options: { id: string; code: string; text: string }[] }[],
+    selectionsMap: Record<string, string>,
+    onSelect: (groupId: string, optionId: string) => void,
+    isCommon: boolean
+  ) => {
+    if (sectionGroups.length === 0) return null;
+    return (
+      <div className="space-y-1">
+        <p className="text-[10px] font-bold text-gray-400 uppercase tracking-widest px-3">{sectionLabel}</p>
+        {sectionGroups.map(group => {
+          const selectedOptionId = selectionsMap[group.id];
+          const selectedOption = group.options.find(o => o.id === selectedOptionId);
+          const isSelected = !!selectedOption;
+          const isGroupLinked = !!group.isLinked;
+          const linkedMismatch = isGroupLinked ? getLinkedMismatch(group.id, group.linkedField, group.options) : null;
+          const isGroupDisabled = commentBanksDisabled || isGroupLinked;
+
+          return (
+            <div key={group.id} className={`flex flex-col gap-2 px-3 py-3 rounded-lg transition-colors border border-transparent ${isGroupLinked ? 'bg-purple-50/50 border-purple-100' : ''} ${isGroupDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${isSelected && !isGroupLinked ? 'bg-primary/5 border-primary/10' : isGroupDisabled ? '' : 'hover:bg-[#f0f2f4] dark:hover:bg-gray-800'}`}>
+              <div className="flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <span className={`material-symbols-outlined text-xl ${isGroupLinked ? 'text-purple-500' : isSelected ? 'text-primary' : 'text-gray-400'}`}>
+                    {isGroupLinked ? 'link' : isCommon ? 'public' : 'article'}
+                  </span>
+                  <p className={`text-sm font-medium ${isGroupLinked ? 'text-purple-700' : isSelected ? 'text-primary' : 'text-[#111418] dark:text-gray-300'}`}>{group.name}</p>
+                  {isGroupLinked && (
+                    <span className="text-[10px] font-medium text-purple-600 bg-purple-100 px-1.5 py-0.5 rounded">Linked</span>
+                  )}
+                </div>
+                {isSelected && <span className={`text-white text-[10px] px-1.5 py-0.5 rounded-full ${isGroupLinked ? 'bg-purple-500' : 'bg-primary'}`}>{selectedOption?.code}</span>}
+              </div>
+              {linkedMismatch && (
+                <div className="pl-8 flex items-center gap-1 text-amber-600">
+                  <span className="material-symbols-outlined text-sm">warning</span>
+                  <span className="text-xs">{linkedMismatch}</span>
+                </div>
+              )}
+              <div className="pl-8 flex flex-wrap gap-2 mt-1">
+                {group.options.map(opt => (
+                  <button
+                    key={opt.id}
+                    onClick={() => !isGroupDisabled && onSelect(group.id, opt.id)}
+                    disabled={isGroupDisabled}
+                    className={`text-xs px-2 py-1 rounded border ${selectionsMap[group.id] === opt.id ? (isGroupLinked ? 'bg-purple-500 text-white border-purple-500' : 'bg-primary text-white border-primary') : 'bg-white text-gray-600 border-gray-200'} ${isGroupDisabled ? 'cursor-not-allowed opacity-50' : 'hover:border-gray-300'}`}
+                    title={isGroupLinked ? 'Linked — auto-populated from data' : commentBanksDisabled ? 'Comment banks are locked' : opt.text}
+                  >
+                    {opt.code}
+                  </button>
+                ))}
+              </div>
+            </div>
+          );
+        })}
+      </div>
+    );
+  };
+
+  // Build sections
+  const p1CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p1').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
+  const p2CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p2').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
+  const subjectGroups = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
+  const p4CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p4').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-8 align-start">
@@ -308,48 +461,29 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                         </p>
                     </div>
                 )}
-                <div className="flex flex-col gap-2">
-                    {groups.map(group => {
-                        const selectedOptionId = selections[group.id];
-                        const selectedOption = group.CommentOption.find(o => o.id === selectedOptionId);
-                        const isSelected = !!selectedOption;
-
-                        return (
-                            <div key={group.id} className={`flex flex-col gap-2 px-3 py-3 rounded-lg transition-colors border border-transparent ${commentBanksDisabled ? 'cursor-not-allowed' : 'cursor-pointer'} ${isSelected ? 'bg-primary/5 border-primary/10' : commentBanksDisabled ? '' : 'hover:bg-[#f0f2f4] dark:hover:bg-gray-800'}`}>
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                        <span className={`material-symbols-outlined text-xl ${isSelected ? 'text-primary' : 'text-gray-400'}`}>
-                                            {group.name === 'Attainment' ? 'school' :
-                                             group.name === 'Effort' ? 'fitness_center' :
-                                             group.name === 'Homework' ? 'home_work' : 'article'}
-                                        </span>
-                                        <p className={`text-sm font-medium ${isSelected ? 'text-primary' : 'text-[#111418] dark:text-gray-300'}`}>{group.name}</p>
-                                    </div>
-                                    {isSelected && <span className="bg-primary text-white text-[10px] px-1.5 py-0.5 rounded-full">{selectedOption?.code}</span>}
-                                </div>
-                                {/* Options (Inline for now or Expandable) - Let's keep them inline for quick access as per logic */}
-                                <div className="pl-8 flex flex-wrap gap-2 mt-1">
-                                    {group.CommentOption.map(opt => (
-                                        <button
-                                            key={opt.id}
-                                            onClick={() => !commentBanksDisabled && handleSelection(group.id, opt.id)}
-                                            disabled={commentBanksDisabled}
-                                            className={`text-xs px-2 py-1 rounded border ${selections[group.id] === opt.id ? 'bg-primary text-white border-primary' : 'bg-white text-gray-600 border-gray-200'} ${commentBanksDisabled ? 'cursor-not-allowed opacity-50' : 'hover:border-gray-300'}`}
-                                            title={commentBanksDisabled ? 'Comment banks are locked' : opt.text}
-                                        >
-                                            {opt.code}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-                        )
-                    })}
+                <div className="flex flex-col gap-4">
+                    {renderGroupSection('P1 — Introduction', p1CommonGroups, commonSelections, handleCommonSelection, true)}
+                    {renderGroupSection('P2 — General', p2CommonGroups, commonSelections, handleCommonSelection, true)}
+                    {renderGroupSection('P3 — Subject', subjectGroups, selections, handleSelection, false)}
+                    {renderGroupSection('P4 — Conclusion', p4CommonGroups, commonSelections, handleCommonSelection, true)}
                 </div>
             </div>
 
             <div className="bg-white dark:bg-gray-900 rounded-xl p-6 border border-[#f0f2f4] dark:border-gray-800 shadow-sm">
                 <h3 className="text-[#111418] dark:text-white text-sm font-bold uppercase tracking-wider mb-4">Selected Codes</h3>
                 <div className="flex flex-wrap gap-2">
+                     {/* Common group selections */}
+                     {Object.entries(commonSelections).map(([gid, oid]) => {
+                         const group = commonGroups?.find(g => g.id === gid);
+                         const option = group?.CommonCommentOption.find(o => o.id === oid);
+                         if (!group || !option) return null;
+                         return (
+                            <span key={gid} className="bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 px-2 py-1 rounded text-xs font-medium border border-green-200 dark:border-green-800">
+                                #{group.name}{option.code}
+                            </span>
+                         );
+                     })}
+                     {/* Subject group selections */}
                      {Object.entries(selections).map(([gid, oid]) => {
                          const group = groups.find(g => g.id === gid);
                          const option = group?.CommentOption.find(o => o.id === oid);
@@ -358,9 +492,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                             <span key={gid} className="bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 px-2 py-1 rounded text-xs font-medium border border-blue-200 dark:border-blue-800">
                                 #{group.name}{option.code}
                             </span>
-                         )
+                         );
                      })}
-                     {Object.keys(selections).length === 0 && <span className="text-gray-400 text-xs italic">No selection</span>}
+                     {Object.keys(selections).length === 0 && Object.keys(commonSelections).length === 0 && <span className="text-gray-400 text-xs italic">No selection</span>}
                 </div>
             </div>
         </aside>
@@ -383,20 +517,19 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                     )}
                 </div>
                 <div className="flex items-center gap-4">
-                    {/* Progress Ring and Word Count */}
                     <div className="flex items-center gap-3">
                         <div className="relative flex items-center justify-center size-10">
                             <svg className="transform -rotate-90 w-full h-full" viewBox="0 0 40 40">
                                 <circle className="text-gray-200 dark:text-gray-700" cx="20" cy="20" fill="transparent" r="16" stroke="currentColor" strokeWidth="3"></circle>
-                                <circle 
-                                    className="text-primary transition-all duration-500" 
-                                    cx="20" cy="20" 
-                                    fill="transparent" 
-                                    r="16" 
-                                    stroke="currentColor" 
-                                    strokeDasharray="100" 
-                                    strokeDashoffset={100 - percent} 
-                                    strokeLinecap="round" 
+                                <circle
+                                    className="text-primary transition-all duration-500"
+                                    cx="20" cy="20"
+                                    fill="transparent"
+                                    r="16"
+                                    stroke="currentColor"
+                                    strokeDasharray="100"
+                                    strokeDashoffset={100 - percent}
+                                    strokeLinecap="round"
                                     strokeWidth="3"
                                 ></circle>
                             </svg>
@@ -439,14 +572,14 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
             <div className="flex-1 p-8 relative">
                 <div className="relative h-full flex flex-col">
                     <label className="text-xs font-bold text-primary uppercase mb-2 block">Generated Comment</label>
-                    <textarea 
-                        className="flex-1 w-full p-6 text-lg leading-relaxed text-[#111418] dark:text-gray-100 bg-background-light/50 dark:bg-gray-950/50 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none outline-none font-display transition-all" 
+                    <textarea
+                        className="flex-1 w-full p-6 text-lg leading-relaxed text-[#111418] dark:text-gray-100 bg-background-light/50 dark:bg-gray-950/50 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none outline-none font-display transition-all"
                         placeholder="Start typing student comments here..."
                         value={preview}
                         onChange={handleTextChange}
                         onBlur={handleTextBlur}
                     ></textarea>
-                    
+
                 </div>
             </div>
 

@@ -32,9 +32,9 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
         },
         include: {
           Pupil: true,
-          PupilCode: true
+          PupilCode: true,
+          CommonPupilCode: true
         }
-        // Note: finalComment is automatically included as a base field
       }
     }
   });
@@ -57,20 +57,45 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
 
   const groups = cls.Subject.CommentGroup;
 
+  // Fetch Common Comment Groups
+  const commonGroups = await (prisma as any).commonCommentGroup.findMany({
+    orderBy: [
+      { paragraphPosition: 'asc' },
+      { displayOrder: 'asc' }
+    ],
+    include: {
+      CommonCommentOption: {
+        orderBy: { displayOrder: 'asc' }
+      }
+    }
+  });
+
+  // Fetch wrapper template
+  const wrapperSetting = await (prisma as any).appSetting.findUnique({
+    where: { key: 'p2_wrapper_template' }
+  });
+  const wrapperTemplate = wrapperSetting?.value || '';
+
   // Decrypt pupil names for display
-  const assignments = cls.Assignment.map((assignment) => ({
+  const assignments = cls.Assignment.map((assignment: any) => ({
     ...assignment,
     Pupil: {
       ...assignment.Pupil,
       firstName: decrypt(assignment.Pupil.firstName),
       lastName: decrypt(assignment.Pupil.lastName)
-    }
+    },
+    finalComment: assignment.finalComment ? decrypt(assignment.finalComment) : null
   }));
 
   // Re-sort because database sort was on encrypted strings
-  assignments.sort((a, b) =>
+  assignments.sort((a: any, b: any) =>
     a.Pupil.lastName.localeCompare(b.Pupil.lastName)
   );
+
+  // Organize CCGs by paragraph position for column headers
+  const p1Groups = commonGroups.filter((g: any) => g.paragraphPosition === 'p1');
+  const p2Groups = commonGroups.filter((g: any) => g.paragraphPosition === 'p2');
+  const p4Groups = commonGroups.filter((g: any) => g.paragraphPosition === 'p4');
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark h-[calc(100vh-64px)] overflow-hidden">
@@ -113,9 +138,34 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 <th scope="col" className="sticky top-0 left-[320px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[140px] min-w-[140px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Status
                                 </th>
+                                {/* P1 CCG columns */}
+                                {p1Groups.map((g: any) => (
+                                    <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
+                                        <Tooltip content={`P1 — ${g.name}`}>
+                                            {g.name}
+                                        </Tooltip>
+                                    </th>
+                                ))}
+                                {/* P2 CCG columns */}
+                                {p2Groups.map((g: any) => (
+                                    <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
+                                        <Tooltip content={`P2 — ${g.name}`}>
+                                            {g.name}
+                                        </Tooltip>
+                                    </th>
+                                ))}
+                                {/* Subject-specific group columns */}
                                 {groups.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
                                         <Tooltip content={g.name}>
+                                            {g.name}
+                                        </Tooltip>
+                                    </th>
+                                ))}
+                                {/* P4 CCG columns */}
+                                {p4Groups.map((g: any) => (
+                                    <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
+                                        <Tooltip content={`P4 — ${g.name}`}>
                                             {g.name}
                                         </Tooltip>
                                     </th>
@@ -133,6 +183,8 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                     groups={groups}
                                     subject={cls.Subject}
                                     classYear={cls.year}
+                                    commonGroups={commonGroups}
+                                    wrapperTemplate={wrapperTemplate}
                                 />
                             ))}
                         </tbody>

@@ -28,6 +28,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
     include: {
       Pupil: true,
       PupilCode: true,
+      CommonPupilCode: true,
       Class: {
         include: {
            User: { select: { id: true } },
@@ -68,6 +69,25 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   const subject = assignment.Class.Subject;
   const groups = subject.CommentGroup;
 
+  // Fetch Common Comment Groups
+  const commonGroups = await (prisma as any).commonCommentGroup.findMany({
+    orderBy: [
+      { paragraphPosition: 'asc' },
+      { displayOrder: 'asc' }
+    ],
+    include: {
+      CommonCommentOption: {
+        orderBy: { displayOrder: 'asc' }
+      }
+    }
+  });
+
+  // Fetch wrapper template
+  const wrapperSetting = await (prisma as any).appSetting.findUnique({
+    where: { key: 'p2_wrapper_template' }
+  });
+  const wrapperTemplate = wrapperSetting?.value || '';
+
   // Decrypt pupil names
   const pupil = {
     ...assignment.Pupil,
@@ -78,7 +98,8 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   // Create assignment with decrypted pupil names for CommentEditor
   const decryptedAssignment = {
     ...assignment,
-    Pupil: pupil
+    Pupil: pupil,
+    finalComment: assignment.finalComment ? decrypt(assignment.finalComment) : null
   };
 
   return (
@@ -110,7 +131,14 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
       </div>
 
       <div className="flex-1 px-10 pb-10 flex gap-8">
-        <CommentEditor assignment={decryptedAssignment} subject={subject} groups={groups} isHoD={canReviewComments} />
+        <CommentEditor
+          assignment={decryptedAssignment}
+          subject={subject}
+          groups={groups}
+          isHoD={canReviewComments}
+          commonGroups={commonGroups}
+          wrapperTemplate={wrapperTemplate}
+        />
       </div>
     </main>
   );

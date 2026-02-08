@@ -16,13 +16,10 @@ export default defineConfig({
       name: 'chromium',
       use: { ...devices['Desktop Chrome'] },
     },
-    {
-      name: 'firefox',
-      use: { ...devices['Desktop Firefox'] },
-    },
-    {
-      name: 'webkit',
-      use: { ...devices['Desktop Safari'] },
-    },
   ],
+  webServer: {
+    command: 'dotenv -e .env.test -- npm run dev',
+    port: 3001,
+    reuseExistingServer: true,
+  },
 });

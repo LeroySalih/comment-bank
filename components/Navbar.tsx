@@ -13,13 +13,16 @@ export default async function Navbar() {
   const showAdmin = isAdmin(session.user);
   const showHoD = isHoD(session.user);
 
+  const envLabel = process.env.NEXT_PUBLIC_ENV || 'DEV';
+  const envColor = envLabel === 'PROD' ? 'bg-red-600' : envLabel === 'TEST' ? 'bg-amber-500' : 'bg-green-600';
+
   return (
     <nav className="bg-white border-b border-gray-200 shadow-sm sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between h-16">
           <div className="flex items-center">
-            <Link 
-              href="/" 
+            <Link
+              href="/"
               className="flex-shrink-0 flex items-center gap-2 text-xl font-bold text-blue-600 hover:text-blue-700 transition-colors"
             >
               <div className="bg-blue-600 text-white p-1.5 rounded-lg">
@@ -27,6 +30,9 @@ export default async function Navbar() {
               </div>
               <span className="hidden sm:block">Comment Bank</span>
             </Link>
+            <span className={`ml-2 px-2 py-0.5 text-[10px] font-bold text-white rounded ${envColor}`}>
+              {envLabel}
+            </span>
             
             <div className="hidden sm:ml-8 sm:flex sm:space-x-4">
               <Link

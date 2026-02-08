@@ -7,80 +7,45 @@ import { SubjectManagement } from "./subject-management"
 import { ClassManagement } from "./class-management"
 import { DeadlineManagement } from "./deadline-management"
 import { ActivityLog } from "./activity-log"
+import { LinkedDataUpload } from "./linked-data-upload"
 
 interface AdminTabsProps {
   users: any[]
   roles: any[]
   subjects: any[]
   deadlines: any[]
+  classes?: { id: string; name: string }[]
 }
 
-export function AdminTabs({ users, roles, subjects, deadlines }: AdminTabsProps) {
-  const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects' | 'classes' | 'deadlines' | 'activity'>('users')
+export function AdminTabs({ users, roles, subjects, deadlines, classes = [] }: AdminTabsProps) {
+  const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects' | 'classes' | 'deadlines' | 'linked-data' | 'activity'>('users')
+
+  const tabs = [
+    { key: 'users' as const, label: 'Users' },
+    { key: 'pupils' as const, label: 'Pupils' },
+    { key: 'subjects' as const, label: 'Subjects' },
+    { key: 'classes' as const, label: 'Classes' },
+    { key: 'deadlines' as const, label: 'Deadlines' },
+    { key: 'linked-data' as const, label: 'Linked Data' },
+    { key: 'activity' as const, label: 'Activity Log' },
+  ]
 
   return (
     <div className="space-y-6">
       <div className="flex border-b">
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'users'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('users')}
-        >
-          Users
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'pupils'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('pupils')}
-        >
-          Pupils
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'subjects'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('subjects')}
-        >
-          Subjects
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'classes'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('classes')}
-        >
-          Classes
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'deadlines'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('deadlines')}
-        >
-          Deadlines
-        </button>
-        <button
-          className={`px-4 py-2 font-medium text-sm transition-colors ${
-            activeTab === 'activity'
-              ? "border-b-2 border-blue-500 text-blue-600"
-              : "text-gray-500 hover:text-gray-700"
-          }`}
-          onClick={() => setActiveTab('activity')}
-        >
-          Activity Log
-        </button>
+        {tabs.map(tab => (
+          <button
+            key={tab.key}
+            className={`px-4 py-2 font-medium text-sm transition-colors ${
+              activeTab === tab.key
+                ? "border-b-2 border-blue-500 text-blue-600"
+                : "text-gray-500 hover:text-gray-700"
+            }`}
+            onClick={() => setActiveTab(tab.key)}
+          >
+            {tab.label}
+          </button>
+        ))}
       </div>
 
       <div className="mt-6">
@@ -94,6 +59,8 @@ export function AdminTabs({ users, roles, subjects, deadlines }: AdminTabsProps)
           <ClassManagement subjects={subjects} />
         ) : activeTab === 'deadlines' ? (
           <DeadlineManagement deadlines={deadlines} />
+        ) : activeTab === 'linked-data' ? (
+          <LinkedDataUpload classes={classes} />
         ) : (
           <ActivityLog />
         )}

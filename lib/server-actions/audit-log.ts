@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { withRole } from '@/lib/auth/with-role'
 import { handleServerActionError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
+import { decrypt } from '@/lib/encryption'
 
 export interface AuditLogEntry {
   id: string
@@ -83,7 +84,7 @@ export const getAuditLogs = withRole('admin', async (
     // Parse details JSON
     const parsedLogs: AuditLogEntry[] = logs.map(log => ({
       ...log,
-      details: log.details ? JSON.parse(log.details) : null
+      details: log.details ? JSON.parse(decrypt(log.details)) : null
     }))
 
     return {

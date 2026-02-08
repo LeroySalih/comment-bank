@@ -8,9 +8,13 @@
     "start": "next start",
     "lint": "eslint",
     "type-check": "tsc --noEmit --incremental false",
+    "db:test:reset": "./scripts/setup-test-db.sh",
     "test": "vitest",
     "test:ui": "vitest --ui",
-    "test:coverage": "vitest --coverage"
+    "test:coverage": "vitest --coverage",
+    "test:e2e": "npx playwright test --project=chromium",
+    "test:e2e:ui": "npx playwright test --project=chromium --ui",
+    "test:e2e:setup": "./scripts/setup-test-db.sh && npx playwright test --project=chromium"
   },
   "dependencies": {
     "@hello-pangea/dnd": "^18.0.1",

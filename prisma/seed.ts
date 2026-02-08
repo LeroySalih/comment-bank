@@ -261,14 +261,22 @@ async function main() {
 
     const cls = classMap.get(pupil.className);
 
-    // Create Assignment
+    // Create Assignment with sample linked data
+    const grades = ["A*", "A", "B", "C", "D", "E", "F", "NA"];
+    const randomGrade = () => grades[Math.floor(Math.random() * grades.length)];
+
     await (prisma as any).assignment.create({
       data: {
         id: cuid(),
         pupilId: pupil.admNo,
         classId: cls.id,
         targetLevel: pupil.target,
-        eoyLevel: pupil.eoy
+        eoyLevel: pupil.eoy,
+        linkedData: {
+          behaviour: randomGrade(),
+          effort: randomGrade(),
+          homework: randomGrade(),
+        }
       }
     });
   }
@@ -314,12 +322,138 @@ async function main() {
     console.log(`Assigned teacher3 to class: 7C`);
   }
 
+  // ============================================================================
+  // Seed Common Comment Groups (CCGs)
+  // ============================================================================
+  console.log('\nSeeding Common Comment Groups...');
+
+  // Clear existing CCG data
+  await (prisma as any).commonPupilCode.deleteMany({});
+  await (prisma as any).commonCommentOption.deleteMany({});
+  await (prisma as any).commonCommentGroup.deleteMany({});
+  await (prisma as any).appSetting.deleteMany({});
+
+  const ccgData = [
+    {
+      name: "Academic Performance",
+      title: "Academic Performance",
+      paragraphPosition: "p1",
+      displayOrder: 0,
+      isLinked: false,
+      linkedField: null as string | null,
+      options: [
+        { code: "H", text: "<Name> has demonstrated an excellent level of academic performance in <Subject> this term.", displayOrder: 0 },
+        { code: "M", text: "<Name> has demonstrated a good level of academic performance in <Subject> this term.", displayOrder: 1 },
+        { code: "L", text: "<Name> has found <Subject> challenging this term and needs to improve <his> academic performance.", displayOrder: 2 },
+      ]
+    },
+    {
+      name: "Effort",
+      title: "Effort",
+      paragraphPosition: "p2",
+      displayOrder: 0,
+      isLinked: true,
+      linkedField: "effort",
+      options: [
+        { code: "A*", text: "<He> consistently puts in outstanding effort in lessons, going above and beyond expectations.", displayOrder: 0 },
+        { code: "A", text: "<He> consistently puts in excellent effort in lessons.", displayOrder: 1 },
+        { code: "B", text: "<He> generally puts in good effort in lessons.", displayOrder: 2 },
+        { code: "C", text: "<He> puts in satisfactory effort in lessons but could do more.", displayOrder: 3 },
+        { code: "D", text: "<He> needs to put in more consistent effort in lessons.", displayOrder: 4 },
+        { code: "E", text: "<He> needs to significantly improve <his> effort in lessons.", displayOrder: 5 },
+        { code: "F", text: "<He> rarely puts in the required effort in lessons.", displayOrder: 6 },
+        { code: "NA", text: "", displayOrder: 7 },
+      ]
+    },
+    {
+      name: "Behaviour",
+      title: "Behaviour",
+      paragraphPosition: "p2",
+      displayOrder: 1,
+      isLinked: true,
+      linkedField: "behaviour",
+      options: [
+        { code: "A*", text: "<His> behaviour in class is exemplary and a model for others.", displayOrder: 0 },
+        { code: "A", text: "<His> behaviour in class is exemplary.", displayOrder: 1 },
+        { code: "B", text: "<His> behaviour in class is generally good.", displayOrder: 2 },
+        { code: "C", text: "<His> behaviour in class is satisfactory.", displayOrder: 3 },
+        { code: "D", text: "<He> needs to improve <his> behaviour in class.", displayOrder: 4 },
+        { code: "E", text: "<He> needs to significantly improve <his> behaviour in class.", displayOrder: 5 },
+        { code: "F", text: "<His> behaviour in class is a serious concern.", displayOrder: 6 },
+        { code: "NA", text: "", displayOrder: 7 },
+      ]
+    },
+    {
+      name: "Homework",
+      title: "Homework",
+      paragraphPosition: "p2",
+      displayOrder: 2,
+      isLinked: true,
+      linkedField: "homework",
+      options: [
+        { code: "A*", text: "<He> always completes homework to an outstanding standard and on time.", displayOrder: 0 },
+        { code: "A", text: "<He> always completes homework to a high standard and on time.", displayOrder: 1 },
+        { code: "B", text: "<He> usually completes homework to a good standard and on time.", displayOrder: 2 },
+        { code: "C", text: "<He> usually completes homework on time.", displayOrder: 3 },
+        { code: "D", text: "<He> needs to ensure that homework is completed on time.", displayOrder: 4 },
+        { code: "E", text: "<He> frequently fails to complete homework on time or to a satisfactory standard.", displayOrder: 5 },
+        { code: "F", text: "<He> rarely completes homework.", displayOrder: 6 },
+        { code: "NA", text: "", displayOrder: 7 },
+      ]
+    },
+    {
+      name: "Overall",
+      title: "Overall",
+      paragraphPosition: "p4",
+      displayOrder: 0,
+      isLinked: false,
+      linkedField: null as string | null,
+      options: [
+        { code: "H", text: "Overall, <Name> is making excellent progress and should continue to work at this level.", displayOrder: 0 },
+        { code: "M", text: "Overall, <Name> is making good progress and should continue to build on this.", displayOrder: 1 },
+        { code: "L", text: "Overall, <Name> needs to focus on improving <his> effort and engagement to make better progress.", displayOrder: 2 },
+      ]
+    },
+  ];
+
+  for (const group of ccgData) {
+    await (prisma as any).commonCommentGroup.create({
+      data: {
+        id: cuid(),
+        name: group.name,
+        title: group.title,
+        paragraphPosition: group.paragraphPosition,
+        displayOrder: group.displayOrder,
+        isLinked: group.isLinked,
+        linkedField: group.linkedField,
+        CommonCommentOption: {
+          create: group.options.map(opt => ({
+            id: cuid(),
+            code: opt.code,
+            text: opt.text,
+            displayOrder: opt.displayOrder,
+          }))
+        }
+      }
+    });
+  }
+
+  // Seed wrapper template
+  await (prisma as any).appSetting.upsert({
+    where: { key: 'p2_wrapper_template' },
+    update: { value: '<Effort> <Behaviour> <Homework>' },
+    create: { key: 'p2_wrapper_template', value: '<Effort> <Behaviour> <Homework>' }
+  });
+
+  console.log('Common Comment Groups seeded successfully');
+
   console.log('\n=== Seeding Summary ===');
   console.log(`Created ${pupilData.length} pupils`);
   console.log(`Created 3 classes: 7A, 7B, 7C`);
   console.log(`Created 3 subjects: 7CS, 7DT, 8CS`);
   console.log(`Assigned all subjects to leroysalih (HOD)`);
   console.log(`Created 5 users: admin, leroysalih, teacher, teacher2, teacher3`);
+  console.log(`Created 5 Common Comment Groups with options`);
   console.log('Seeding completed successfully');
 }
 

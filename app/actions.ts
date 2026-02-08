@@ -4,6 +4,7 @@ import { prisma } from '@/lib/prisma'
 import { revalidatePath } from 'next/cache'
 import { createId } from '@paralleldrive/cuid2'
 import { createAuditLog, logDataChange } from '@/lib/audit-log'
+import { encrypt } from '@/lib/encryption'
 
 export async function updateAssignmentCode(
   assignmentId: string,
@@ -11,6 +12,12 @@ export async function updateAssignmentCode(
   code: string | null
 ) {
   try {
+    // Guard: reject if group is linked
+    const group = await prisma.commentGroup.findUnique({ where: { id: groupId } })
+    if (group && (group as any).isLinked) {
+      return { success: false, error: 'Cannot manually update a linked group code' }
+    }
+
     // Get current code for audit log
     const currentPupilCode = await (prisma as any).pupilCode.findUnique({
       where: { assignmentId_groupId: { assignmentId, groupId } }
@@ -59,6 +66,63 @@ export async function updateAssignmentCode(
   }
 }
 
+export async function updateCommonAssignmentCode(
+  assignmentId: string,
+  commonGroupId: string,
+  code: string | null
+) {
+  try {
+    // Guard: reject if group is linked
+    const commonGroup = await (prisma as any).commonCommentGroup.findUnique({ where: { id: commonGroupId } })
+    if (commonGroup && commonGroup.isLinked) {
+      return { success: false, error: 'Cannot manually update a linked group code' }
+    }
+
+    const currentCode = await (prisma as any).commonPupilCode.findUnique({
+      where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } }
+    })
+    const oldCode = currentCode?.code || null
+
+    if (code === null || code === '') {
+      await (prisma as any).commonPupilCode.delete({
+        where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } }
+      }).catch(() => {});
+    } else {
+      await (prisma as any).commonPupilCode.upsert({
+        where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } },
+        update: { code },
+        create: { id: createId(), assignmentId, commonGroupId, code }
+      })
+    }
+
+    if (oldCode !== code) {
+      await logDataChange(
+        'update_common_assignment_code',
+        'assignment',
+        assignmentId,
+        { commonGroupId, code: oldCode },
+        { commonGroupId, code }
+      )
+    }
+
+    revalidatePath(`/student/${assignmentId}`)
+    revalidatePath('/')
+
+    const assignment = await (prisma as any).assignment.findUnique({
+      where: { id: assignmentId },
+      select: { classId: true }
+    });
+    if (assignment?.classId) {
+      revalidatePath(`/class/${assignment.classId}`);
+    }
+
+    return { success: true }
+  } catch (error) {
+    console.error('Failed to update common code:', error)
+    return { success: false, error: 'Database error' }
+  }
+}
+
 export async function updateAssignmentCommentText(assignmentId: string, comment: string) {
   try {
     // Get current assignment to check status
@@ -87,7 +151,7 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
     const updated = await prisma.assignment.update({
       where: { id: assignmentId },
       data: {
-        finalComment: comment,
+        finalComment: encrypt(comment),
         checkStatus: newStatus,
         // Clear check data if we're changing status to required_check
         ...(newStatus === 'required_check' && currentStatus !== 'required_check' ? {

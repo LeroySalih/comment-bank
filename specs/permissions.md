@@ -25,6 +25,7 @@ should have access to all routes permitted by any of their roles.
 | `/login`        | ✅    | ✅  | ✅      | ✅                      |
 | `/` (Dashboard) | ✅    | ✅  | ✅      | ❌ Redirect to `/login` |
 | `/admin/*`      | ✅    | ❌  | ❌      | ❌ Redirect to `/login` |
+| `/admin/ccg`    | ✅    | ❌  | ❌      | ❌ Redirect to `/login` |
 | `/hod/*`        | ❌    | ✅  | ❌      | ❌ Redirect to `/login` |
 | `/class/*`      | ❌    | ❌  | ✅      | ❌ Redirect to `/login` |
 | `/student/*`    | ❌    | ❌  | ✅      | ❌ Redirect to `/login` |
@@ -34,7 +35,10 @@ should have access to all routes permitted by any of their roles.
 ### Admin Routes (`/admin/*`)
 
 - **Access**: Admin role ONLY
-- **Purpose**: System administration, user management, subject creation
+- **Purpose**: System administration, user management, subject creation,
+  Common Comment Group (CCG) management
+- **Includes**: `/admin/ccg` — Create, edit, delete common comment groups
+  and their options; configure paragraph 2 wrapper template
 - **Redirect**: Users without admin role → `/login`
 
 ### HOD Routes (`/hod/*`)
@@ -63,6 +67,7 @@ The navigation menu should display links based on the user's role(s):
 
 - Dashboard
 - Admin Dashboard link (`/admin`)
+- Common Comment Groups link (`/admin/ccg`)
 
 ### HOD Users See:
 

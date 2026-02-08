@@ -7,7 +7,7 @@ import QuickGroupSelector from '@/components/QuickGroupSelector';
 import CopyCommentButton from '@/components/CopyCommentButton';
 import CommentStatusBadge from '@/components/CommentStatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
-import { revertAssignmentComment } from '@/app/actions';
+import { revertAssignmentComment, updateCommonAssignmentCode } from '@/app/actions';
 
 type Option = {
   id: string;
@@ -18,7 +18,18 @@ type Option = {
 type Group = {
   id: string;
   name: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
   CommentOption: Option[];
+};
+
+type CommonCommentGroup = {
+  id: string;
+  name: string;
+  paragraphPosition: string;
+  isLinked?: boolean;
+  linkedField?: string | null;
+  CommonCommentOption: Option[];
 };
 
 type Pupil = {
@@ -32,15 +43,22 @@ type PupilCode = {
   code: string | null;
 };
 
+type CommonPupilCode = {
+  commonGroupId: string;
+  code: string | null;
+};
+
 type Assignment = {
   id: string;
   Pupil: Pupil;
   PupilCode: PupilCode[];
+  CommonPupilCode?: CommonPupilCode[];
   eoyLevel?: string | null;
   targetLevel?: string | null;
   checkStatus?: string;
   checkNote?: string | null;
   finalComment?: string | null;
+  linkedData?: any;
 };
 
 type Subject = {
@@ -53,16 +71,54 @@ interface StudentMatrixRowProps {
   groups: Group[];
   subject: Subject;
   classYear?: string | null;
+  commonGroups?: CommonCommentGroup[];
+  wrapperTemplate?: string;
 }
 
-export default function StudentMatrixRow({ assignment, groups, subject, classYear }: StudentMatrixRowProps) {
+function LinkedCodeBadge({ code, hasMatch }: { code: string | null; hasMatch: boolean }) {
+  if (!code) {
+    return (
+      <span className="inline-flex items-center gap-1 text-xs text-gray-400 italic">
+        <span className="material-symbols-outlined text-sm">link_off</span>
+        No data
+      </span>
+    );
+  }
+  return (
+    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-1.5 rounded-lg border ${
+      hasMatch
+        ? 'text-purple-700 bg-purple-50 border-purple-200'
+        : 'text-amber-700 bg-amber-50 border-amber-200'
+    }`}>
+      <span className="material-symbols-outlined text-sm">{hasMatch ? 'link' : 'warning'}</span>
+      {code}
+    </span>
+  );
+}
+
+export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroups, wrapperTemplate }: StudentMatrixRowProps) {
   const router = useRouter();
 
-  // Track selections locally so CopyCommentButton updates immediately
+  // Track subject-specific selections locally
   const [selections, setSelections] = useState<Record<string, string | null>>(() => {
     const initial: Record<string, string | null> = {};
     assignment.PupilCode.forEach(pc => {
       initial[pc.groupId] = pc.code;
+    });
+    return initial;
+  });
+
+  // Track common group selections locally
+  const [commonSelections, setCommonSelections] = useState<Record<string, string | null>>(() => {
+    const initial: Record<string, string | null> = {};
+    const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
+    (commonGroups || []).forEach(cg => {
+      if (cg.isLinked && cg.linkedField && linkedData) {
+        initial[cg.id] = linkedData[cg.linkedField] || null;
+      } else {
+        const cpc = (assignment.CommonPupilCode || []).find(c => c.commonGroupId === cg.id);
+        initial[cg.id] = cpc?.code || null;
+      }
     });
     return initial;
   });
@@ -76,8 +132,16 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
   const [isReverting, setIsReverting] = useState(false);
 
   const handleSelectionChange = (groupId: string, code: string | null) => {
-    if (commentBanksDisabled) return; // Don't allow changes if disabled
+    if (commentBanksDisabled) return;
     setSelections(prev => ({
+      ...prev,
+      [groupId]: code
+    }));
+  };
+
+  const handleCommonSelectionChange = (groupId: string, code: string | null) => {
+    if (commentBanksDisabled) return;
+    setCommonSelections(prev => ({
       ...prev,
       [groupId]: code
     }));
@@ -107,9 +171,29 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
       groupId: g.id,
       code: selections[g.id] || null
     })),
-    // Pass through the saved finalComment and checkStatus
     finalComment: assignment.finalComment,
-    checkStatus: assignment.checkStatus
+    checkStatus: assignment.checkStatus,
+    linkedData: assignment.linkedData
+  };
+
+  // Build current common pupil codes for CopyCommentButton
+  const currentCommonPupilCodes = (commonGroups || []).map(g => ({
+    commonGroupId: g.id,
+    code: commonSelections[g.id] || null
+  }));
+
+  // Organize CCGs by paragraph position
+  const p1Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p1');
+  const p2Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p2');
+  const p4Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p4');
+
+  const contextForTooltip = {
+    firstName: assignment.Pupil.firstName,
+    gender: assignment.Pupil.gender,
+    subjectTitle: subject.title || undefined,
+    year: classYear || undefined,
+    eoyLevel: assignment.eoyLevel,
+    targetLevel: assignment.targetLevel
   };
 
   return (
@@ -136,6 +220,62 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
           )}
         </div>
       </td>
+
+      {/* P1 CCG columns */}
+      {p1Groups.map((g) => {
+        const currentCode = commonSelections[g.id] || null;
+        if (g.isLinked) {
+          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
+          return (
+            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
+            </td>
+          );
+        }
+        return (
+          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+            <QuickGroupSelector
+              assignmentId={assignment.id}
+              groupId={g.id}
+              currentCode={currentCode}
+              options={g.CommonCommentOption}
+              context={contextForTooltip}
+              onSelectionChange={handleCommonSelectionChange}
+              onCodeUpdate={updateCommonAssignmentCode}
+              disabled={commentBanksDisabled}
+            />
+          </td>
+        );
+      })}
+
+      {/* P2 CCG columns */}
+      {p2Groups.map((g) => {
+        const currentCode = commonSelections[g.id] || null;
+        if (g.isLinked) {
+          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
+          return (
+            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
+            </td>
+          );
+        }
+        return (
+          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+            <QuickGroupSelector
+              assignmentId={assignment.id}
+              groupId={g.id}
+              currentCode={currentCode}
+              options={g.CommonCommentOption}
+              context={contextForTooltip}
+              onSelectionChange={handleCommonSelectionChange}
+              onCodeUpdate={updateCommonAssignmentCode}
+              disabled={commentBanksDisabled}
+            />
+          </td>
+        );
+      })}
+
+      {/* Subject-specific group columns */}
       {groups.map((g) => {
         const currentCode = selections[g.id] || null;
         return (
@@ -145,26 +285,50 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
               groupId={g.id}
               currentCode={currentCode}
               options={g.CommentOption}
-              context={{
-                firstName: assignment.Pupil.firstName,
-                gender: assignment.Pupil.gender,
-                subjectTitle: subject.title || undefined,
-                year: classYear || undefined,
-                eoyLevel: assignment.eoyLevel,
-                targetLevel: assignment.targetLevel
-              }}
+              context={contextForTooltip}
               onSelectionChange={handleSelectionChange}
               disabled={commentBanksDisabled}
             />
           </td>
         );
       })}
+
+      {/* P4 CCG columns */}
+      {p4Groups.map((g) => {
+        const currentCode = commonSelections[g.id] || null;
+        if (g.isLinked) {
+          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
+          return (
+            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
+            </td>
+          );
+        }
+        return (
+          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+            <QuickGroupSelector
+              assignmentId={assignment.id}
+              groupId={g.id}
+              currentCode={currentCode}
+              options={g.CommonCommentOption}
+              context={contextForTooltip}
+              onSelectionChange={handleCommonSelectionChange}
+              onCodeUpdate={updateCommonAssignmentCode}
+              disabled={commentBanksDisabled}
+            />
+          </td>
+        );
+      })}
+
       <td className="px-6 py-4 whitespace-nowrap text-right">
         <div className="flex items-center justify-end gap-3">
           <CopyCommentButton
             assignment={currentAssignment}
             subject={subject}
             groups={groups}
+            commonGroups={commonGroups}
+            commonPupilCodes={currentCommonPupilCodes}
+            wrapperTemplate={wrapperTemplate}
           />
           <Link
             href={`/student/${assignment.id}`}

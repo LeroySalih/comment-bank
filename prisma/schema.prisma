@@ -15,6 +15,7 @@ model Assignment {
   targetLevel  String?
   actualLevel  String?
   finalComment String?
+  linkedData   Json?       // JSONB: e.g. { "behaviour": "A", "effort": "B", "homework": "A*" }
 
   // Comment Check Status
   checkStatus   String    @default("not_required")  // not_required | required_check | checked_ok | checked_rejected
@@ -25,6 +26,7 @@ model Assignment {
   Class        Class       @relation(fields: [classId], references: [id], onDelete: Cascade)
   Pupil        Pupil       @relation(fields: [pupilId], references: [admissionNumber], onDelete: Cascade)
   PupilCode    PupilCode[]
+  CommonPupilCode CommonPupilCode[]
   CheckedBy    User?       @relation("CheckedAssignments", fields: [checkedById], references: [id])
 
   @@index([classId])
@@ -50,6 +52,8 @@ model CommentGroup {
   displayOrder  Int             @default(0)
   subjectId     String
   title         String          @default("")
+  isLinked      Boolean         @default(false)
+  linkedField   String?         // key in Assignment.linkedData
   Subject       Subject         @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   CommentOption CommentOption[]
   PupilCode     PupilCode[]
@@ -126,6 +130,46 @@ model Deadline {
   description String?
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+}
+
+model CommonCommentGroup {
+  id                String                @id
+  name              String                @unique
+  title             String                @default("")
+  displayOrder      Int                   @default(0)
+  paragraphPosition String                // "p1", "p2", or "p4"
+  isLinked          Boolean               @default(false)
+  linkedField       String?               // key in Assignment.linkedData
+  CommonCommentOption CommonCommentOption[]
+  CommonPupilCode    CommonPupilCode[]
+}
+
+model CommonCommentOption {
+  id           String             @id
+  code         String
+  text         String
+  displayOrder Int                @default(0)
+  groupId      String
+  CommonCommentGroup CommonCommentGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+  @@unique([groupId, code])
+  @@index([groupId])
+}
+
+model CommonPupilCode {
+  id            String             @id
+  assignmentId  String
+  commonGroupId String
+  code          String?
+  Assignment    Assignment         @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  CommonCommentGroup CommonCommentGroup @relation(fields: [commonGroupId], references: [id], onDelete: Cascade)
+  @@unique([assignmentId, commonGroupId])
+  @@index([assignmentId])
+  @@index([commonGroupId])
+}
+
+model AppSetting {
+  key   String @id
+  value String
 }
 
 model AuditLog {
