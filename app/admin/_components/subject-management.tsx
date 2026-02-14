@@ -17,41 +17,55 @@ export function SubjectManagement({ subjects, users }: SubjectManagementProps) {
         <SubjectForm />
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-        {subjects.map((subject: any) => (
-          <div key={subject.id} className="relative group">
-            <Link 
-              href={`/hod/subject/${subject.id}`}
-              className="block"
-            >
-              <div className="bg-white shadow rounded-lg p-6 border border-transparent hover:border-indigo-500 transition-colors min-h-[160px] flex flex-col">
-                <div className="mb-2">
-                  <h2 className="text-xl font-semibold text-gray-900 pr-16">{subject.code}</h2>
-                  {subject.title && <h3 className="text-sm font-medium text-gray-600">{subject.title}</h3>}
-                </div>
-                <p className="text-gray-500 text-sm mb-4 line-clamp-2 flex-grow">{subject.studiedComment || "No introduction"}</p>
-                
-                <div className="flex justify-between items-center text-sm text-gray-500 mt-auto pt-4 border-t">
-                  <div className="flex gap-4">
-                     <span>{subject._count.Class} Classes</span>
-                     <span>{subject._count.CommentGroup} Groups</span>
+      <div className="overflow-x-auto">
+        <table className="w-full text-sm">
+          <thead>
+            <tr className="border-b border-gray-200 dark:border-gray-700 text-left">
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Code</th>
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Title</th>
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 text-center">Classes</th>
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 text-center">Groups</th>
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400">Assigned Users</th>
+              <th className="px-4 py-3 font-semibold text-gray-600 dark:text-gray-400 text-right">Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            {subjects.map((subject: any) => (
+              <tr key={subject.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
+                <td className="px-4 py-3">
+                  <Link href={`/hod/subject/${subject.id}`} className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
+                    {subject.code}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 text-gray-700 dark:text-gray-300">{subject.title || "—"}</td>
+                <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{subject._count.Class}</td>
+                <td className="px-4 py-3 text-center text-gray-600 dark:text-gray-400">{subject._count.CommentGroup}</td>
+                <td className="px-4 py-3">
+                  <div className="flex flex-wrap gap-1">
+                    {subject.User?.length > 0 ? subject.User.map((u: any) => (
+                      <span key={u.id} className="text-xs bg-gray-100 dark:bg-gray-800 text-gray-600 dark:text-gray-400 px-1.5 py-0.5 rounded">
+                        {u.username}
+                      </span>
+                    )) : <span className="text-xs text-gray-400 italic">None</span>}
                   </div>
-                </div>
-              </div>
-            </Link>
-            <div className="absolute bottom-4 right-4 z-10 flex gap-2">
-               <SubjectUserAssignment
-                 subjectId={subject.id}
-                 assignedUsers={subject.User}
-                 allUsers={users}
-               />
-               <EditSubjectForm subject={subject} />
-            </div>
-          </div>
-        ))}
+                </td>
+                <td className="px-4 py-3 text-right">
+                  <div className="flex gap-2 justify-end">
+                    <SubjectUserAssignment
+                      subjectId={subject.id}
+                      assignedUsers={subject.User}
+                      allUsers={users}
+                    />
+                    <EditSubjectForm subject={subject} />
+                  </div>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
 
         {subjects.length === 0 && (
-          <div className="col-span-full text-center py-10 bg-gray-50 rounded-lg border-2 border-dashed border-gray-200">
+          <div className="text-center py-10 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 mt-4">
             <p className="text-gray-500">No subjects found. Create one to get started.</p>
           </div>
         )}
