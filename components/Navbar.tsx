@@ -40,7 +40,7 @@ export default async function Navbar() {
                 className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all gap-2"
               >
                 <LayoutDashboard size={18} />
-                Dashboard
+                Pupil Comments
               </Link>
 
               {showHoD && (

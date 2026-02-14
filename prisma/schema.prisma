@@ -4,7 +4,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Assignment {
@@ -107,6 +106,7 @@ model Subject {
   code           String         @unique
   title          String?
   studiedComment String?
+  commentFormat  String?
   Class          Class[]
   CommentGroup   CommentGroup[]
   User           User[]
@@ -137,7 +137,6 @@ model CommonCommentGroup {
   name              String                @unique
   title             String                @default("")
   displayOrder      Int                   @default(0)
-  paragraphPosition String                // "p1", "p2", or "p4"
   isLinked          Boolean               @default(false)
   linkedField       String?               // key in Assignment.linkedData
   CommonCommentOption CommonCommentOption[]

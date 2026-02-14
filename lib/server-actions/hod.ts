@@ -18,6 +18,7 @@ import {
   DeleteCommentOptionSchema,
   ReorderCommentGroupsSchema,
   ReorderCommentOptionsSchema,
+  UpdateSubjectCommentFormatSchema,
   validateFormData
 } from '@/lib/validation-schemas'
 import { getServerSession } from 'next-auth'
@@ -398,6 +399,47 @@ export const reorderCommentGroups = withRole(['admin', 'hod'], async (
     return { success: true }
   } catch (error) {
     logger.error('Failed to reorder comment groups', { error, subjectId })
+    return handleServerActionError(error)
+  }
+})
+
+// ============================================================================
+// Subject Comment Format
+// ============================================================================
+
+export const updateSubjectCommentFormat = withRole(['admin', 'hod'], async (
+  subjectId: string,
+  commentFormat: string | null
+) => {
+  try {
+    await checkSubjectAccess(subjectId)
+
+    const validation = validateFormData(UpdateSubjectCommentFormatSchema, { subjectId, commentFormat })
+    if (!validation.success) {
+      return validation
+    }
+
+    const currentSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
+
+    await prisma.subject.update({
+      where: { id: subjectId },
+      data: { commentFormat: commentFormat || null }
+    })
+
+    await logDataChange(
+      'update_subject_comment_format',
+      'subject',
+      subjectId,
+      { commentFormat: (currentSubject as any)?.commentFormat },
+      { commentFormat }
+    )
+
+    logger.info('Subject comment format updated', { subjectId })
+    revalidatePath(`/hod/subject/${subjectId}`)
+
+    return { success: true }
+  } catch (error) {
+    logger.error('Failed to update subject comment format', { error, subjectId })
     return handleServerActionError(error)
   }
 })

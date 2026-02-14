@@ -32,7 +32,6 @@ type CommonCommentGroup = {
   id: string;
   name: string;
   title: string;
-  paragraphPosition: string;
   isLinked?: boolean;
   linkedField?: string | null;
   CommonCommentOption: CommonCommentOption[];
@@ -84,10 +83,11 @@ interface CommentEditorProps {
   groups: CommentGroup[];
   isHoD?: boolean;
   commonGroups?: CommonCommentGroup[];
-  wrapperTemplate?: string;
+  formatTemplate?: string;
+  subjectFormat?: string | null;
 }
 
-export default function CommentEditor({ assignment, subject, groups, isHoD = false, commonGroups, wrapperTemplate }: CommentEditorProps) {
+export default function CommentEditor({ assignment, subject, groups, isHoD = false, commonGroups, formatTemplate, subjectFormat }: CommentEditorProps) {
   const router = useRouter();
   const [selections, setSelections] = useState<Record<string, string>>({}); // groupId -> optionId
   const [commonSelections, setCommonSelections] = useState<Record<string, string>>({}); // commonGroupId -> optionId
@@ -180,67 +180,74 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
         return group.CommonCommentOption.find(o => o.id === selectedOptionId)?.text || "";
     };
 
-    if (!commonGroups || commonGroups.length === 0) {
-      // Legacy single-paragraph behavior
-      const parts: string[] = [];
-      if (subject.studiedComment) {
-        parts.push(subject.studiedComment);
-      }
-      const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
-      const groupTexts: string[] = [];
-      for (const group of sortedGroups) {
-        const text = getOptText(group);
-        if (text) groupTexts.push(text);
-      }
-      if (groupTexts.length > 0) parts.push(groupTexts.join(" "));
-      const combined = parts.join("\n\n");
-      setPreview(parseComment(combined, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
-    } else {
-      // 4-paragraph layout
-      const paragraphs: string[] = [];
+    // Build the subject content
+    const buildSubjectContent = (): string => {
+        const parts: string[] = [];
+        if (subject.studiedComment) parts.push(subject.studiedComment);
 
-      // P1: CCGs with paragraphPosition "p1"
-      const p1Groups = commonGroups.filter(g => g.paragraphPosition === 'p1');
-      const p1Texts = p1Groups.map(g => getCommonOptText(g)).filter(Boolean);
-      if (p1Texts.length > 0) paragraphs.push(p1Texts.join(" "));
-
-      // P2: CCGs with paragraphPosition "p2" — use wrapper template
-      const p2Groups = commonGroups.filter(g => g.paragraphPosition === 'p2');
-      if (p2Groups.length > 0 && wrapperTemplate) {
-        let p2Text = wrapperTemplate;
-        for (const group of p2Groups) {
-          const text = getCommonOptText(group);
-          p2Text = p2Text.replaceAll(`<${group.name}>`, text);
+        let orderedGroups: CommentGroup[];
+        if (subjectFormat) {
+            const codes = subjectFormat.split(/\s+/).filter(Boolean);
+            orderedGroups = [];
+            for (const code of codes) {
+                const group = groups.find(g => g.name === code);
+                if (group) orderedGroups.push(group);
+            }
+        } else {
+            orderedGroups = [...groups].sort((a, b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
         }
-        p2Text = p2Text.replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim();
-        if (p2Text) paragraphs.push(p2Text);
-      } else if (p2Groups.length > 0) {
-        const p2Texts = p2Groups.map(g => getCommonOptText(g)).filter(Boolean);
-        if (p2Texts.length > 0) paragraphs.push(p2Texts.join(" "));
+
+        const groupTexts: string[] = [];
+        for (const group of orderedGroups) {
+            const text = getOptText(group);
+            if (text) groupTexts.push(text);
+        }
+        if (groupTexts.length > 0) parts.push(groupTexts.join(" "));
+        return parts.join(" ");
+    };
+
+    if (formatTemplate && commonGroups && commonGroups.length > 0) {
+      // Format template-based generation
+      let result = formatTemplate;
+
+      // Replace each CCG group tag
+      for (const group of commonGroups) {
+        const text = getCommonOptText(group);
+        result = result.replaceAll(`<${group.name}>`, text);
       }
 
-      // P3: Subject studiedComment + subject-specific groups
-      const p3Parts: string[] = [];
-      if (subject.studiedComment) p3Parts.push(subject.studiedComment);
-      const sortedGroups = [...groups].sort((a,b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
-      const groupTexts: string[] = [];
-      for (const group of sortedGroups) {
-        const text = getOptText(group);
-        if (text) groupTexts.push(text);
-      }
-      if (groupTexts.length > 0) p3Parts.push(groupTexts.join(" "));
-      if (p3Parts.length > 0) paragraphs.push(p3Parts.join(" "));
+      // Replace <SCG> tag with subject comment group content
+      const subjectContent = buildSubjectContent();
+      result = result.replaceAll('<SCG>', subjectContent);
 
-      // P4: CCGs with paragraphPosition "p4"
-      const p4Groups = commonGroups.filter(g => g.paragraphPosition === 'p4');
-      const p4Texts = p4Groups.map(g => getCommonOptText(g)).filter(Boolean);
-      if (p4Texts.length > 0) paragraphs.push(p4Texts.join(" "));
+      // Clean up unreplaced custom tags (not standard variables)
+      const standardVars = ['Name', 'He', 'he', 'She', 'she', 'His', 'his', 'Her', 'her', 'Him', 'him', 'Subject', 'TargetLevel', 'EoYLevel', 'Year', 'SCG'];
+      result = result.replace(/<([^>]+)>/g, (match, tagName) => {
+        if (standardVars.includes(tagName)) return match;
+        return '';
+      });
+      result = result.replace(/\s{2,}/g, ' ').trim();
+      result = result.split('\n\n').filter(p => p.trim()).join('\n\n');
+
+      setPreview(parseComment(result, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
+    } else if (!commonGroups || commonGroups.length === 0) {
+      // No common groups — just subject content
+      const subjectContent = buildSubjectContent();
+      setPreview(parseComment(subjectContent, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
+    } else {
+      // Has common groups but no template: join common then subject
+      const paragraphs: string[] = [];
+      const commonTexts = commonGroups.map(g => getCommonOptText(g)).filter(Boolean);
+      if (commonTexts.length > 0) paragraphs.push(commonTexts.join(" "));
+
+      const subjectContent = buildSubjectContent();
+      if (subjectContent) paragraphs.push(subjectContent);
 
       const combined = paragraphs.join("\n\n");
       setPreview(parseComment(combined, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
     }
 
-  }, [selections, commonSelections, subject, groups, assignment, isManuallyEdited, commonGroups, wrapperTemplate]);
+  }, [selections, commonSelections, subject, groups, assignment, isManuallyEdited, commonGroups, formatTemplate, subjectFormat]);
 
   const handleSelection = async (groupId: string, optionId: string) => {
     setSelections(prev => ({
@@ -434,11 +441,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     );
   };
 
-  // Build sections
-  const p1CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p1').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
-  const p2CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p2').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
-  const subjectGroups = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
-  const p4CommonGroups = (commonGroups || []).filter(g => g.paragraphPosition === 'p4').map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
+  // Build sections — Common and Subject (no more P1/P2/P4 labels)
+  const commonGroupsMapped = (commonGroups || []).map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
+  const subjectGroupsMapped = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-8 align-start">
@@ -462,10 +467,8 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                     </div>
                 )}
                 <div className="flex flex-col gap-4">
-                    {renderGroupSection('P1 — Introduction', p1CommonGroups, commonSelections, handleCommonSelection, true)}
-                    {renderGroupSection('P2 — General', p2CommonGroups, commonSelections, handleCommonSelection, true)}
-                    {renderGroupSection('P3 — Subject', subjectGroups, selections, handleSelection, false)}
-                    {renderGroupSection('P4 — Conclusion', p4CommonGroups, commonSelections, handleCommonSelection, true)}
+                    {renderGroupSection('Common', commonGroupsMapped, commonSelections, handleCommonSelection, true)}
+                    {renderGroupSection('Subject', subjectGroupsMapped, selections, handleSelection, false)}
                 </div>
             </div>
 

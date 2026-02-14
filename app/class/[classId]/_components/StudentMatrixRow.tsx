@@ -26,7 +26,6 @@ type Group = {
 type CommonCommentGroup = {
   id: string;
   name: string;
-  paragraphPosition: string;
   isLinked?: boolean;
   linkedField?: string | null;
   CommonCommentOption: Option[];
@@ -72,7 +71,8 @@ interface StudentMatrixRowProps {
   subject: Subject;
   classYear?: string | null;
   commonGroups?: CommonCommentGroup[];
-  wrapperTemplate?: string;
+  formatTemplate?: string;
+  subjectFormat?: string | null;
 }
 
 function LinkedCodeBadge({ code, hasMatch }: { code: string | null; hasMatch: boolean }) {
@@ -96,7 +96,7 @@ function LinkedCodeBadge({ code, hasMatch }: { code: string | null; hasMatch: bo
   );
 }
 
-export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroups, wrapperTemplate }: StudentMatrixRowProps) {
+export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroups, formatTemplate, subjectFormat }: StudentMatrixRowProps) {
   const router = useRouter();
 
   // Track subject-specific selections locally
@@ -182,11 +182,6 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
     code: commonSelections[g.id] || null
   }));
 
-  // Organize CCGs by paragraph position
-  const p1Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p1');
-  const p2Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p2');
-  const p4Groups = (commonGroups || []).filter(g => g.paragraphPosition === 'p4');
-
   const contextForTooltip = {
     firstName: assignment.Pupil.firstName,
     gender: assignment.Pupil.gender,
@@ -221,35 +216,8 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
         </div>
       </td>
 
-      {/* P1 CCG columns */}
-      {p1Groups.map((g) => {
-        const currentCode = commonSelections[g.id] || null;
-        if (g.isLinked) {
-          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
-          return (
-            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
-              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
-            </td>
-          );
-        }
-        return (
-          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
-            <QuickGroupSelector
-              assignmentId={assignment.id}
-              groupId={g.id}
-              currentCode={currentCode}
-              options={g.CommonCommentOption}
-              context={contextForTooltip}
-              onSelectionChange={handleCommonSelectionChange}
-              onCodeUpdate={updateCommonAssignmentCode}
-              disabled={commentBanksDisabled}
-            />
-          </td>
-        );
-      })}
-
-      {/* P2 CCG columns */}
-      {p2Groups.map((g) => {
+      {/* Common group columns */}
+      {(commonGroups || []).map((g) => {
         const currentCode = commonSelections[g.id] || null;
         if (g.isLinked) {
           const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
@@ -293,33 +261,6 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
         );
       })}
 
-      {/* P4 CCG columns */}
-      {p4Groups.map((g) => {
-        const currentCode = commonSelections[g.id] || null;
-        if (g.isLinked) {
-          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
-          return (
-            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
-              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
-            </td>
-          );
-        }
-        return (
-          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
-            <QuickGroupSelector
-              assignmentId={assignment.id}
-              groupId={g.id}
-              currentCode={currentCode}
-              options={g.CommonCommentOption}
-              context={contextForTooltip}
-              onSelectionChange={handleCommonSelectionChange}
-              onCodeUpdate={updateCommonAssignmentCode}
-              disabled={commentBanksDisabled}
-            />
-          </td>
-        );
-      })}
-
       <td className="px-6 py-4 whitespace-nowrap text-right">
         <div className="flex items-center justify-end gap-3">
           <CopyCommentButton
@@ -328,7 +269,8 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
             groups={groups}
             commonGroups={commonGroups}
             commonPupilCodes={currentCommonPupilCodes}
-            wrapperTemplate={wrapperTemplate}
+            formatTemplate={formatTemplate}
+            subjectFormat={subjectFormat}
           />
           <Link
             href={`/student/${assignment.id}`}

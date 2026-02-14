@@ -3,6 +3,7 @@ import { notFound } from "next/navigation"
 import Link from "next/link"
 import { GroupForm } from "./_components/group-form"
 import { ReorderableGroupList } from "./_components/ReorderableGroupList"
+import { SubjectCommentFormat } from "./_components/SubjectCommentFormat"
 import { countWords } from "@/lib/utils"
 import { getReviewStats } from "@/lib/server-actions/comment-check"
 
@@ -89,7 +90,7 @@ export default async function SubjectPage({ params }: Props) {
           </div>
       </div>
 
-      <div className="p-8">
+      <div className="p-8 space-y-6">
         {/* Comment Groups Section */}
         <section className="bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm flex flex-col overflow-hidden">
            <div className="p-6 border-b border-[#f0f2f4] dark:border-gray-800 flex justify-between items-center bg-gray-50/50 dark:bg-gray-800/50">
@@ -109,6 +110,13 @@ export default async function SubjectPage({ params }: Props) {
                   />
             </div>
         </section>
+
+        {/* Subject Comment Format */}
+        <SubjectCommentFormat
+          subjectId={subject.id}
+          initialFormat={(subject as any).commentFormat}
+          groups={subject.CommentGroup}
+        />
       </div>
     </main>
   )

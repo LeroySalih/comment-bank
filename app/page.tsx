@@ -128,7 +128,7 @@ export default async function Home() {
       {/* PageHeading */}
       <div className="flex flex-wrap items-center justify-between gap-4 p-8">
         <div className="flex min-w-72 flex-col gap-1">
-          <p className="text-slate-900 dark:text-white text-3xl font-extrabold leading-tight tracking-tight">Teacher Dashboard</p>
+          <p className="text-slate-900 dark:text-white text-3xl font-extrabold leading-tight tracking-tight">Pupil Comments</p>
           <p className="text-slate-500 dark:text-slate-400 text-base font-normal leading-normal">Manage your subjects and track report completion progress.</p>
         </div>
         <div className="flex gap-3">

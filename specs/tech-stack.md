@@ -96,8 +96,7 @@ control with three user types: Admin, Head of Department (HOD), and Teacher.
 ```
 comment-bank-claude/
 ├── app/                    # Next.js App Router
-│   ├── admin/             # Admin dashboard & management
-│   │   └── ccg/           # Common Comment Group management
+│   ├── admin/             # Admin dashboard & management (CCG + Format tabs)
 │   ├── hod/               # HOD subject & comment management
 │   ├── class/             # Teacher class management
 │   ├── student/           # Student assignment & comments
@@ -140,9 +139,10 @@ comment-bank-claude/
 
 - `CommentGroup` - Subject-specific groups of comment options (e.g., "Written Production")
 - `CommentOption` - Predefined comment templates with codes (H/M/L)
-- `CommonCommentGroup` - Common comment groups applied to all subjects (e.g., "Academic Performance", "Effort")
+- `CommonCommentGroup` - Common comment groups applied to all subjects (e.g., "Academic", "Effort")
 - `CommonCommentOption` - Predefined comment templates for common groups
-- `CommentParagraphTemplate` - Admin-configurable wrapper template for combining CCGs into paragraph 2
+- `AppSetting` (`comment_format_template`) - Admin-configurable global format template defining how comment groups combine (uses `<GroupName>` tags and `<SCG>` for subject comment groups)
+- `Subject.commentFormat` - Per-subject format template controlling how subject-specific groups combine (space-separated group codes)
 - `Assignment` - Links pupils to classes; includes a `linkedData` (JSONB) field
   for flexible data-driven comment groups
 - `PupilCode` - Selected comment codes per pupil per group (subject-specific)
@@ -217,9 +217,12 @@ erDiagram
 - User management
 - Role assignment
 - System-wide oversight
-- Common Comment Group (CCG) management (`/admin/ccg`)
+- Common Comment Group (CCG) management (CCG tab in admin dashboard)
   - Create, edit, delete common comment groups and their options
-  - Configure paragraph 2 wrapper template
+  - Drag-and-drop reorder for groups and options
+- Comment Format management (Format tab in admin dashboard)
+  - Global format template using `<GroupName>` tags and `<SCG>` placeholder for subject comment groups
+  - Live preview and available tag reference
 
 **HOD (`/hod`)**
 
@@ -245,7 +248,7 @@ group**, where the selected option is auto-populated from uploaded student data.
 ##### Common Comment Groups (CCGs)
 
 CCGs are managed by **admins only** and apply across all subjects. The initial
-set is: Academic Performance, Behaviour, Homework, Effort, and Overall. Admins
+set is: Academic, Behaviour, Homework, Effort, and Overall. Admins
 can add, edit, and remove CCGs over time.
 
 - CCG option texts are **shared globally** — one set of templates for all
@@ -254,7 +257,7 @@ can add, edit, and remove CCGs over time.
   `<TargetLevel>`, `<EoYLevel>`, etc.)
 - Teachers select CCG codes **per student per subject** (i.e., a student can
   receive different effort ratings in different subjects).
-- Admin UI located at `/admin/ccg`.
+- Admin UI located in the **CCG tab** of the admin dashboard (`/admin`).
 
 ##### Subject-Specific Comment Groups
 
@@ -299,7 +302,7 @@ can be either CCGs or subject-specific groups.
 
 **Admin Configuration:**
 
-1. Create a comment group (name, title, paragraph position) as normal.
+1. Create a comment group (name, title) as normal.
 2. Mark the group as **"Linked"** and select which data field it links to (e.g.
    `behaviour`). The available fields are those present in the uploaded data.
 3. Add options where the **code must exactly match** a possible value of the
@@ -330,22 +333,30 @@ automatically selected and locked.
 
 ##### Final Comment Structure
 
-The generated comment follows a **fixed 4-paragraph layout**:
+The generated comment uses a **flexible format template** system:
 
-| Paragraph | Source | Content |
-|-----------|--------|---------|
-| **P1** | CCG | Academic Performance selected text |
-| **P2** | CCG (combined) | Effort + Behaviour + Homework, joined via an admin-configurable **wrapper template** |
-| **P3** | Subject-specific | Existing subject comment groups (joined as before) |
-| **P4** | CCG | Overall selected text |
+**Global Format Template:**
+- Configured by admins in the **Format tab** of the admin dashboard.
+- Uses `<GroupName>` tags for CCG groups (e.g., `<Academic>`, `<Effort>`) and
+  `<SCG>` for subject comment groups.
+- Example: `"<Academic>\n\n<Effort> <Behaviour> <Homework>\n\n<SCG>\n\n<Overall>"`
+- Each `<GroupName>` tag is replaced with the selected CCG option's text.
+- `<SCG>` is expanded using the subject's format template.
+- `<Subject>` remains a standard variable replaced with the subject title (e.g., "Computer Science").
 
-**Paragraph 2 Wrapper Template:**
-- Configured by admins at `/admin/ccg`.
-- Uses placeholders such as `<Effort>`, `<Behaviour>`, `<Homework>` that are
-  replaced with the selected option text for each CCG.
-- Example: `"<Effort> <Behaviour> <Homework>"` — the system substitutes each
-  placeholder with the teacher's selected option text, then applies standard
-  variable replacement (`<Name>`, `<He>`, etc.) to the result.
+**Subject Format Template:**
+- Each subject has an optional `commentFormat` field (space-separated group codes).
+- Example: `"WP TH"` — joins the selected texts for groups with codes WP and TH.
+- If no subject format is set, all subject groups are joined in display order.
+- The subject's `studiedComment` (if any) is prepended to the subject content.
+- Configured by HODs on the subject management page.
+
+**Generation Process:**
+1. Start with the global format template.
+2. Replace each `<GroupName>` tag with the selected CCG option text.
+3. Expand `<SCG>` using the subject's format template (or default order).
+4. Apply variable replacement (`<Name>`, `<He>`, etc.) to the final result.
+5. Clean up any unreplaced custom tags.
 
 ##### Variable Replacement
 
@@ -357,12 +368,10 @@ The generated comment follows a **fixed 4-paragraph layout**:
 
 ##### Teacher UX (CommentEditor)
 
-Comment groups are displayed to the teacher **interleaved by paragraph order**:
+Comment groups are displayed to the teacher in two sections:
 
-1. Academic Performance (CCG)
-2. Effort, Behaviour, Homework (CCGs)
-3. Subject-specific groups (in display order)
-4. Overall (CCG)
+1. **Common** — All CCG groups in display order
+2. **Subject** — Subject-specific groups in display order
 
 ### Deployment Configuration
 
@@ -427,8 +436,8 @@ Tests run against **Chrome only** (`--project=chromium`) for speed and reliabili
 | `tests/permissions.spec.ts` | 24 scenarios — Admin, HOD, Teacher, unauthenticated access |
 | `tests/hod-management.spec.ts` | HOD subject and comment group management |
 | `tests/teacher-comment-flow.spec.ts` | Teacher class/student comment selection |
-| `tests/admin-dashboard.spec.ts` | Admin dashboard tabs (Users, Subjects, Classes, Deadlines, Activity Log) |
-| `tests/admin-ccg.spec.ts` | CCG CRUD — create/edit/delete groups and options, wrapper template |
+| `tests/admin-dashboard.spec.ts` | Admin dashboard tabs (Users, Subjects, Classes, Deadlines, Activity Log, CCG, Format) |
+| `tests/admin-ccg.spec.ts` | CCG tab CRUD — create/edit/delete groups and options within admin dashboard |
 
 #### Shared Helpers
 

@@ -38,7 +38,6 @@ type MinimalCommonPupilCode = {
 type MinimalCommonGroup = {
   id: string;
   name: string;
-  paragraphPosition: string;
   isLinked?: boolean;
   linkedField?: string | null;
   CommonCommentOption: MinimalOption[];
@@ -66,10 +65,11 @@ interface CopyCommentButtonProps {
   groups: MinimalGroup[];
   commonGroups?: MinimalCommonGroup[];
   commonPupilCodes?: MinimalCommonPupilCode[];
-  wrapperTemplate?: string;
+  formatTemplate?: string;
+  subjectFormat?: string | null;
 }
 
-export default function CopyCommentButton({ assignment, subject, groups, commonGroups, commonPupilCodes, wrapperTemplate }: CopyCommentButtonProps) {
+export default function CopyCommentButton({ assignment, subject, groups, commonGroups, commonPupilCodes, formatTemplate, subjectFormat }: CopyCommentButtonProps) {
   const [copied, setCopied] = useState(false);
 
   // Check if all subject groups have a selected code
@@ -105,7 +105,7 @@ export default function CopyCommentButton({ assignment, subject, groups, commonG
 
     const comment = assignment.finalComment || generateComment(
       assignment, subject, groups, undefined,
-      commonGroups, commonPupilCodes, wrapperTemplate
+      commonGroups, commonPupilCodes, formatTemplate, subjectFormat
     );
 
     if (!comment) return;
@@ -128,7 +128,7 @@ export default function CopyCommentButton({ assignment, subject, groups, commonG
     }
     const comment = assignment.finalComment || generateComment(
       assignment, subject, groups, undefined,
-      commonGroups, commonPupilCodes, wrapperTemplate
+      commonGroups, commonPupilCodes, formatTemplate, subjectFormat
     );
     setPreview(comment || "No comment generated");
   };

@@ -71,10 +71,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
 
   // Fetch Common Comment Groups
   const commonGroups = await (prisma as any).commonCommentGroup.findMany({
-    orderBy: [
-      { paragraphPosition: 'asc' },
-      { displayOrder: 'asc' }
-    ],
+    orderBy: { displayOrder: 'asc' },
     include: {
       CommonCommentOption: {
         orderBy: { displayOrder: 'asc' }
@@ -82,11 +79,14 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
     }
   });
 
-  // Fetch wrapper template
-  const wrapperSetting = await (prisma as any).appSetting.findUnique({
-    where: { key: 'p2_wrapper_template' }
+  // Fetch format template
+  const formatSetting = await (prisma as any).appSetting.findUnique({
+    where: { key: 'comment_format_template' }
   });
-  const wrapperTemplate = wrapperSetting?.value || '';
+  const formatTemplate = formatSetting?.value || '';
+
+  // Fetch subject comment format
+  const subjectFormat = (subject as any).commentFormat || null;
 
   // Decrypt pupil names
   const pupil = {
@@ -137,7 +137,8 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
           groups={groups}
           isHoD={canReviewComments}
           commonGroups={commonGroups}
-          wrapperTemplate={wrapperTemplate}
+          formatTemplate={formatTemplate}
+          subjectFormat={subjectFormat}
         />
       </div>
     </main>

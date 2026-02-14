@@ -163,7 +163,6 @@ export const DeleteDeadlineSchema = z.object({
 export const CreateCommonCommentGroupSchema = z.object({
   name: z.string().min(1, 'Group name is required').max(100),
   title: z.string().min(1, 'Group title is required').max(200),
-  paragraphPosition: z.enum(['p1', 'p2', 'p4'], { message: 'Paragraph position must be p1, p2, or p4' }),
   isLinked: z.boolean().optional().default(false),
   linkedField: z.string().max(100).nullable().optional()
 }).refine(data => !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
@@ -175,7 +174,6 @@ export const UpdateCommonCommentGroupSchema = z.object({
   groupId: z.string().min(1, 'Group ID is required'),
   name: z.string().min(1).max(100).optional(),
   title: z.string().min(1).max(200).optional(),
-  paragraphPosition: z.enum(['p1', 'p2', 'p4']).optional(),
   isLinked: z.boolean().optional(),
   linkedField: z.string().max(100).nullable().optional()
 }).refine(data => data.isLinked === undefined || !data.isLinked || (data.linkedField && data.linkedField.trim().length > 0), {
@@ -212,8 +210,13 @@ export const ReorderCommonCommentOptionsSchema = z.object({
   optionIds: z.array(z.string()).min(1, 'At least one option is required')
 })
 
-export const UpdateWrapperTemplateSchema = z.object({
-  value: z.string().min(1, 'Template value is required').max(1000)
+export const UpdateCommentFormatTemplateSchema = z.object({
+  value: z.string().min(1, 'Template value is required').max(2000)
+})
+
+export const UpdateSubjectCommentFormatSchema = z.object({
+  subjectId: z.string().min(1, 'Subject ID is required'),
+  commentFormat: z.string().max(500).nullable()
 })
 
 /**

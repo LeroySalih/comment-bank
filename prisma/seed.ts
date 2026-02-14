@@ -1,11 +1,16 @@
+import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
+import { PrismaPg } from '@prisma/adapter-pg';
+import { Pool } from 'pg';
 import fs from 'fs';
 import path from 'path';
 import { hash } from 'bcryptjs';
 import { encrypt } from '../lib/encryption';
 import { createId as cuid } from '@paralleldrive/cuid2';
 
-const prisma = new PrismaClient();
+const pool = new Pool({ connectionString: process.env.DATABASE_URL! });
+const adapter = new PrismaPg(pool);
+const prisma = new PrismaClient({ adapter });
 const PUPIL_LIST_PATH = './data/pupil-list.md';
 
 async function main() {
@@ -18,7 +23,7 @@ async function main() {
   await prisma.commentOption.deleteMany({});
   await prisma.commentGroup.deleteMany({});
   await (prisma as any).subject.deleteMany({});
-  await (prisma as any).user.deleteMany({ where: { username: { in: ['admin', 'leroysalih', 'teacher', 'teacher2', 'teacher3'] } } });
+  await (prisma as any).user.deleteMany({ where: { username: { in: ['admin', 'leroysalih', 'teacher', 'teacher2', 'teacher3', 'teacher4'] } } });
 
   // Seed Roles
   const adminRole = await prisma.role.upsert({ where: { name: 'admin' }, update: {}, create: { id: cuid(), name: 'admin' } });
@@ -57,6 +62,12 @@ async function main() {
     where: { username: 'teacher3' },
     update: { password, Role: { connect: { id: teacherRole.id } } },
     create: { id: cuid(), username: 'teacher3', password, Role: { connect: { id: teacherRole.id } } }
+  });
+
+  const teacher4User = await prisma.user.upsert({
+    where: { username: 'teacher4' },
+    update: { password, Role: { connect: { id: teacherRole.id } } },
+    create: { id: cuid(), username: 'teacher4', password, Role: { connect: { id: teacherRole.id } } }
   });
 
   // Create Subjects with Comment Groups
@@ -188,36 +199,46 @@ async function main() {
 
   // Generate realistic pupils
   const pupilData = [
-    // Year 7 Class A
-    { admNo: "12345", lastName: "Smith", firstName: "John", gender: "M", className: "7A", form: "7A", target: "7H", eoy: "7M" },
-    { admNo: "12346", lastName: "Johnson", firstName: "Emma", gender: "F", className: "7A", form: "7A", target: "7H", eoy: "7H" },
-    { admNo: "12350", lastName: "Davis", firstName: "Noah", gender: "M", className: "7A", form: "7A", target: "7M", eoy: "7M" },
-    { admNo: "12351", lastName: "Miller", firstName: "Olivia", gender: "F", className: "7A", form: "7A", target: "7H", eoy: "7M" },
-    { admNo: "12352", lastName: "Wilson", firstName: "James", gender: "M", className: "7A", form: "7A", target: "7M", eoy: "7L" },
-    { admNo: "12353", lastName: "Moore", firstName: "Ava", gender: "F", className: "7A", form: "7A", target: "7L", eoy: "7M" },
-    { admNo: "12354", lastName: "Taylor", firstName: "William", gender: "M", className: "7A", form: "7A", target: "7H", eoy: "7H" },
-    { admNo: "12355", lastName: "Anderson", firstName: "Isabella", gender: "F", className: "7A", form: "7A", target: "7M", eoy: "7M" },
-    
-    // Year 7 Class B
-    { admNo: "12347", lastName: "Williams", firstName: "Oliver", gender: "M", className: "7B", form: "7B", target: "7M", eoy: "7M" },
-    { admNo: "12348", lastName: "Brown", firstName: "Sophia", gender: "F", className: "7B", form: "7B", target: "7H", eoy: "7M" },
-    { admNo: "12356", lastName: "Thomas", firstName: "Ethan", gender: "M", className: "7B", form: "7B", target: "7L", eoy: "7M" },
-    { admNo: "12357", lastName: "Jackson", firstName: "Mia", gender: "F", className: "7B", form: "7B", target: "7M", eoy: "7H" },
-    { admNo: "12358", lastName: "White", firstName: "Lucas", gender: "M", className: "7B", form: "7B", target: "7H", eoy: "7H" },
-    { admNo: "12359", lastName: "Harris", firstName: "Charlotte", gender: "F", className: "7B", form: "7B", target: "7M", eoy: "7M" },
-    { admNo: "12360", lastName: "Martin", firstName: "Benjamin", gender: "M", className: "7B", form: "7B", target: "7L", eoy: "7L" },
-    { admNo: "12361", lastName: "Thompson", firstName: "Amelia", gender: "F", className: "7B", form: "7B", target: "7H", eoy: "7M" },
-    
-    // Year 7 Class C
-    { admNo: "12349", lastName: "Jones", firstName: "Liam", gender: "M", className: "7C", form: "7C", target: "7M", eoy: "7H" },
-    { admNo: "12362", lastName: "Garcia", firstName: "Harper", gender: "F", className: "7C", form: "7C", target: "7H", eoy: "7H" },
-    { admNo: "12363", lastName: "Martinez", firstName: "Alexander", gender: "M", className: "7C", form: "7C", target: "7M", eoy: "7M" },
-    { admNo: "12364", lastName: "Robinson", firstName: "Evelyn", gender: "F", className: "7C", form: "7C", target: "7L", eoy: "7M" },
-    { admNo: "12365", lastName: "Clark", firstName: "Henry", gender: "M", className: "7C", form: "7C", target: "7H", eoy: "7M" },
-    { admNo: "12366", lastName: "Rodriguez", firstName: "Ella", gender: "F", className: "7C", form: "7C", target: "7M", eoy: "7M" },
-    { admNo: "12367", lastName: "Lewis", firstName: "Sebastian", gender: "M", className: "7C", form: "7C", target: "7M", eoy: "7L" },
-    { admNo: "12368", lastName: "Lee", firstName: "Scarlett", gender: "F", className: "7C", form: "7C", target: "7H", eoy: "7H" },
-    { admNo: "12369", lastName: "Walker", firstName: "Jack", gender: "M", className: "7C", form: "7C", target: "7L", eoy: "7M" },
+    // 25-7A
+    { admNo: "12345", lastName: "Smith", firstName: "John", gender: "M", className: "25-7A", form: "25-7A", target: "7H", eoy: "7M" },
+    { admNo: "12346", lastName: "Johnson", firstName: "Emma", gender: "F", className: "25-7A", form: "25-7A", target: "7H", eoy: "7H" },
+    { admNo: "12350", lastName: "Davis", firstName: "Noah", gender: "M", className: "25-7A", form: "25-7A", target: "7M", eoy: "7M" },
+    { admNo: "12351", lastName: "Miller", firstName: "Olivia", gender: "F", className: "25-7A", form: "25-7A", target: "7H", eoy: "7M" },
+    { admNo: "12352", lastName: "Wilson", firstName: "James", gender: "M", className: "25-7A", form: "25-7A", target: "7M", eoy: "7L" },
+    { admNo: "12353", lastName: "Moore", firstName: "Ava", gender: "F", className: "25-7A", form: "25-7A", target: "7L", eoy: "7M" },
+    { admNo: "12354", lastName: "Taylor", firstName: "William", gender: "M", className: "25-7A", form: "25-7A", target: "7H", eoy: "7H" },
+    { admNo: "12355", lastName: "Anderson", firstName: "Isabella", gender: "F", className: "25-7A", form: "25-7A", target: "7M", eoy: "7M" },
+
+    // 25-7B
+    { admNo: "12347", lastName: "Williams", firstName: "Oliver", gender: "M", className: "25-7B", form: "25-7B", target: "7M", eoy: "7M" },
+    { admNo: "12348", lastName: "Brown", firstName: "Sophia", gender: "F", className: "25-7B", form: "25-7B", target: "7H", eoy: "7M" },
+    { admNo: "12356", lastName: "Thomas", firstName: "Ethan", gender: "M", className: "25-7B", form: "25-7B", target: "7L", eoy: "7M" },
+    { admNo: "12357", lastName: "Jackson", firstName: "Mia", gender: "F", className: "25-7B", form: "25-7B", target: "7M", eoy: "7H" },
+    { admNo: "12358", lastName: "White", firstName: "Lucas", gender: "M", className: "25-7B", form: "25-7B", target: "7H", eoy: "7H" },
+    { admNo: "12359", lastName: "Harris", firstName: "Charlotte", gender: "F", className: "25-7B", form: "25-7B", target: "7M", eoy: "7M" },
+    { admNo: "12360", lastName: "Martin", firstName: "Benjamin", gender: "M", className: "25-7B", form: "25-7B", target: "7L", eoy: "7L" },
+    { admNo: "12361", lastName: "Thompson", firstName: "Amelia", gender: "F", className: "25-7B", form: "25-7B", target: "7H", eoy: "7M" },
+
+    // 25-7C
+    { admNo: "12349", lastName: "Jones", firstName: "Liam", gender: "M", className: "25-7C", form: "25-7C", target: "7M", eoy: "7H" },
+    { admNo: "12362", lastName: "Garcia", firstName: "Harper", gender: "F", className: "25-7C", form: "25-7C", target: "7H", eoy: "7H" },
+    { admNo: "12363", lastName: "Martinez", firstName: "Alexander", gender: "M", className: "25-7C", form: "25-7C", target: "7M", eoy: "7M" },
+    { admNo: "12364", lastName: "Robinson", firstName: "Evelyn", gender: "F", className: "25-7C", form: "25-7C", target: "7L", eoy: "7M" },
+    { admNo: "12365", lastName: "Clark", firstName: "Henry", gender: "M", className: "25-7C", form: "25-7C", target: "7H", eoy: "7M" },
+    { admNo: "12366", lastName: "Rodriguez", firstName: "Ella", gender: "F", className: "25-7C", form: "25-7C", target: "7M", eoy: "7M" },
+    { admNo: "12367", lastName: "Lewis", firstName: "Sebastian", gender: "M", className: "25-7C", form: "25-7C", target: "7M", eoy: "7L" },
+    { admNo: "12368", lastName: "Lee", firstName: "Scarlett", gender: "F", className: "25-7C", form: "25-7C", target: "7H", eoy: "7H" },
+    { admNo: "12369", lastName: "Walker", firstName: "Jack", gender: "M", className: "25-7C", form: "25-7C", target: "7L", eoy: "7M" },
+
+    // 25-7D
+    { admNo: "12370", lastName: "Hall", firstName: "Daniel", gender: "M", className: "25-7D", form: "25-7D", target: "7H", eoy: "7H" },
+    { admNo: "12371", lastName: "Allen", firstName: "Grace", gender: "F", className: "25-7D", form: "25-7D", target: "7M", eoy: "7M" },
+    { admNo: "12372", lastName: "Young", firstName: "Matthew", gender: "M", className: "25-7D", form: "25-7D", target: "7H", eoy: "7M" },
+    { admNo: "12373", lastName: "King", firstName: "Chloe", gender: "F", className: "25-7D", form: "25-7D", target: "7M", eoy: "7H" },
+    { admNo: "12374", lastName: "Wright", firstName: "Samuel", gender: "M", className: "25-7D", form: "25-7D", target: "7L", eoy: "7M" },
+    { admNo: "12375", lastName: "Scott", firstName: "Lily", gender: "F", className: "25-7D", form: "25-7D", target: "7H", eoy: "7H" },
+    { admNo: "12376", lastName: "Green", firstName: "Oscar", gender: "M", className: "25-7D", form: "25-7D", target: "7M", eoy: "7L" },
+    { admNo: "12377", lastName: "Adams", firstName: "Ruby", gender: "F", className: "25-7D", form: "25-7D", target: "7M", eoy: "7M" },
   ];
 
   const classMap = new Map();
@@ -253,7 +274,7 @@ async function main() {
           id: cuid(),
           name: pupil.className, 
           subjectId: subject7CS.id,
-          year: pupil.className.substring(0, 1) 
+          year: pupil.className.split('-')[1]?.substring(0, 1) || '7'
         }
       });
       classMap.set(pupil.className, cls);
@@ -282,44 +303,22 @@ async function main() {
   }
 
   // Assign teachers to classes
-  const class7A = classMap.get("7A");
-  const class7B = classMap.get("7B");
-  const class7C = classMap.get("7C");
+  const classAssignments: [string, any][] = [
+    ["25-7A", teacherUser],
+    ["25-7B", teacher2User],
+    ["25-7C", teacher3User],
+    ["25-7D", teacher4User],
+  ];
 
-  if (class7A) {
-    await (prisma as any).class.update({
-      where: { id: class7A.id },
-      data: {
-        User: {
-          connect: { id: teacherUser.id }
-        }
-      }
-    });
-    console.log(`Assigned teacher to class: 7A`);
-  }
-
-  if (class7B) {
-    await (prisma as any).class.update({
-      where: { id: class7B.id },
-      data: {
-        User: {
-          connect: { id: teacher2User.id }
-        }
-      }
-    });
-    console.log(`Assigned teacher2 to class: 7B`);
-  }
-
-  if (class7C) {
-    await (prisma as any).class.update({
-      where: { id: class7C.id },
-      data: {
-        User: {
-          connect: { id: teacher3User.id }
-        }
-      }
-    });
-    console.log(`Assigned teacher3 to class: 7C`);
+  for (const [className, teacher] of classAssignments) {
+    const cls = classMap.get(className);
+    if (cls) {
+      await (prisma as any).class.update({
+        where: { id: cls.id },
+        data: { User: { connect: { id: teacher.id } } }
+      });
+      console.log(`Assigned ${teacher.username} to class: ${className}`);
+    }
   }
 
   // ============================================================================
@@ -335,9 +334,8 @@ async function main() {
 
   const ccgData = [
     {
-      name: "Academic Performance",
+      name: "Academic",
       title: "Academic Performance",
-      paragraphPosition: "p1",
       displayOrder: 0,
       isLinked: false,
       linkedField: null as string | null,
@@ -350,8 +348,7 @@ async function main() {
     {
       name: "Effort",
       title: "Effort",
-      paragraphPosition: "p2",
-      displayOrder: 0,
+      displayOrder: 1,
       isLinked: true,
       linkedField: "effort",
       options: [
@@ -368,8 +365,7 @@ async function main() {
     {
       name: "Behaviour",
       title: "Behaviour",
-      paragraphPosition: "p2",
-      displayOrder: 1,
+      displayOrder: 2,
       isLinked: true,
       linkedField: "behaviour",
       options: [
@@ -386,8 +382,7 @@ async function main() {
     {
       name: "Homework",
       title: "Homework",
-      paragraphPosition: "p2",
-      displayOrder: 2,
+      displayOrder: 3,
       isLinked: true,
       linkedField: "homework",
       options: [
@@ -404,8 +399,7 @@ async function main() {
     {
       name: "Overall",
       title: "Overall",
-      paragraphPosition: "p4",
-      displayOrder: 0,
+      displayOrder: 4,
       isLinked: false,
       linkedField: null as string | null,
       options: [
@@ -422,7 +416,6 @@ async function main() {
         id: cuid(),
         name: group.name,
         title: group.title,
-        paragraphPosition: group.paragraphPosition,
         displayOrder: group.displayOrder,
         isLinked: group.isLinked,
         linkedField: group.linkedField,
@@ -438,21 +431,35 @@ async function main() {
     });
   }
 
-  // Seed wrapper template
+  // Seed comment format template
   await (prisma as any).appSetting.upsert({
-    where: { key: 'p2_wrapper_template' },
-    update: { value: '<Effort> <Behaviour> <Homework>' },
-    create: { key: 'p2_wrapper_template', value: '<Effort> <Behaviour> <Homework>' }
+    where: { key: 'comment_format_template' },
+    update: { value: '<Academic>\n\n<Effort> <Behaviour> <Homework>\n\n<SCG>\n\n<Overall>' },
+    create: { key: 'comment_format_template', value: '<Academic>\n\n<Effort> <Behaviour> <Homework>\n\n<SCG>\n\n<Overall>' }
+  });
+
+  // Set sample commentFormat on subjects
+  await (prisma as any).subject.update({
+    where: { id: subject7CS.id },
+    data: { commentFormat: 'WP TH' }
+  });
+  await (prisma as any).subject.update({
+    where: { id: subject7DT.id },
+    data: { commentFormat: 'PS DS' }
+  });
+  await (prisma as any).subject.update({
+    where: { id: subject8CS.id },
+    data: { commentFormat: 'PR TH' }
   });
 
   console.log('Common Comment Groups seeded successfully');
 
   console.log('\n=== Seeding Summary ===');
   console.log(`Created ${pupilData.length} pupils`);
-  console.log(`Created 3 classes: 7A, 7B, 7C`);
+  console.log(`Created 4 classes: 25-7A, 25-7B, 25-7C, 25-7D`);
   console.log(`Created 3 subjects: 7CS, 7DT, 8CS`);
   console.log(`Assigned all subjects to leroysalih (HOD)`);
-  console.log(`Created 5 users: admin, leroysalih, teacher, teacher2, teacher3`);
+  console.log(`Created 6 users: admin, leroysalih, teacher, teacher2, teacher3, teacher4`);
   console.log(`Created 5 Common Comment Groups with options`);
   console.log('Seeding completed successfully');
 }

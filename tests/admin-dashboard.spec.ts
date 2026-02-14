@@ -15,6 +15,8 @@ test.describe('Admin Dashboard', () => {
     await expect(page.getByRole('button', { name: 'Classes' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Deadlines' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Activity Log' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'CCG' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Format' })).toBeVisible();
   });
 
   test('Users tab shows seeded users', async ({ page }) => {
@@ -59,6 +61,26 @@ test.describe('Admin Dashboard', () => {
 
     // Tab should load without error — just verify we're still on /admin
     await expect(page).toHaveURL(/\/admin/);
+  });
+
+  test('CCG tab loads with common groups', async ({ page }) => {
+    await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
+    await page.goto('/admin');
+
+    await page.getByRole('button', { name: 'CCG' }).click();
+
+    await expect(page.getByText('Common Comment Groups')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Add Group' })).toBeVisible();
+  });
+
+  test('Format tab loads with template editor', async ({ page }) => {
+    await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
+    await page.goto('/admin');
+
+    await page.getByRole('button', { name: 'Format' }).click();
+
+    await expect(page.getByText('Comment Format Template')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Save Template' })).toBeVisible();
   });
 
   test('Activity Log tab loads', async ({ page }) => {

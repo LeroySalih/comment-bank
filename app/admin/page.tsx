@@ -1,5 +1,4 @@
 import { prisma } from "@/lib/prisma"
-import Link from "next/link"
 import { AdminTabs } from "./_components/admin-tabs"
 import SignOutButton from "@/components/SignOutButton"
 
@@ -32,6 +31,14 @@ export default async function AdminPage() {
       },
       User: {
         select: { id: true, username: true, Role: { select: { name: true } } }
+      },
+      CommentGroup: {
+        orderBy: { displayOrder: 'asc' },
+        include: {
+          CommentOption: {
+            orderBy: { displayOrder: 'asc' }
+          }
+        }
       }
     }
   })
@@ -45,6 +52,20 @@ export default async function AdminPage() {
     orderBy: { name: 'asc' }
   })
 
+  const commonGroups = await (prisma as any).commonCommentGroup.findMany({
+    orderBy: { displayOrder: 'asc' },
+    include: {
+      CommonCommentOption: {
+        orderBy: { displayOrder: 'asc' }
+      }
+    }
+  })
+
+  const formatSetting = await (prisma as any).appSetting.findUnique({
+    where: { key: 'comment_format_template' }
+  })
+  const commentFormatTemplate = formatSetting?.value || ''
+
   return (
     <div className="container mx-auto py-10">
       <div className="flex justify-between items-center mb-8">
@@ -52,21 +73,7 @@ export default async function AdminPage() {
         <SignOutButton />
       </div>
       
-      <div className="mb-6">
-        <Link
-          href="/admin/ccg"
-          className="inline-flex items-center gap-3 px-6 py-4 bg-white border border-gray-200 rounded-xl shadow-sm hover:shadow-md hover:border-primary/30 transition-all"
-        >
-          <span className="material-symbols-outlined text-2xl text-primary">comment</span>
-          <div>
-            <span className="text-sm font-bold text-gray-900 block">Common Comment Groups</span>
-            <span className="text-xs text-gray-500">Manage global comment groups for all subjects</span>
-          </div>
-          <span className="material-symbols-outlined text-gray-400 ml-4">chevron_right</span>
-        </Link>
-      </div>
-
-      <AdminTabs users={users} roles={roles} subjects={subjects} deadlines={deadlines} classes={classes} />
+      <AdminTabs users={users} roles={roles} subjects={subjects} deadlines={deadlines} classes={classes} commonGroups={commonGroups} commentFormatTemplate={commentFormatTemplate} />
     </div>
   )
 }

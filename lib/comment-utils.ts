@@ -47,7 +47,6 @@ type MinimalClass = {
 type MinimalCommonGroup = {
   id: string;
   name: string;
-  paragraphPosition: string;
   isLinked?: boolean;
   linkedField?: string | null;
   CommonCommentOption: MinimalOption[];
@@ -59,13 +58,13 @@ type MinimalCommonPupilCode = {
 };
 
 /**
- * Generates the full comment string for an assignment based on PupilCodes and Subject configuration.
- * When commonGroups is provided, produces a 4-paragraph layout:
- *   P1: CCGs with paragraphPosition "p1"
- *   P2: CCGs with paragraphPosition "p2" — substituted into wrapperTemplate
- *   P3: Subject studiedComment + subject-specific group texts
- *   P4: CCGs with paragraphPosition "p4"
- * When commonGroups is undefined, only P3 is generated (backward compatible).
+ * Generates the full comment string for an assignment using the format template system.
+ *
+ * The format template uses <GroupName> tags for CCG groups and <SCG> for subject comment groups.
+ * For <SCG>, the subject's commentFormat defines the order of groups to include.
+ * <Subject> remains a standard variable replaced with the subject title.
+ *
+ * When no format template is provided, falls back to joining all group texts.
  */
 export function generateComment(
   assignment: MinimalAssignment,
@@ -74,7 +73,8 @@ export function generateComment(
   cls?: MinimalClass,
   commonGroups?: MinimalCommonGroup[],
   commonPupilCodes?: MinimalCommonPupilCode[],
-  wrapperTemplate?: string
+  formatTemplate?: string,
+  subjectFormat?: string | null
 ): string {
     // Helper to get selected option text for a subject-specific group
     const getOptionTextForGroup = (group: MinimalGroup): string => {
@@ -106,30 +106,64 @@ export function generateComment(
         return option?.text || "";
     };
 
-    // If no common groups provided, use legacy single-paragraph behavior
-    if (!commonGroups) {
+    // Build the subject content
+    const buildSubjectContent = (): string => {
         const parts: string[] = [];
-
         if (subject.studiedComment) {
             parts.push(subject.studiedComment);
         }
 
-        const groupTexts: string[] = [];
-        for (const group of groups) {
-            const text = getOptionTextForGroup(group);
-            if (text) {
-                groupTexts.push(text);
+        let orderedGroups: MinimalGroup[];
+        if (subjectFormat) {
+            // Use the subject's comment format to order groups
+            const codes = subjectFormat.split(/\s+/).filter(Boolean);
+            orderedGroups = [];
+            for (const code of codes) {
+                const group = groups.find(g => g.name === code);
+                if (group) orderedGroups.push(group);
             }
+        } else {
+            // Default: all groups in display order
+            orderedGroups = groups;
         }
 
-        if (groupTexts.length > 0) {
-            parts.push(groupTexts.join(" "));
+        const groupTexts: string[] = [];
+        for (const group of orderedGroups) {
+            const text = getOptionTextForGroup(group);
+            if (text) groupTexts.push(text);
+        }
+        if (groupTexts.length > 0) parts.push(groupTexts.join(" "));
+        return parts.join(" ");
+    };
+
+    // If we have a format template, use it
+    if (formatTemplate && commonGroups && commonGroups.length > 0) {
+        let result = formatTemplate;
+
+        // Replace each CCG group tag
+        for (const group of commonGroups) {
+            const text = getCommonOptionText(group);
+            result = result.replaceAll(`<${group.name}>`, text);
         }
 
-        const combined = parts.join("\n\n");
+        // Replace <SCG> tag with subject comment group content
+        const subjectContent = buildSubjectContent();
+        result = result.replaceAll('<SCG>', subjectContent);
+
+        // Clean up any unreplaced custom tags (but not standard variable tags)
+        // Only remove tags that are not standard variables
+        const standardVars = ['Name', 'He', 'he', 'She', 'she', 'His', 'his', 'Her', 'her', 'Him', 'him', 'Subject', 'TargetLevel', 'EoYLevel', 'Year', 'SCG'];
+        result = result.replace(/<([^>]+)>/g, (match, tagName) => {
+            if (standardVars.includes(tagName)) return match;
+            return '';
+        });
+        result = result.replace(/\s{2,}/g, ' ').trim();
+
+        // Clean up empty paragraphs (lines that are just whitespace)
+        result = result.split('\n\n').filter(p => p.trim()).join('\n\n');
 
         return parseComment(
-            combined,
+            result,
             assignment.Pupil.firstName,
             assignment.Pupil.gender,
             subject.title || '',
@@ -139,65 +173,29 @@ export function generateComment(
         );
     }
 
-    // 4-paragraph layout
+    // No format template: legacy behavior - just join all groups
+    if (!commonGroups || commonGroups.length === 0) {
+        const subjectContent = buildSubjectContent();
+        return parseComment(
+            subjectContent,
+            assignment.Pupil.firstName,
+            assignment.Pupil.gender,
+            subject.title || '',
+            cls?.year,
+            assignment.eoyLevel,
+            assignment.targetLevel
+        );
+    }
+
+    // Has common groups but no template: join common groups then subject groups
     const paragraphs: string[] = [];
 
-    // P1: CCGs with paragraphPosition === "p1"
-    const p1Groups = commonGroups.filter(g => g.paragraphPosition === 'p1');
-    const p1Texts = p1Groups.map(g => getCommonOptionText(g)).filter(Boolean);
-    if (p1Texts.length > 0) {
-        paragraphs.push(p1Texts.join(" "));
-    }
+    const commonTexts = commonGroups.map(g => getCommonOptionText(g)).filter(Boolean);
+    if (commonTexts.length > 0) paragraphs.push(commonTexts.join(" "));
 
-    // P2: CCGs with paragraphPosition === "p2" — substitute into wrapper template
-    const p2Groups = commonGroups.filter(g => g.paragraphPosition === 'p2');
-    if (p2Groups.length > 0 && wrapperTemplate) {
-        let p2Text = wrapperTemplate;
-        for (const group of p2Groups) {
-            const text = getCommonOptionText(group);
-            // Replace <GroupName> placeholder with the resolved text
-            p2Text = p2Text.replaceAll(`<${group.name}>`, text);
-        }
-        // Clean up any unreplaced placeholders (groups with no selection)
-        p2Text = p2Text.replace(/<[^>]+>/g, '').replace(/\s{2,}/g, ' ').trim();
-        if (p2Text) {
-            paragraphs.push(p2Text);
-        }
-    } else if (p2Groups.length > 0) {
-        // Fallback: just join texts if no wrapper template
-        const p2Texts = p2Groups.map(g => getCommonOptionText(g)).filter(Boolean);
-        if (p2Texts.length > 0) {
-            paragraphs.push(p2Texts.join(" "));
-        }
-    }
+    const subjectContent = buildSubjectContent();
+    if (subjectContent) paragraphs.push(subjectContent);
 
-    // P3: Subject studiedComment + subject-specific group texts
-    const p3Parts: string[] = [];
-    if (subject.studiedComment) {
-        p3Parts.push(subject.studiedComment);
-    }
-    const groupTexts: string[] = [];
-    for (const group of groups) {
-        const text = getOptionTextForGroup(group);
-        if (text) {
-            groupTexts.push(text);
-        }
-    }
-    if (groupTexts.length > 0) {
-        p3Parts.push(groupTexts.join(" "));
-    }
-    if (p3Parts.length > 0) {
-        paragraphs.push(p3Parts.join(" "));
-    }
-
-    // P4: CCGs with paragraphPosition === "p4"
-    const p4Groups = commonGroups.filter(g => g.paragraphPosition === 'p4');
-    const p4Texts = p4Groups.map(g => getCommonOptionText(g)).filter(Boolean);
-    if (p4Texts.length > 0) {
-        paragraphs.push(p4Texts.join(" "));
-    }
-
-    // Join non-empty paragraphs with double newlines
     const combined = paragraphs.join("\n\n");
 
     return parseComment(

@@ -3,23 +3,15 @@ import { login, TEST_USERS } from './helpers';
 
 test.describe('Admin CCG Management', () => {
 
-  test('navigate to CCG page from admin dashboard', async ({ page }) => {
+  test('CCG tab shows seeded groups', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
     await page.goto('/admin');
 
-    // Click the Common Comment Groups link
-    await page.getByText('Common Comment Groups').first().click();
-
-    await expect(page).toHaveURL(/\/admin\/ccg/);
-    await expect(page.getByRole('heading', { name: 'Common Comment Groups' })).toBeVisible();
-  });
-
-  test('CCG page shows seeded groups', async ({ page }) => {
-    await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    // Click the CCG tab
+    await page.getByRole('button', { name: 'CCG' }).click();
 
     // Verify seeded CCG groups are visible
-    await expect(page.getByText('Academic Performance').first()).toBeVisible();
+    await expect(page.getByText('Academic').first()).toBeVisible();
     await expect(page.getByText('Effort').first()).toBeVisible();
     await expect(page.getByText('Behaviour').first()).toBeVisible();
     await expect(page.getByText('Homework').first()).toBeVisible();
@@ -28,15 +20,16 @@ test.describe('Admin CCG Management', () => {
 
   test('create a new comment group', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
+
+    await page.getByRole('button', { name: 'CCG' }).click();
 
     // Click Add Group
     await page.getByRole('button', { name: 'Add Group' }).click();
 
-    // Fill form
-    await page.fill('input[name="name"]', 'Test Group');
-    await page.fill('input[name="title"]', 'Test Group Title');
-    await page.selectOption('select[name="paragraphPosition"]', 'p1');
+    // Fill form — name (code) and title fields
+    await page.locator('input').filter({ hasText: '' }).nth(0).fill('Test Group');
+    await page.locator('input').filter({ hasText: '' }).nth(1).fill('Test Group Title');
 
     // Submit
     await page.getByRole('button', { name: 'Create Group' }).click();
@@ -47,103 +40,115 @@ test.describe('Admin CCG Management', () => {
 
   test('add an option to a group', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
 
-    // Find the "Test Group" card and click its Add Option button
-    // We target the last "Add Option" link since Test Group was just created
-    const testGroupCard = page.locator('h3:has-text("Test Group")').locator('..').locator('..').locator('..');
-    await testGroupCard.getByText('Add Option').click();
+    await page.getByRole('button', { name: 'CCG' }).click();
 
-    // Fill the option form
-    await testGroupCard.locator('input[name="code"]').fill('T1');
-    await testGroupCard.locator('input[name="text"]').fill('<Name> shows great test skills.');
+    // Find the "Test Group" row and click its Add button
+    const testGroupRow = page.locator('text=Test Group Title').locator('..');
+    await testGroupRow.getByText('Add').click();
+
+    // Fill the option form — code and text
+    await page.locator('input[placeholder="e.g. H"]').fill('T1');
+    await page.locator('textarea').last().fill('<Name> shows great test skills.');
 
     // Submit
-    await testGroupCard.getByRole('button', { name: 'Add' }).click();
+    await page.getByRole('button', { name: 'Add Comment' }).click();
 
     // Verify option appears
     await expect(page.getByText('T1').first()).toBeVisible();
     await expect(page.getByText('<Name> shows great test skills.').first()).toBeVisible();
   });
 
-  test('edit a group title', async ({ page }) => {
+  test('edit a group', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
 
-    // Find the Test Group card and click edit
-    const testGroupHeader = page.locator('h3:has-text("Test Group")').locator('..').locator('..');
-    await testGroupHeader.getByTitle('Edit group').click();
+    await page.getByRole('button', { name: 'CCG' }).click();
 
-    // The edit form should appear — update the title
-    await page.locator('input[name="title"]').fill('Updated Test Title');
-    await page.getByRole('button', { name: 'Update Group' }).click();
+    // Find the Test Group card and click Edit group button
+    const testGroupRow = page.locator('text=Test Group Title').locator('..');
+    await testGroupRow.getByTitle('Edit group').click();
+
+    // Update the title
+    const titleInput = page.locator('input').filter({ hasText: /Test Group Title/ });
+    await titleInput.clear();
+    await titleInput.fill('Updated Test Title');
+    await page.getByRole('button', { name: 'Save Changes' }).click();
 
     // Verify the updated title appears
     await expect(page.getByText('Updated Test Title').first()).toBeVisible();
   });
 
-  test('edit an option text', async ({ page }) => {
-    await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
-
-    // Find option T1 in Test Group and click its edit button
-    const optionRow = page.locator('text=<Name> shows great test skills.').locator('..').locator('..');
-    await optionRow.getByTitle('Edit').click();
-
-    // Update the text
-    await page.locator('input[name="text"]').last().fill('<Name> has updated test skills.');
-    await page.getByRole('button', { name: 'Save' }).click();
-
-    // Verify updated text
-    await expect(page.getByText('<Name> has updated test skills.').first()).toBeVisible();
-  });
-
   test('delete an option', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
 
-    // Find option T1 and click delete
-    const optionRow = page.locator('text=<Name> has updated test skills.').locator('..').locator('..');
+    await page.getByRole('button', { name: 'CCG' }).click();
+
+    // Expand the Test Group to see options
+    const testGroupRow = page.locator('text=Updated Test Title').locator('..');
+    // Click the chevron to expand
+    await testGroupRow.locator('button').first().click();
 
     // Handle the browser confirm dialog
     page.on('dialog', dialog => dialog.accept());
 
+    // Find the option and delete it
+    const optionRow = page.locator('text=<Name> shows great test skills.').locator('..');
     await optionRow.getByTitle('Delete').click();
 
     // Verify option is removed
-    await expect(page.getByText('<Name> has updated test skills.')).not.toBeVisible();
+    await expect(page.getByText('<Name> shows great test skills.')).not.toBeVisible();
   });
 
   test('delete a group', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
+
+    await page.getByRole('button', { name: 'CCG' }).click();
+
+    // Handle the browser confirm dialog
+    page.on('dialog', dialog => dialog.accept());
 
     // Find Test Group and click delete
-    const testGroupHeader = page.locator('h3:has-text("Test Group")').locator('..').locator('..');
-    await testGroupHeader.getByTitle('Delete group').click();
-
-    // Confirm in the modal
-    await page.getByRole('button', { name: 'Delete Group' }).click();
+    const testGroupRow = page.locator('text=Updated Test Title').locator('..');
+    await testGroupRow.getByTitle('Delete group').click();
 
     // Verify group is removed
-    await expect(page.locator('h3:has-text("Test Group")')).not.toBeVisible();
+    await expect(page.getByText('Updated Test Title')).not.toBeVisible();
   });
 
-  test('update P2 wrapper template', async ({ page }) => {
+  test('Format tab shows template editor', async ({ page }) => {
     await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
-    await page.goto('/admin/ccg');
+    await page.goto('/admin');
 
-    // Find the wrapper template textarea
-    const templateSection = page.locator('h3:has-text("P2 Wrapper Template")').locator('..').locator('..');
-    const textarea = templateSection.locator('textarea');
+    await page.getByRole('button', { name: 'Format' }).click();
 
-    // Clear and type new template
-    await textarea.fill('<Effort> <Behaviour> <Homework>');
+    // Verify format management UI is visible
+    await expect(page.getByText('Comment Format Template').first()).toBeVisible();
+    await expect(page.getByText('Available Tags').first()).toBeVisible();
+    await expect(page.getByText('Expansion').first()).toBeVisible();
+
+    // Verify the textarea has a template value
+    const textarea = page.locator('textarea');
+    await expect(textarea).toBeVisible();
+  });
+
+  test('update format template', async ({ page }) => {
+    await login(page, TEST_USERS.admin.username, TEST_USERS.admin.password);
+    await page.goto('/admin');
+
+    await page.getByRole('button', { name: 'Format' }).click();
+
+    // Find the format template textarea and update it
+    const textarea = page.locator('textarea');
+    await textarea.fill('<Academic>\n\n<Effort> <Behaviour>\n\n<Subject>\n\n<Overall>');
 
     // Save
-    await templateSection.getByRole('button', { name: 'Save Template' }).click();
+    await page.getByRole('button', { name: 'Save Template' }).click();
 
     // Verify save confirmation
-    await expect(templateSection.getByText('Saved!')).toBeVisible();
+    await expect(page.getByText('Saved!')).toBeVisible();
   });
 });

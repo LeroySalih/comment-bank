@@ -53,8 +53,9 @@ export type AuditAction =
   | 'update_common_comment_option'
   | 'delete_common_comment_option'
   | 'reorder_common_comment_options'
-  // Wrapper template
-  | 'update_wrapper_template'
+  // Format template
+  | 'update_comment_format_template'
+  | 'update_subject_comment_format'
   // Assignment/Report management
   | 'create_assignment'
   | 'update_assignment'
