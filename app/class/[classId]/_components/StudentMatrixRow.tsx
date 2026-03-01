@@ -70,7 +70,8 @@ interface StudentMatrixRowProps {
   groups: Group[];
   subject: Subject;
   classYear?: string | null;
-  commonGroups?: CommonCommentGroup[];
+  commonGroupsBefore?: CommonCommentGroup[];
+  commonGroupsAfter?: CommonCommentGroup[];
   formatTemplate?: string;
   subjectFormat?: string | null;
 }
@@ -96,7 +97,7 @@ function LinkedCodeBadge({ code, hasMatch }: { code: string | null; hasMatch: bo
   );
 }
 
-export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroups, formatTemplate, subjectFormat }: StudentMatrixRowProps) {
+export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroupsBefore, commonGroupsAfter, formatTemplate, subjectFormat }: StudentMatrixRowProps) {
   const router = useRouter();
 
   // Track subject-specific selections locally
@@ -112,7 +113,7 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
   const [commonSelections, setCommonSelections] = useState<Record<string, string | null>>(() => {
     const initial: Record<string, string | null> = {};
     const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
-    (commonGroups || []).forEach(cg => {
+    [...(commonGroupsBefore || []), ...(commonGroupsAfter || [])].forEach(cg => {
       if (cg.isLinked && cg.linkedField && linkedData) {
         initial[cg.id] = linkedData[cg.linkedField] || null;
       } else {
@@ -177,7 +178,7 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
   };
 
   // Build current common pupil codes for CopyCommentButton
-  const currentCommonPupilCodes = (commonGroups || []).map(g => ({
+  const currentCommonPupilCodes = [...(commonGroupsBefore || []), ...(commonGroupsAfter || [])].map(g => ({
     commonGroupId: g.id,
     code: commonSelections[g.id] || null
   }));
@@ -193,15 +194,15 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
 
   return (
     <tr className="group hover:bg-primary/5 dark:hover:bg-primary/10 transition-colors">
-      <td className="sticky left-0 z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-primary/5 dark:group-hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+      <td className="sticky left-0 z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-blue-50 dark:group-hover:bg-[#1d2838] border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
         <span className="text-[#111418] dark:text-white text-sm font-semibold">
           {assignment.Pupil.lastName}, {assignment.Pupil.firstName}
         </span>
       </td>
-      <td className="sticky left-[240px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-primary/5 dark:group-hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+      <td className="sticky left-[240px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-blue-50 dark:group-hover:bg-[#1d2838] border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
         <span className="text-sm text-[#617289] dark:text-gray-400">{assignment.Pupil.gender}</span>
       </td>
-      <td className="sticky left-[320px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-primary/5 dark:group-hover:bg-gray-800/50 border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+      <td className="sticky left-[320px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-blue-50 dark:group-hover:bg-[#1d2838] border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
         <div className="flex items-center gap-2">
           <CommentStatusBadge status={assignment.checkStatus || 'not_required'} showLabel={true} size="sm" />
           {commentBanksDisabled && (
@@ -216,8 +217,8 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
         </div>
       </td>
 
-      {/* Common group columns */}
-      {(commonGroups || []).map((g) => {
+      {/* CCG columns before SCG */}
+      {(commonGroupsBefore || []).map((g) => {
         const currentCode = commonSelections[g.id] || null;
         if (g.isLinked) {
           const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
@@ -261,13 +262,40 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
         );
       })}
 
+      {/* CCG columns after SCG */}
+      {(commonGroupsAfter || []).map((g) => {
+        const currentCode = commonSelections[g.id] || null;
+        if (g.isLinked) {
+          const hasMatch = currentCode && g.CommonCommentOption.some(o => o.code === currentCode);
+          return (
+            <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+              <LinkedCodeBadge code={currentCode} hasMatch={!!hasMatch} />
+            </td>
+          );
+        }
+        return (
+          <td key={g.id} className="px-6 py-4 whitespace-nowrap">
+            <QuickGroupSelector
+              assignmentId={assignment.id}
+              groupId={g.id}
+              currentCode={currentCode}
+              options={g.CommonCommentOption}
+              context={contextForTooltip}
+              onSelectionChange={handleCommonSelectionChange}
+              onCodeUpdate={updateCommonAssignmentCode}
+              disabled={commentBanksDisabled}
+            />
+          </td>
+        );
+      })}
+
       <td className="px-6 py-4 whitespace-nowrap text-right">
         <div className="flex items-center justify-end gap-3">
           <CopyCommentButton
             assignment={currentAssignment}
             subject={subject}
             groups={groups}
-            commonGroups={commonGroups}
+            commonGroups={[...(commonGroupsBefore || []), ...(commonGroupsAfter || [])]}
             commonPupilCodes={currentCommonPupilCodes}
             formatTemplate={formatTemplate}
             subjectFormat={subjectFormat}

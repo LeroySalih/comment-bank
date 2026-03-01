@@ -77,9 +77,9 @@ export default async function HoDDashboard() {
     // For each class, fetch up to 5 pending assignments with pupils
     for (const cls of classRows) {
       const { rows: assignmentRows } = await pool.query(
-        `SELECT a.*, p."admissionNumber" as pupil_admissionNumber,
-                p."firstName" as pupil_firstName, p."lastName" as pupil_lastName,
-                p.gender as pupil_gender, p."isActive" as pupil_isActive, p.form as pupil_form
+        `SELECT a.*, p."admissionNumber" as "pupil_admissionNumber",
+                p."firstName" as "pupil_firstName", p."lastName" as "pupil_lastName",
+                p.gender as "pupil_gender", p."isActive" as "pupil_isActive", p.form as "pupil_form"
          FROM "Assignment" a
          JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
          WHERE a."classId" = $1 AND a."checkStatus" = 'required_check'

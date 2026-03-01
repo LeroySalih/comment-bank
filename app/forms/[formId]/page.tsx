@@ -87,9 +87,9 @@ export default async function FormPage({ params }: { params: Promise<{ formId: s
   // Fetch all assignments for these pupils with class, subject, and comment groups
   const { rows: assignmentRows } = await pool.query(
     `SELECT a.*,
-            c.id as class_id, c.name as class_name, c.year as class_year, c."subjectId" as class_subjectId,
-            s.id as s_id, s.code as s_code, s.title as s_title, s."commentFormat" as s_commentFormat,
-            s."studiedComment" as s_studiedComment
+            c.id as "class_id", c.name as "class_name", c.year as "class_year", c."subjectId" as "class_subjectId",
+            s.id as "s_id", s.code as "s_code", s.title as "s_title", s."commentFormat" as "s_commentFormat",
+            s."studiedComment" as "s_studiedComment"
      FROM "Assignment" a
      JOIN "Class" c ON c.id = a."classId"
      JOIN "Subject" s ON s.id = c."subjectId"

@@ -39,12 +39,12 @@ export default async function ClassPage({ params }: Props) {
   // Fetch assignments with pupils, sorted by decrypted lastName
   const { rows: assignmentRows } = await pool.query(
     `SELECT a.*,
-            p."admissionNumber" as pupil_admissionNumber,
-            p."firstName" as pupil_firstName,
-            p."lastName" as pupil_lastName,
-            p.gender as pupil_gender,
-            p."isActive" as pupil_isActive,
-            p.form as pupil_form
+            p."admissionNumber" as "pupil_admissionNumber",
+            p."firstName" as "pupil_firstName",
+            p."lastName" as "pupil_lastName",
+            p.gender as "pupil_gender",
+            p."isActive" as "pupil_isActive",
+            p.form as "pupil_form"
      FROM "Assignment" a
      JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
      WHERE a."classId" = $1`,

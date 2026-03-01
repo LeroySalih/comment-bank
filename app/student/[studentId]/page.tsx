@@ -22,15 +22,15 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
   // Fetch assignment with class, subject, and pupil
   const { rows: assignmentRows } = await pool.query(
     `SELECT a.*,
-            p."admissionNumber" as pupil_admissionNumber,
-            p."firstName" as pupil_firstName,
-            p."lastName" as pupil_lastName,
-            p.gender as pupil_gender,
-            p."isActive" as pupil_isActive,
-            p.form as pupil_form,
-            c.id as class_id, c.name as class_name, c.year as class_year, c."subjectId" as class_subjectId,
-            s.id as s_id, s.code as s_code, s.title as s_title, s."commentFormat" as s_commentFormat,
-            s."studiedComment" as s_studiedComment
+            p."admissionNumber" as "pupil_admissionNumber",
+            p."firstName" as "pupil_firstName",
+            p."lastName" as "pupil_lastName",
+            p.gender as "pupil_gender",
+            p."isActive" as "pupil_isActive",
+            p.form as "pupil_form",
+            c.id as "class_id", c.name as "class_name", c.year as "class_year", c."subjectId" as "class_subjectId",
+            s.id as "s_id", s.code as "s_code", s.title as "s_title", s."commentFormat" as "s_commentFormat",
+            s."studiedComment" as "s_studiedComment"
      FROM "Assignment" a
      JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
      JOIN "Class" c ON c.id = a."classId"

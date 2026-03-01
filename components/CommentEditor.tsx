@@ -226,8 +226,7 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
         if (standardVars.includes(tagName)) return match;
         return '';
       });
-      result = result.replace(/\s{2,}/g, ' ').trim();
-      result = result.split('\n\n').filter(p => p.trim()).join('\n\n');
+      result = result.split(/\n+/).map(p => p.replace(/\s+/g, ' ').trim()).filter(p => p).join('\n\n');
 
       setPreview(parseComment(result, assignment.Pupil.firstName, assignment.Pupil.gender, subject.title || '', assignment.Class?.year, assignment.eoyLevel, assignment.targetLevel));
     } else if (!commonGroups || commonGroups.length === 0) {
@@ -441,9 +440,22 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     );
   };
 
-  // Build sections — Common and Subject (no more P1/P2/P4 labels)
+  // Build sections — ordered by template position
   const commonGroupsMapped = (commonGroups || []).map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
   const subjectGroupsMapped = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
+
+  // Split CCG groups into before-SCG and after-SCG based on where <SCG> appears in the template
+  let ccgBeforeSCG = commonGroupsMapped;
+  let ccgAfterSCG: typeof commonGroupsMapped = [];
+
+  if (formatTemplate && formatTemplate.includes('<SCG>')) {
+    const scgIdx = formatTemplate.indexOf('<SCG>');
+    const namesAfterSCG = new Set([...formatTemplate.slice(scgIdx + 5).matchAll(/<([^>]+)>/g)].map(m => m[1]));
+    const posMap = new Map([...formatTemplate.matchAll(/<([^>]+)>/g)].map((m, i) => [m[1], i] as [string, number]));
+    const byPos = (a: { name: string }, b: { name: string }) => (posMap.get(a.name) ?? 999) - (posMap.get(b.name) ?? 999);
+    ccgBeforeSCG = commonGroupsMapped.filter(g => !namesAfterSCG.has(g.name)).sort(byPos);
+    ccgAfterSCG = commonGroupsMapped.filter(g => namesAfterSCG.has(g.name)).sort(byPos);
+  }
 
   return (
     <div className="flex-1 flex flex-col lg:flex-row gap-8 align-start">
@@ -467,8 +479,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                     </div>
                 )}
                 <div className="flex flex-col gap-4">
-                    {renderGroupSection('Common', commonGroupsMapped, commonSelections, handleCommonSelection, true)}
+                    {renderGroupSection('Common', ccgBeforeSCG, commonSelections, handleCommonSelection, true)}
                     {renderGroupSection('Subject', subjectGroupsMapped, selections, handleSelection, false)}
+                    {renderGroupSection('Common', ccgAfterSCG, commonSelections, handleCommonSelection, true)}
                 </div>
             </div>
 

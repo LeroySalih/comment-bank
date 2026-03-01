@@ -157,10 +157,7 @@ export function generateComment(
             if (standardVars.includes(tagName)) return match;
             return '';
         });
-        result = result.replace(/\s{2,}/g, ' ').trim();
-
-        // Clean up empty paragraphs (lines that are just whitespace)
-        result = result.split('\n\n').filter(p => p.trim()).join('\n\n');
+        result = result.split(/\n+/).map(p => p.replace(/\s+/g, ' ').trim()).filter(p => p).join('\n\n');
 
         return parseComment(
             result,

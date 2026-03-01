@@ -16,7 +16,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const { rows: classRows } = await pool.query(
     `SELECT c.*,
             s.id as s_id, s.code as s_code, s.title as s_title,
-            s."commentFormat" as s_commentFormat
+            s."commentFormat" as "s_commentFormat"
      FROM "Class" c
      JOIN "Subject" s ON s.id = c."subjectId"
      WHERE c.id = $1`,
@@ -92,12 +92,12 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   // Fetch assignments with active pupils
   const { rows: assignmentRows } = await pool.query(
     `SELECT a.*,
-            p."admissionNumber" as pupil_admissionNumber,
-            p."firstName" as pupil_firstName,
-            p."lastName" as pupil_lastName,
-            p.gender as pupil_gender,
-            p."isActive" as pupil_isActive,
-            p.form as pupil_form
+            p."admissionNumber" as "pupil_admissionNumber",
+            p."firstName" as "pupil_firstName",
+            p."lastName" as "pupil_lastName",
+            p.gender as "pupil_gender",
+            p."isActive" as "pupil_isActive",
+            p.form as "pupil_form"
      FROM "Assignment" a
      JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
      WHERE a."classId" = $1 AND p."isActive" = true`,
@@ -197,6 +197,19 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const formatTemplate = settingRows[0]?.value || '';
   const subjectFormat = cls.Subject.commentFormat || null;
 
+  // Split CCG groups into before-SCG and after-SCG based on template position
+  let commonGroupsBefore = commonGroups as any[];
+  let commonGroupsAfter: any[] = [];
+
+  if (formatTemplate && formatTemplate.includes('<SCG>')) {
+    const scgIdx = formatTemplate.indexOf('<SCG>');
+    const namesAfterSCG = new Set([...formatTemplate.slice(scgIdx + 5).matchAll(/<([^>]+)>/g)].map((m: RegExpMatchArray) => m[1]));
+    const posMap = new Map([...formatTemplate.matchAll(/<([^>]+)>/g)].map((m: RegExpMatchArray, i: number) => [m[1], i]));
+    const byPos = (a: any, b: any) => (posMap.get(a.name) ?? 999) - (posMap.get(b.name) ?? 999);
+    commonGroupsBefore = (commonGroups as any[]).filter((g: any) => !namesAfterSCG.has(g.name)).sort(byPos);
+    commonGroupsAfter = (commonGroups as any[]).filter((g: any) => namesAfterSCG.has(g.name)).sort(byPos);
+  }
+
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark h-[calc(100vh-64px)] overflow-hidden">
         {/* Page Heading */}
@@ -211,7 +224,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                     </h1>
                 </div>
                 <p className="text-[#617289] dark:text-gray-400 text-sm font-normal leading-normal">
-                    {cls.Subject.code} • {assignments.length} Students
+                    {cls.Subject.code} • {assignments.length} Pupils
                 </p>
             </div>
             <div className="flex gap-3">
@@ -230,7 +243,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                         <thead className="bg-white dark:bg-[#1a222c] sticky top-0 z-30">
                             <tr>
                                 <th scope="col" className="sticky top-0 left-0 z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[240px] min-w-[240px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
-                                    Student Name
+                                    Pupil Name
                                 </th>
                                 <th scope="col" className="sticky top-0 left-[240px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[80px] min-w-[80px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Gender
@@ -238,8 +251,8 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 <th scope="col" className="sticky top-0 left-[320px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[140px] min-w-[140px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Status
                                 </th>
-                                {/* Common group columns */}
-                                {commonGroups.map((g: any) => (
+                                {/* CCG columns before SCG */}
+                                {commonGroupsBefore.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
                                         <Tooltip content={g.name}>
                                             {g.name}
@@ -249,6 +262,14 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 {/* Subject-specific group columns */}
                                 {groups.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
+                                        <Tooltip content={g.name}>
+                                            {g.name}
+                                        </Tooltip>
+                                    </th>
+                                ))}
+                                {/* CCG columns after SCG */}
+                                {commonGroupsAfter.map((g: any) => (
+                                    <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
                                         <Tooltip content={g.name}>
                                             {g.name}
                                         </Tooltip>
@@ -267,7 +288,8 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                     groups={groups}
                                     subject={cls.Subject}
                                     classYear={cls.year}
-                                    commonGroups={commonGroups}
+                                    commonGroupsBefore={commonGroupsBefore}
+                                    commonGroupsAfter={commonGroupsAfter}
                                     formatTemplate={formatTemplate}
                                     subjectFormat={subjectFormat}
                                 />

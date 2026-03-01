@@ -1,14 +1,12 @@
-import { PrismaClient } from '@prisma/client'
-
-const prisma = new PrismaClient()
+import { pool } from '@/lib/db'
 
 async function main() {
   console.log('Clearing pupils and related data...')
-  
-  // Due to Cascade deletes in the schema, deleting Pupil should handle Assignment and PupilCode
-  const deleteCount = await prisma.pupil.deleteMany({})
-  
-  console.log(`Successfully deleted ${deleteCount.count} pupils.`)
+
+  // Due to CASCADE deletes in the schema, deleting Pupil handles Assignment, PupilCode, etc.
+  const { rowCount } = await pool.query(`DELETE FROM "Pupil"`)
+
+  console.log(`Successfully deleted ${rowCount} pupils.`)
 }
 
 main()
@@ -17,5 +15,5 @@ main()
     process.exit(1)
   })
   .finally(async () => {
-    await prisma.$disconnect()
+    await pool.end()
   })
