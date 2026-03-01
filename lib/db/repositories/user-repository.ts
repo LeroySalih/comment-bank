@@ -1,7 +1,12 @@
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { NotFoundError } from '@/lib/errors'
 import { createId } from '@paralleldrive/cuid2'
-import type { User } from '@prisma/client'
+import type { DbUser, DbRole, DbUserWithRoles, DbSubject, DbClass } from '@/lib/types/db'
+
+type DbUserWithRelations = DbUserWithRoles & {
+  Subject: DbSubject[]
+  Class: DbClass[]
+}
 
 /**
  * Repository for User data access
@@ -10,45 +15,84 @@ export class UserRepository {
   /**
    * Find all users with their roles
    */
-  async findAll() {
-    return prisma.user.findMany({
-      include: {
-        Role: true
-      },
-      orderBy: { username: 'asc' }
-    })
+  async findAll(): Promise<DbUserWithRoles[]> {
+    const usersResult = await pool.query<DbUser>(
+      `SELECT * FROM "User" ORDER BY "username" ASC`
+    )
+    const users = usersResult.rows
+
+    const usersWithRoles = await Promise.all(
+      users.map(async (user) => {
+        const rolesResult = await pool.query<DbRole>(
+          `SELECT r.* FROM "Role" r JOIN "_RoleToUser" ru ON ru."A" = r.id WHERE ru."B" = $1`,
+          [user.id]
+        )
+        return { ...user, Role: rolesResult.rows }
+      })
+    )
+
+    return usersWithRoles
   }
 
   /**
-   * Find user by ID with roles
+   * Find user by ID with roles, subjects, and classes
    */
-  async findById(id: string) {
-    const user = await prisma.user.findUnique({
-      where: { id },
-      include: {
-        Role: true,
-        Subject: true,
-        Class: true
-      }
-    })
+  async findById(id: string): Promise<DbUserWithRelations> {
+    const userResult = await pool.query<DbUser>(
+      `SELECT * FROM "User" WHERE id = $1`,
+      [id]
+    )
 
-    if (!user) {
+    if (userResult.rows.length === 0) {
       throw new NotFoundError(`User with ID ${id} not found`)
     }
 
-    return user
+    const user = userResult.rows[0]
+
+    const [rolesResult, subjectsResult, classesResult] = await Promise.all([
+      pool.query<DbRole>(
+        `SELECT r.* FROM "Role" r JOIN "_RoleToUser" ru ON ru."A" = r.id WHERE ru."B" = $1`,
+        [id]
+      ),
+      pool.query<DbSubject>(
+        `SELECT s.* FROM "Subject" s JOIN "_SubjectToUser" su ON su."A" = s.id WHERE su."B" = $1`,
+        [id]
+      ),
+      pool.query<DbClass>(
+        `SELECT c.* FROM "Class" c JOIN "_ClassToUser" cu ON cu."A" = c.id WHERE cu."B" = $1`,
+        [id]
+      )
+    ])
+
+    return {
+      ...user,
+      Role: rolesResult.rows,
+      Subject: subjectsResult.rows,
+      Class: classesResult.rows
+    }
   }
 
   /**
    * Find user by username
    */
-  async findByUsername(username: string) {
-    return prisma.user.findUnique({
-      where: { username },
-      include: {
-        Role: true
-      }
-    })
+  async findByUsername(username: string): Promise<DbUserWithRoles | null> {
+    const userResult = await pool.query<DbUser>(
+      `SELECT * FROM "User" WHERE "username" = $1`,
+      [username]
+    )
+
+    if (userResult.rows.length === 0) {
+      return null
+    }
+
+    const user = userResult.rows[0]
+
+    const rolesResult = await pool.query<DbRole>(
+      `SELECT r.* FROM "Role" r JOIN "_RoleToUser" ru ON ru."A" = r.id WHERE ru."B" = $1`,
+      [user.id]
+    )
+
+    return { ...user, Role: rolesResult.rows }
   }
 
   /**
@@ -58,69 +102,119 @@ export class UserRepository {
     username: string
     password: string
     roleNames?: string[]
-  }) {
-    const { roleNames = [], ...userData } = data
+  }): Promise<DbUserWithRoles> {
+    const { roleNames = [], username, password } = data
+    const client = await pool.connect()
 
-    // Find or create roles
-    const roles = await Promise.all(
-      roleNames.map(name =>
-        prisma.role.upsert({
-          where: { name },
-          create: { id: name, name },
-          update: {}
-        })
+    try {
+      await client.query('BEGIN')
+
+      const userId = createId()
+
+      await client.query(
+        `INSERT INTO "User" (id, username, password, "isActive") VALUES ($1, $2, $3, true)`,
+        [userId, username, password]
       )
-    )
 
-    return prisma.user.create({
-      data: {
-        id: createId(),
-        ...userData,
-        Role: {
-          connect: roles.map(role => ({ id: role.id }))
-        }
-      },
-      include: {
-        Role: true
+      const roles: DbRole[] = []
+
+      for (const roleName of roleNames) {
+        await client.query(
+          `INSERT INTO "Role" (id, name) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+          [roleName, roleName]
+        )
+        const roleResult = await client.query<DbRole>(
+          `SELECT id, name FROM "Role" WHERE name = $1`,
+          [roleName]
+        )
+        const role = roleResult.rows[0]
+        roles.push(role)
+
+        await client.query(
+          `INSERT INTO "_RoleToUser" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [role.id, userId]
+        )
       }
-    })
+
+      await client.query('COMMIT')
+
+      const userResult = await pool.query<DbUser>(
+        `SELECT * FROM "User" WHERE id = $1`,
+        [userId]
+      )
+
+      return { ...userResult.rows[0], Role: roles }
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
   }
 
   /**
    * Update user roles
    */
-  async updateRoles(userId: string, roleNames: string[]) {
-    // Find or create roles
-    const roles = await Promise.all(
-      roleNames.map(name =>
-        prisma.role.upsert({
-          where: { name },
-          create: { id: name, name },
-          update: {}
-        })
-      )
-    )
+  async updateRoles(userId: string, roleNames: string[]): Promise<DbUserWithRoles> {
+    const client = await pool.connect()
 
-    return prisma.user.update({
-      where: { id: userId },
-      data: {
-        Role: {
-          set: roles.map(role => ({ id: role.id }))
-        }
-      },
-      include: {
-        Role: true
+    try {
+      await client.query('BEGIN')
+
+      await client.query(
+        `DELETE FROM "_RoleToUser" WHERE "B" = $1`,
+        [userId]
+      )
+
+      const roles: DbRole[] = []
+
+      for (const roleName of roleNames) {
+        await client.query(
+          `INSERT INTO "Role" (id, name) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
+          [roleName, roleName]
+        )
+        const roleResult = await client.query<DbRole>(
+          `SELECT id, name FROM "Role" WHERE name = $1`,
+          [roleName]
+        )
+        const role = roleResult.rows[0]
+        roles.push(role)
+
+        await client.query(
+          `INSERT INTO "_RoleToUser" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [role.id, userId]
+        )
       }
-    })
+
+      await client.query('COMMIT')
+
+      const userResult = await pool.query<DbUser>(
+        `SELECT * FROM "User" WHERE id = $1`,
+        [userId]
+      )
+
+      if (userResult.rows.length === 0) {
+        throw new NotFoundError(`User with ID ${userId} not found`)
+      }
+
+      return { ...userResult.rows[0], Role: roles }
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
   }
 
   /**
    * Delete a user
    */
-  async delete(userId: string) {
-    return prisma.user.delete({
-      where: { id: userId }
-    })
+  async delete(userId: string): Promise<DbUser> {
+    const result = await pool.query<DbUser>(
+      `DELETE FROM "User" WHERE id = $1 RETURNING *`,
+      [userId]
+    )
+    return result.rows[0]
   }
 }
 
