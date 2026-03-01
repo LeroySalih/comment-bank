@@ -1,7 +1,7 @@
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { encrypt, decrypt } from '@/lib/encryption'
 import { NotFoundError } from '@/lib/errors'
-import type { Pupil } from '@prisma/client'
+import type { DbPupil } from '@/lib/types/db'
 
 /**
  * Repository for Pupil data access
@@ -12,21 +12,24 @@ export class PupilRepository {
    * Find all pupils with optional search query
    * Automatically decrypts PII fields
    */
-  async findAll(query?: string): Promise<Pupil[]> {
-    const pupils = await prisma.pupil.findMany({
-      where: query
-        ? {
-            OR: [
-              { firstName: { contains: query } },
-              { lastName: { contains: query } },
-              { admissionNumber: { contains: query } }
-            ]
-          }
-        : undefined,
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
-    })
+  async findAll(query?: string): Promise<DbPupil[]> {
+    let result
 
-    return pupils.map(pupil => ({
+    if (query) {
+      const param = `%${query}%`
+      result = await pool.query<DbPupil>(
+        `SELECT * FROM "Pupil"
+         WHERE "firstName" ILIKE $1 OR "lastName" ILIKE $1 OR "admissionNumber" ILIKE $1
+         ORDER BY "lastName" ASC, "firstName" ASC`,
+        [param]
+      )
+    } else {
+      result = await pool.query<DbPupil>(
+        `SELECT * FROM "Pupil" ORDER BY "lastName" ASC, "firstName" ASC`
+      )
+    }
+
+    return result.rows.map(pupil => ({
       ...pupil,
       firstName: decrypt(pupil.firstName),
       lastName: decrypt(pupil.lastName)
@@ -37,13 +40,15 @@ export class PupilRepository {
    * Find pupil by admission number
    * Automatically decrypts PII fields
    */
-  async findByAdmissionNumber(admissionNumber: string): Promise<Pupil | null> {
-    const pupil = await prisma.pupil.findUnique({
-      where: { admissionNumber }
-    })
+  async findByAdmissionNumber(admissionNumber: string): Promise<DbPupil | null> {
+    const { rows } = await pool.query<DbPupil>(
+      `SELECT * FROM "Pupil" WHERE "admissionNumber" = $1`,
+      [admissionNumber]
+    )
 
-    if (!pupil) return null
+    if (rows.length === 0) return null
 
+    const pupil = rows[0]
     return {
       ...pupil,
       firstName: decrypt(pupil.firstName),
@@ -61,15 +66,20 @@ export class PupilRepository {
     lastName: string
     gender: string
     isActive?: boolean
-  }): Promise<Pupil> {
-    const pupil = await prisma.pupil.create({
-      data: {
-        ...data,
-        firstName: encrypt(data.firstName),
-        lastName: encrypt(data.lastName)
-      }
-    })
+  }): Promise<DbPupil> {
+    const { rows } = await pool.query<DbPupil>(
+      `INSERT INTO "Pupil" ("admissionNumber", "firstName", "lastName", "gender", "isActive")
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [
+        data.admissionNumber,
+        encrypt(data.firstName),
+        encrypt(data.lastName),
+        data.gender,
+        data.isActive ?? true
+      ]
+    )
 
+    const pupil = rows[0]
     return {
       ...pupil,
       firstName: data.firstName, // Return unencrypted
@@ -89,21 +99,40 @@ export class PupilRepository {
       gender?: string
       isActive?: boolean
     }
-  ): Promise<Pupil> {
-    const updateData: any = { ...data }
-    
-    if (data.firstName) {
-      updateData.firstName = encrypt(data.firstName)
+  ): Promise<DbPupil> {
+    const setClauses: string[] = []
+    const params: unknown[] = []
+
+    if (data.firstName !== undefined) {
+      params.push(encrypt(data.firstName))
+      setClauses.push(`"firstName" = $${params.length}`)
     }
-    if (data.lastName) {
-      updateData.lastName = encrypt(data.lastName)
+    if (data.lastName !== undefined) {
+      params.push(encrypt(data.lastName))
+      setClauses.push(`"lastName" = $${params.length}`)
+    }
+    if (data.gender !== undefined) {
+      params.push(data.gender)
+      setClauses.push(`"gender" = $${params.length}`)
+    }
+    if (data.isActive !== undefined) {
+      params.push(data.isActive)
+      setClauses.push(`"isActive" = $${params.length}`)
     }
 
-    const pupil = await prisma.pupil.update({
-      where: { admissionNumber },
-      data: updateData
-    })
+    params.push(admissionNumber)
+    const whereParam = `$${params.length}`
 
+    const { rows } = await pool.query<DbPupil>(
+      `UPDATE "Pupil" SET ${setClauses.join(', ')} WHERE "admissionNumber" = ${whereParam} RETURNING *`,
+      params
+    )
+
+    if (rows.length === 0) {
+      throw new NotFoundError(`Pupil with admissionNumber ${admissionNumber} not found`)
+    }
+
+    const pupil = rows[0]
     return {
       ...pupil,
       firstName: data.firstName ? data.firstName : decrypt(pupil.firstName),
@@ -125,34 +154,44 @@ export class PupilRepository {
       isActive?: boolean
     }>
   ): Promise<number> {
-    const encryptedPupils = pupils.map(pupil => ({
-      ...pupil,
-      firstName: encrypt(pupil.firstName),
-      lastName: encrypt(pupil.lastName)
-    }))
+    if (pupils.length === 0) return 0
 
-    const result = await prisma.pupil.createMany({
-      data: encryptedPupils,
-      skipDuplicates: true
+    const params: unknown[] = []
+    const valuePlaceholders = pupils.map(pupil => {
+      const base = params.length
+      params.push(
+        pupil.admissionNumber,
+        encrypt(pupil.firstName),
+        encrypt(pupil.lastName),
+        pupil.gender,
+        pupil.form ?? null,
+        pupil.isActive ?? true
+      )
+      return `($${base + 1}, $${base + 2}, $${base + 3}, $${base + 4}, $${base + 5}, $${base + 6})`
     })
 
-    return result.count
+    const { rowCount } = await pool.query(
+      `INSERT INTO "Pupil" ("admissionNumber", "firstName", "lastName", "gender", "form", "isActive")
+       VALUES ${valuePlaceholders.join(', ')}
+       ON CONFLICT ("admissionNumber") DO NOTHING`,
+      params
+    )
+
+    return rowCount ?? 0
   }
 
   /**
    * Find pupils by form name
    * Automatically decrypts PII fields
    */
-  async findByForm(formName: string): Promise<Pupil[]> {
-    const pupils = await prisma.pupil.findMany({
-      where: {
-        form: formName,
-        isActive: true
-      },
-      orderBy: [{ lastName: 'asc' }, { firstName: 'asc' }]
-    })
+  async findByForm(formName: string): Promise<DbPupil[]> {
+    const { rows } = await pool.query<DbPupil>(
+      `SELECT * FROM "Pupil" WHERE "form" = $1 AND "isActive" = true
+       ORDER BY "lastName" ASC, "firstName" ASC`,
+      [formName]
+    )
 
-    return pupils.map(pupil => ({
+    return rows.map(pupil => ({
       ...pupil,
       firstName: decrypt(pupil.firstName),
       lastName: decrypt(pupil.lastName)
