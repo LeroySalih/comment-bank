@@ -1,6 +1,6 @@
 "use server"
 
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
 import { isAdmin } from "@/lib/access-control"
@@ -24,9 +24,11 @@ export async function createUser(formData: FormData) {
   }
 
   try {
-    const existingUser = await prisma.user.findUnique({
-      where: { username }
-    })
+    const { rows: existingRows } = await pool.query(
+      `SELECT id FROM "User" WHERE username = $1`,
+      [username]
+    )
+    const existingUser = existingRows[0] ?? null
 
     if (existingUser) {
       return { success: false, error: "Username already exists" }
@@ -34,16 +36,26 @@ export async function createUser(formData: FormData) {
 
     const hashedPassword = await hash(password, 12)
 
-    const newUser = await prisma.user.create({
-      data: {
-        id: createId(),
-        username,
-        password: hashedPassword,
-        Role: role ? {
-          connect: { name: role }
-        } : undefined
+    const userId = createId()
+    await pool.query(
+      `INSERT INTO "User" (id, username, password, "isActive") VALUES ($1, $2, $3, true)`,
+      [userId, username, hashedPassword]
+    )
+
+    if (role) {
+      const { rows: roleRows } = await pool.query(
+        `SELECT id FROM "Role" WHERE name = $1`,
+        [role]
+      )
+      if (roleRows.length > 0) {
+        await pool.query(
+          `INSERT INTO "_RoleToUser" ("A", "B") VALUES ($1, $2) ON CONFLICT DO NOTHING`,
+          [roleRows[0].id, userId]
+        )
       }
-    })
+    }
+
+    const newUser = { id: userId }
 
     // Audit log
     await createAuditLog({
