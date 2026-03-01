@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from 'next/cache'
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { userRepository } from '@/lib/db/repositories/user-repository'
 import { pupilRepository } from '@/lib/db/repositories/pupil-repository'
@@ -44,11 +44,18 @@ export const updateUserRoles = withRole('admin', async (
     const { data } = validation
 
     // Get current roles for audit log
-    const currentUser = await prisma.user.findUnique({
-      where: { id: data.userId },
-      include: { Role: { select: { name: true } } }
-    })
-    const oldRoles = currentUser?.Role.map(r => r.name) || []
+    const { rows: userWithRoles } = await pool.query(
+      `SELECT r.name FROM "Role" r JOIN "_RoleToUser" ru ON ru."A" = r.id WHERE ru."B" = $1`,
+      [data.userId]
+    )
+    const oldRoles = userWithRoles.map((r: any) => r.name)
+
+    // Get username for audit log
+    const { rows: userRows } = await pool.query(
+      `SELECT username FROM "User" WHERE id = $1`,
+      [data.userId]
+    )
+    const currentUser = userRows[0] ?? null
 
     // Update roles using repository
     await userRepository.updateRoles(data.userId, data.roleNames)
@@ -91,10 +98,11 @@ export const updateUserActiveStatus = withRole('admin', async (
     const { data } = validation
 
     // Get current user for audit log
-    const currentUser = await prisma.user.findUnique({
-      where: { id: data.userId },
-      select: { username: true, isActive: true }
-    })
+    const { rows } = await pool.query(
+      `SELECT username, "isActive" FROM "User" WHERE id = $1`,
+      [data.userId]
+    )
+    const currentUser = rows[0] ?? null
 
     if (!currentUser) {
       return {
@@ -105,10 +113,7 @@ export const updateUserActiveStatus = withRole('admin', async (
     }
 
     // Update user active status
-    await prisma.user.update({
-      where: { id: data.userId },
-      data: { isActive: data.isActive }
-    })
+    await pool.query(`UPDATE "User" SET "isActive" = $1 WHERE id = $2`, [data.isActive, data.userId])
 
     // Audit log
     await logDataChange(
@@ -211,7 +216,7 @@ export const processPupilUpload = withRole('admin', async (content: string) => {
     }))
 
     // Filter out invalid rows
-    const validPupils = pupils.filter(p => 
+    const validPupils = pupils.filter(p =>
       p.admissionNumber && p.firstName && p.lastName && (p.gender === 'M' || p.gender === 'F')
     )
 
@@ -324,9 +329,8 @@ export const updateSubject = withRole('admin', async (
     const validated = validation.data
 
     // Get current subject for audit log
-    const currentSubject = await prisma.subject.findUnique({
-      where: { id: validated.subjectId }
-    })
+    const { rows: subjectRows } = await pool.query(`SELECT * FROM "Subject" WHERE id = $1`, [validated.subjectId])
+    const currentSubject = subjectRows[0] ?? null
 
     // Update subject using repository
     await subjectRepository.update(validated.subjectId, {
@@ -367,9 +371,8 @@ export const deleteSubject = withRole('admin', async (subjectId: string) => {
     }
 
     // Get current subject for audit log
-    const currentSubject = await prisma.subject.findUnique({
-      where: { id: subjectId }
-    })
+    const { rows: subjectRows } = await pool.query(`SELECT * FROM "Subject" WHERE id = $1`, [subjectId])
+    const currentSubject = subjectRows[0] ?? null
 
     // Delete subject using repository
     await subjectRepository.delete(subjectId)
@@ -409,10 +412,12 @@ export const assignUserToSubject = withRole('admin', async (
     }
 
     // Get user and subject names for audit log
-    const [user, subject] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId }, select: { username: true } }),
-      prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, title: true } })
+    const [{ rows: userRows }, { rows: subjectRows }] = await Promise.all([
+      pool.query(`SELECT username FROM "User" WHERE id = $1`, [userId]),
+      pool.query(`SELECT code, title FROM "Subject" WHERE id = $1`, [subjectId])
     ])
+    const user = userRows[0] ?? null
+    const subject = subjectRows[0] ?? null
 
     // Assign user using repository
     await subjectRepository.assignUser(subjectId, userId)
@@ -455,10 +460,12 @@ export const removeUserFromSubject = withRole('admin', async (
     }
 
     // Get user and subject names for audit log
-    const [user, subject] = await Promise.all([
-      prisma.user.findUnique({ where: { id: userId }, select: { username: true } }),
-      prisma.subject.findUnique({ where: { id: subjectId }, select: { code: true, title: true } })
+    const [{ rows: userRows }, { rows: subjectRows }] = await Promise.all([
+      pool.query(`SELECT username FROM "User" WHERE id = $1`, [userId]),
+      pool.query(`SELECT code, title FROM "Subject" WHERE id = $1`, [subjectId])
     ])
+    const user = userRows[0] ?? null
+    const subject = subjectRows[0] ?? null
 
     // Remove user using repository
     await subjectRepository.removeUser(subjectId, userId)
@@ -501,17 +508,19 @@ export const assignTeachersToClass = withRole('admin', async (
     }
 
     // Get class info and current teachers for audit log
-    const classInfo = await prisma.class.findUnique({
-      where: { id: classId },
-      include: { User: { select: { id: true, username: true } } }
-    })
-    const oldTeacherIds = classInfo?.User.map(u => u.id) || []
+    const { rows: classRows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const { rows: currentTeachers } = await pool.query(
+      `SELECT u.id, u.username FROM "User" u JOIN "_ClassToUser" cu ON cu."B" = u.id WHERE cu."A" = $1`,
+      [classId]
+    )
+    const classInfo = classRows[0] ? { ...classRows[0], User: currentTeachers } : null
+    const oldTeacherIds = classInfo?.User.map((u: any) => u.id) ?? []
 
     // Get new teacher usernames
-    const newTeachers = await prisma.user.findMany({
-      where: { id: { in: teacherIds } },
-      select: { id: true, username: true }
-    })
+    const { rows: newTeachers } = await pool.query(
+      `SELECT id, username FROM "User" WHERE id = ANY($1::text[])`,
+      [teacherIds]
+    )
 
     // Assign teachers using repository
     await classRepository.assignTeachers(classId, teacherIds)
@@ -523,7 +532,7 @@ export const assignTeachersToClass = withRole('admin', async (
       classId,
       { teacherIds: oldTeacherIds },
       { teacherIds },
-      { className: classInfo?.name, teacherUsernames: newTeachers.map(t => t.username) }
+      { className: classInfo?.name, teacherUsernames: newTeachers.map((t: any) => t.username) }
     )
 
     logger.info('Teachers assigned to class', { classId, teacherIds })
@@ -593,10 +602,11 @@ export const createClassFromForm = withRole('admin', async (
     }
 
     // Get subject info for audit log
-    const subject = await prisma.subject.findUnique({
-      where: { id: subjectId },
-      select: { code: true }
-    })
+    const { rows: subjectRows } = await pool.query(
+      `SELECT code FROM "Subject" WHERE id = $1`,
+      [subjectId]
+    )
+    const subject = subjectRows[0] ?? null
 
     // Audit log
     await createAuditLog({
@@ -633,11 +643,18 @@ export const deleteClass = withRole('admin', async (classId: string) => {
       }
     }
 
-    // Get class info for audit log
-    const classInfo = await prisma.class.findUnique({
-      where: { id: classId },
-      include: { Subject: { select: { code: true } } }
-    })
+    // Get class info for audit log (with subject code)
+    const { rows: classRows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const classBase = classRows[0] ?? null
+    let subjectCode: string | undefined
+    if (classBase) {
+      const { rows: subjectRows } = await pool.query(
+        `SELECT code FROM "Subject" WHERE id = $1`,
+        [classBase.subjectId]
+      )
+      subjectCode = subjectRows[0]?.code
+    }
+    const classInfo = classBase ? { ...classBase, Subject: subjectCode ? { code: subjectCode } : null } : null
 
     await classRepository.delete(classId)
 
@@ -678,10 +695,14 @@ export const updateClass = withRole('admin', async (
     }
 
     // Get current class info for audit log
-    const currentClass = await prisma.class.findUnique({
-      where: { id: classId },
-      include: { User: { select: { id: true } } }
-    })
+    const { rows: classRows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const { rows: currentTeachers } = await pool.query(
+      `SELECT u.id FROM "User" u JOIN "_ClassToUser" cu ON cu."B" = u.id WHERE cu."A" = $1`,
+      [classId]
+    )
+    const currentClass = classRows[0]
+      ? { ...classRows[0], User: currentTeachers }
+      : null
 
     const { teacherIds, ...classData } = data
 
@@ -700,7 +721,7 @@ export const updateClass = withRole('admin', async (
       'update_class',
       'class',
       classId,
-      currentClass ? { name: currentClass.name, year: currentClass.year, teacherIds: currentClass.User.map(u => u.id) } : null,
+      currentClass ? { name: currentClass.name, year: currentClass.year, teacherIds: currentClass.User.map((u: any) => u.id) } : null,
       { ...classData, ...(teacherIds !== undefined ? { teacherIds } : {}) }
     )
 
@@ -719,16 +740,25 @@ export const updateClass = withRole('admin', async (
  */
 export const getAllUsers = withRole('admin', async () => {
   try {
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        Role: {
-          select: { name: true }
-        }
-      },
-      orderBy: { username: 'asc' }
-    })
+    const { rows } = await pool.query(
+      `SELECT u.id, u.username, r.name as "roleName"
+       FROM "User" u
+       LEFT JOIN "_RoleToUser" ru ON ru."B" = u.id
+       LEFT JOIN "Role" r ON r.id = ru."A"
+       ORDER BY u.username ASC`
+    )
+
+    // Group by user in JS
+    const userMap = new Map<string, { id: string; username: string; Role: { name: string }[] }>()
+    for (const row of rows) {
+      const existing = userMap.get(row.id)
+      if (existing) {
+        if (row.roleName) existing.Role.push({ name: row.roleName })
+      } else {
+        userMap.set(row.id, { id: row.id, username: row.username, Role: row.roleName ? [{ name: row.roleName }] : [] })
+      }
+    }
+    const users = Array.from(userMap.values())
 
     return { success: true as const, users }
   } catch (error) {
@@ -764,17 +794,12 @@ export const getClassPupils = withRole('admin', async (classId: string) => {
 export const getAllForms = withRole('admin', async () => {
   try {
     console.log('getAllForms: Starting query')
-    const result = await prisma.pupil.groupBy({
-      by: ['form'],
-      where: {
-        form: { not: null },
-        isActive: true
-      },
-      orderBy: { form: 'asc' }
-    })
-    console.log('getAllForms: Query result', result)
+    const { rows } = await pool.query(
+      `SELECT DISTINCT form FROM "Pupil" WHERE form IS NOT NULL AND "isActive" = true ORDER BY form ASC`
+    )
+    console.log('getAllForms: Query result', rows)
 
-    const forms = result.map((r: { form: string | null }) => r.form).filter(Boolean) as string[]
+    const forms = rows.map((r: any) => r.form).filter(Boolean) as string[]
     console.log('getAllForms: Returning forms', forms)
     return { success: true as const, forms }
   } catch (error) {
@@ -798,10 +823,8 @@ export const addPupilsToClass = withRole('admin', async (classId: string, pupilA
     }
 
     // Get class info for audit log
-    const classInfo = await prisma.class.findUnique({
-      where: { id: classId },
-      select: { name: true }
-    })
+    const { rows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const classInfo = rows[0] ?? null
 
     await classRepository.assignPupils(classId, pupilAdmissionNumbers)
 
@@ -841,10 +864,8 @@ export const removePupilsFromClass = withRole('admin', async (classId: string, p
     }
 
     // Get class info for audit log
-    const classInfo = await prisma.class.findUnique({
-      where: { id: classId },
-      select: { name: true }
-    })
+    const { rows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const classInfo = rows[0] ?? null
 
     await classRepository.removePupils(classId, pupilAdmissionNumbers)
 
@@ -879,11 +900,9 @@ export const removePupilsFromClass = withRole('admin', async (classId: string, p
  */
 export const getDeadlines = withRole('admin', async () => {
   try {
-    const deadlines = await prisma.deadline.findMany({
-      orderBy: [
-        { date: 'asc' }
-      ]
-    })
+    const { rows: deadlines } = await pool.query(
+      `SELECT * FROM "Deadline" ORDER BY date ASC`
+    )
     return { success: true as const, deadlines }
   } catch (error) {
     logger.error('Failed to get deadlines', { error })
@@ -908,14 +927,12 @@ export const createDeadline = withRole('admin', async (formData: FormData) => {
     }
 
     const validated = validation.data
-    const deadline = await prisma.deadline.create({
-      data: {
-        id: createId(),
-        title: validated.title,
-        date: new Date(validated.date),
-        description: validated.description || null
-      }
-    })
+    const createdId = createId()
+    await pool.query(
+      `INSERT INTO "Deadline" (id, title, date, description) VALUES ($1, $2, $3, $4)`,
+      [createdId, validated.title, new Date(validated.date), validated.description ?? null]
+    )
+    const deadline = { id: createdId }
 
     // Audit log
     await createAuditLog({
@@ -962,26 +979,20 @@ export const updateDeadline = withRole('admin', async (
     const validated = validation.data
 
     // Get current deadline for audit log
-    const currentDeadline = await prisma.deadline.findUnique({
-      where: { id: validated.deadlineId }
-    })
+    const { rows: deadlineRows } = await pool.query(`SELECT * FROM "Deadline" WHERE id = $1`, [validated.deadlineId])
+    const currentDeadline = deadlineRows[0] ?? null
 
-    await prisma.deadline.update({
-      where: { id: validated.deadlineId },
-      data: {
-        title: validated.title,
-        date: validated.date ? new Date(validated.date) : undefined,
-        description: validated.description,
-        isActive: validated.isActive
-      }
-    })
+    await pool.query(
+      `UPDATE "Deadline" SET title = $1, date = $2, description = $3, "isActive" = $4 WHERE id = $5`,
+      [validated.title, validated.date ? new Date(validated.date) : undefined, validated.description, validated.isActive, validated.deadlineId]
+    )
 
     // Audit log
     await logDataChange(
       'update_deadline',
       'deadline',
       validated.deadlineId,
-      currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString(), isActive: currentDeadline.isActive } : null,
+      currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date instanceof Date ? currentDeadline.date.toISOString() : currentDeadline.date, isActive: currentDeadline.isActive } : null,
       { title: validated.title, date: validated.date, isActive: validated.isActive }
     )
 
@@ -1007,13 +1018,10 @@ export const deleteDeadline = withRole('admin', async (deadlineId: string) => {
     }
 
     // Get current deadline for audit log
-    const currentDeadline = await prisma.deadline.findUnique({
-      where: { id: deadlineId }
-    })
+    const { rows: deadlineRows } = await pool.query(`SELECT * FROM "Deadline" WHERE id = $1`, [deadlineId])
+    const currentDeadline = deadlineRows[0] ?? null
 
-    await prisma.deadline.delete({
-      where: { id: deadlineId }
-    })
+    await pool.query(`DELETE FROM "Deadline" WHERE id = $1`, [deadlineId])
 
     // Audit log
     await createAuditLog({
@@ -1021,7 +1029,7 @@ export const deleteDeadline = withRole('admin', async (deadlineId: string) => {
       entityType: 'deadline',
       entityId: deadlineId,
       details: {
-        before: currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date.toISOString() } : undefined
+        before: currentDeadline ? { title: currentDeadline.title, date: currentDeadline.date instanceof Date ? currentDeadline.date.toISOString() : currentDeadline.date } : undefined
       }
     })
 
