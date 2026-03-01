@@ -2,7 +2,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
 import { AuthError, ForbiddenError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 
 /**
  * Higher-order function to wrap server actions with role-based authorization
@@ -39,10 +39,11 @@ export function withRole<T extends any[], R>(
     }
 
     // Check if user is still active in the database
-    const user = await prisma.user.findUnique({
-      where: { id: session.user.id },
-      select: { isActive: true }
-    })
+    const { rows } = await pool.query<{ isActive: boolean }>(
+      `SELECT "isActive" FROM "User" WHERE id = $1`,
+      [session.user.id]
+    )
+    const user = rows[0] ?? null
 
     if (!user || !user.isActive) {
       logger.warn('Forbidden access attempt - user is inactive', {
