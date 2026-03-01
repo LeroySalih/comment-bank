@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from 'next/cache'
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { handleServerActionError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
@@ -14,14 +14,14 @@ import * as XLSX from 'xlsx'
  */
 export const getAvailableLinkedFields = withRole('admin', async () => {
   try {
-    const result = await prisma.$queryRaw<{ field_name: string }[]>`
-      SELECT DISTINCT jsonb_object_keys("linkedData") as field_name
-      FROM "Assignment" WHERE "linkedData" IS NOT NULL
-    `
+    const { rows } = await pool.query<{ field_name: string }>(
+      `SELECT DISTINCT jsonb_object_keys("linkedData") as field_name
+       FROM "Assignment" WHERE "linkedData" IS NOT NULL`
+    )
 
     return {
       success: true,
-      fields: result.map(r => r.field_name).sort()
+      fields: rows.map(r => r.field_name).sort()
     }
   } catch (error) {
     logger.error('Failed to get available linked fields', { error })
@@ -53,10 +53,10 @@ export const uploadClassLinkedData = withRole('admin', async (
     }
 
     // Get all assignments for this class
-    const assignments = await prisma.assignment.findMany({
-      where: { classId },
-      select: { id: true, pupilId: true }
-    })
+    const { rows: assignments } = await pool.query<{ id: string; pupilId: string }>(
+      `SELECT id, "pupilId" FROM "Assignment" WHERE "classId" = $1`,
+      [classId]
+    )
 
     const assignmentByPupilId = new Map(
       assignments.map(a => [a.pupilId, a.id])
@@ -101,10 +101,10 @@ export const uploadClassLinkedData = withRole('admin', async (
         detectedFields.add(lowerKey)
       }
 
-      await prisma.assignment.update({
-        where: { id: assignmentId },
-        data: { linkedData }
-      })
+      await pool.query(
+        `UPDATE "Assignment" SET "linkedData" = $1 WHERE id = $2`,
+        [JSON.stringify(linkedData), assignmentId]
+      )
 
       matchedCount++
     }
