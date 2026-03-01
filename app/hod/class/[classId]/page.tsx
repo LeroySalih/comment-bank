@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { PupilForm } from "./_components/pupil-form"
@@ -15,27 +15,63 @@ interface Props {
 
 export default async function ClassPage({ params }: Props) {
   const { classId } = await params
-  
-  const classData = await prisma.class.findUnique({
-    where: { id: classId },
-    include: {
-      Assignment: {
-        include: { Pupil: true },
-        orderBy: { Pupil: { lastName: 'asc' } }
-      },
-      Subject: true
-    }
-  })
 
-  if (!classData) notFound()
+  // Fetch class with subject
+  const { rows: classRows } = await pool.query(
+    `SELECT c.*, s.id as s_id, s.code as s_code, s.title as s_title
+     FROM "Class" c
+     JOIN "Subject" s ON s.id = c."subjectId"
+     WHERE c.id = $1`,
+    [classId]
+  )
+
+  if (classRows.length === 0) notFound()
+
+  const classRow = classRows[0]
+  const classData = {
+    id: classRow.id,
+    name: classRow.name,
+    year: classRow.year,
+    subjectId: classRow.subjectId,
+    Subject: { id: classRow.s_id, code: classRow.s_code, title: classRow.s_title },
+  }
+
+  // Fetch assignments with pupils, sorted by decrypted lastName
+  const { rows: assignmentRows } = await pool.query(
+    `SELECT a.*,
+            p."admissionNumber" as pupil_admissionNumber,
+            p."firstName" as pupil_firstName,
+            p."lastName" as pupil_lastName,
+            p.gender as pupil_gender,
+            p."isActive" as pupil_isActive,
+            p.form as pupil_form
+     FROM "Assignment" a
+     JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
+     WHERE a."classId" = $1`,
+    [classId]
+  )
 
   // Decrypt pupil names
-  const assignments = classData.Assignment.map((assignment: any) => ({
-    ...assignment,
+  const assignments = assignmentRows.map((row: any) => ({
+    id: row.id,
+    pupilId: row.pupilId,
+    classId: row.classId,
+    eoyLevel: row.eoyLevel,
+    targetLevel: row.targetLevel,
+    actualLevel: row.actualLevel,
+    finalComment: row.finalComment,
+    linkedData: row.linkedData,
+    checkStatus: row.checkStatus,
+    checkNote: row.checkNote,
+    checkedAt: row.checkedAt,
+    checkedById: row.checkedById,
     Pupil: {
-      ...assignment.Pupil,
-      firstName: decrypt(assignment.Pupil.firstName),
-      lastName: decrypt(assignment.Pupil.lastName)
+      admissionNumber: row.pupil_admissionNumber,
+      firstName: decrypt(row.pupil_firstName),
+      lastName: decrypt(row.pupil_lastName),
+      gender: row.pupil_gender,
+      isActive: row.pupil_isActive,
+      form: row.pupil_form,
     }
   }))
 

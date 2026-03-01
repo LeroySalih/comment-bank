@@ -1,6 +1,6 @@
 'use server'
 
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { revalidatePath } from 'next/cache'
 import { createId } from '@paralleldrive/cuid2'
 import { createAuditLog, logDataChange } from '@/lib/audit-log'
@@ -13,27 +13,34 @@ export async function updateAssignmentCode(
 ) {
   try {
     // Guard: reject if group is linked
-    const group = await prisma.commentGroup.findUnique({ where: { id: groupId } })
-    if (group && (group as any).isLinked) {
+    const { rows: groupRows } = await pool.query(
+      `SELECT id, "isLinked" FROM "CommentGroup" WHERE id = $1`,
+      [groupId]
+    )
+    const group = groupRows[0] ?? null
+    if (group && group.isLinked) {
       return { success: false, error: 'Cannot manually update a linked group code' }
     }
 
     // Get current code for audit log
-    const currentPupilCode = await (prisma as any).pupilCode.findUnique({
-      where: { assignmentId_groupId: { assignmentId, groupId } }
-    })
-    const oldCode = currentPupilCode?.code || null
+    const { rows: currentRows } = await pool.query(
+      `SELECT code FROM "PupilCode" WHERE "assignmentId" = $1 AND "groupId" = $2`,
+      [assignmentId, groupId]
+    )
+    const oldCode = currentRows[0]?.code ?? null
 
     if (code === null || code === '') {
-      await (prisma as any).pupilCode.delete({
-        where: { assignmentId_groupId: { assignmentId, groupId } }
-      }).catch(() => {});
+      await pool.query(
+        `DELETE FROM "PupilCode" WHERE "assignmentId" = $1 AND "groupId" = $2`,
+        [assignmentId, groupId]
+      )
     } else {
-      await (prisma as any).pupilCode.upsert({
-        where: { assignmentId_groupId: { assignmentId, groupId } },
-        update: { code },
-        create: { id: createId(), assignmentId, groupId, code }
-      })
+      await pool.query(
+        `INSERT INTO "PupilCode" (id, "assignmentId", "groupId", code)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT ("assignmentId", "groupId") DO UPDATE SET code = EXCLUDED.code`,
+        [createId(), assignmentId, groupId, code]
+      )
     }
 
     // Audit log - only log if code actually changed
@@ -51,12 +58,12 @@ export async function updateAssignmentCode(
     revalidatePath('/')
 
     // Also revalidate the class page
-    const assignment = await (prisma as any).assignment.findUnique({
-      where: { id: assignmentId },
-      select: { classId: true }
-    });
-    if (assignment?.classId) {
-      revalidatePath(`/class/${assignment.classId}`);
+    const { rows: assignmentRows } = await pool.query(
+      `SELECT "classId" FROM "Assignment" WHERE id = $1`,
+      [assignmentId]
+    )
+    if (assignmentRows[0]?.classId) {
+      revalidatePath(`/class/${assignmentRows[0].classId}`)
     }
 
     return { success: true }
@@ -73,26 +80,33 @@ export async function updateCommonAssignmentCode(
 ) {
   try {
     // Guard: reject if group is linked
-    const commonGroup = await (prisma as any).commonCommentGroup.findUnique({ where: { id: commonGroupId } })
+    const { rows: cgRows } = await pool.query(
+      `SELECT id, "isLinked" FROM "CommonCommentGroup" WHERE id = $1`,
+      [commonGroupId]
+    )
+    const commonGroup = cgRows[0] ?? null
     if (commonGroup && commonGroup.isLinked) {
       return { success: false, error: 'Cannot manually update a linked group code' }
     }
 
-    const currentCode = await (prisma as any).commonPupilCode.findUnique({
-      where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } }
-    })
-    const oldCode = currentCode?.code || null
+    const { rows: currentRows } = await pool.query(
+      `SELECT code FROM "CommonPupilCode" WHERE "assignmentId" = $1 AND "commonGroupId" = $2`,
+      [assignmentId, commonGroupId]
+    )
+    const oldCode = currentRows[0]?.code ?? null
 
     if (code === null || code === '') {
-      await (prisma as any).commonPupilCode.delete({
-        where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } }
-      }).catch(() => {});
+      await pool.query(
+        `DELETE FROM "CommonPupilCode" WHERE "assignmentId" = $1 AND "commonGroupId" = $2`,
+        [assignmentId, commonGroupId]
+      )
     } else {
-      await (prisma as any).commonPupilCode.upsert({
-        where: { assignmentId_commonGroupId: { assignmentId, commonGroupId } },
-        update: { code },
-        create: { id: createId(), assignmentId, commonGroupId, code }
-      })
+      await pool.query(
+        `INSERT INTO "CommonPupilCode" (id, "assignmentId", "commonGroupId", code)
+         VALUES ($1, $2, $3, $4)
+         ON CONFLICT ("assignmentId", "commonGroupId") DO UPDATE SET code = EXCLUDED.code`,
+        [createId(), assignmentId, commonGroupId, code]
+      )
     }
 
     if (oldCode !== code) {
@@ -108,12 +122,12 @@ export async function updateCommonAssignmentCode(
     revalidatePath(`/student/${assignmentId}`)
     revalidatePath('/')
 
-    const assignment = await (prisma as any).assignment.findUnique({
-      where: { id: assignmentId },
-      select: { classId: true }
-    });
-    if (assignment?.classId) {
-      revalidatePath(`/class/${assignment.classId}`);
+    const { rows: assignmentRows } = await pool.query(
+      `SELECT "classId" FROM "Assignment" WHERE id = $1`,
+      [assignmentId]
+    )
+    if (assignmentRows[0]?.classId) {
+      revalidatePath(`/class/${assignmentRows[0].classId}`)
     }
 
     return { success: true }
@@ -126,43 +140,38 @@ export async function updateCommonAssignmentCode(
 export async function updateAssignmentCommentText(assignmentId: string, comment: string) {
   try {
     // Get current assignment to check status
-    const currentAssignment = await prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      select: { checkStatus: true, classId: true }
-    })
+    const { rows: currentRows } = await pool.query(
+      `SELECT "checkStatus", "classId" FROM "Assignment" WHERE id = $1`,
+      [assignmentId]
+    )
 
-    if (!currentAssignment) {
+    if (currentRows.length === 0) {
       return { success: false, error: 'Assignment not found' }
     }
 
+    const currentAssignment = currentRows[0]
+
     // Determine if status needs to change to required_check
-    // If teacher is editing the comment (saving to finalComment), it needs review
-    // unless it's already been reviewed and approved
     const currentStatus = currentAssignment.checkStatus || 'not_required'
     let newStatus = currentStatus
 
-    // If status is "not_required", change to "required_check" since teacher is now editing
-    // If status is "checked_rejected", also change to "required_check" (resubmitting)
-    // If status is "checked_ok" and teacher edits again, it needs re-review
     if (currentStatus === 'not_required' || currentStatus === 'checked_rejected' || currentStatus === 'checked_ok') {
       newStatus = 'required_check'
     }
 
-    const updated = await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        finalComment: encrypt(comment),
-        checkStatus: newStatus,
-        // Clear check data if we're changing status to required_check
-        ...(newStatus === 'required_check' && currentStatus !== 'required_check' ? {
-          checkNote: null,
-          checkedAt: null,
-          checkedById: null
-        } : {})
-      }
-    })
+    const clearCheckData = newStatus === 'required_check' && currentStatus !== 'required_check'
 
-    // Audit log - log the comment text change
+    const { rows: updatedRows } = await pool.query(
+      `UPDATE "Assignment"
+       SET "finalComment" = $1,
+           "checkStatus" = $2
+           ${clearCheckData ? ', "checkNote" = NULL, "checkedAt" = NULL, "checkedById" = NULL' : ''}
+       WHERE id = $3
+       RETURNING "finalComment"`,
+      [encrypt(comment), newStatus, assignmentId]
+    )
+
+    // Audit log
     await logDataChange(
       'update_assignment_comment',
       'assignment',
@@ -171,9 +180,7 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
       { finalComment: '(comment updated)', checkStatus: newStatus }
     )
 
-    // Don't call revalidatePath here - it causes stale data to be fetched
-    // The client has the correct data in local state
-    return { success: true, finalComment: updated.finalComment }
+    return { success: true, finalComment: updatedRows[0]?.finalComment ?? null }
   } catch (error) {
     console.error('Failed to update comment text:', error)
     return { success: false, error: error instanceof Error ? error.message : 'Database error' }
@@ -182,27 +189,27 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
 
 export async function revertAssignmentComment(assignmentId: string) {
   try {
-    // Get current assignment to verify it exists
-    const currentAssignment = await prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      select: { classId: true }
-    });
+    // Verify assignment exists and get classId
+    const { rows: currentRows } = await pool.query(
+      `SELECT "classId" FROM "Assignment" WHERE id = $1`,
+      [assignmentId]
+    )
 
-    if (!currentAssignment) {
+    if (currentRows.length === 0) {
       return { success: false, error: 'Assignment not found' }
     }
 
     // Clear the finalComment and reset status to not_required
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        finalComment: null,
-        checkStatus: 'not_required',
-        checkNote: null,
-        checkedAt: null,
-        checkedById: null
-      }
-    });
+    await pool.query(
+      `UPDATE "Assignment"
+       SET "finalComment" = NULL,
+           "checkStatus" = 'not_required',
+           "checkNote" = NULL,
+           "checkedAt" = NULL,
+           "checkedById" = NULL
+       WHERE id = $1`,
+      [assignmentId]
+    )
 
     // Audit log
     await createAuditLog({

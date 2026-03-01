@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { pool } from '@/lib/db';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import { getServerSession } from 'next-auth';
@@ -17,67 +17,60 @@ export default async function FormPage({ params }: { params: Promise<{ formId: s
   const userId = session?.user?.id;
 
   // Get classes the user is directly assigned to (for edit permissions)
-  const userAssignedClasses = userId ? await prisma.class.findMany({
-    where: {
-      User: { some: { id: userId } }
-    },
-    select: { id: true }
-  }) : [];
-  const userAssignedClassIds = userIsAdmin
-    ? [] // Admin can edit all - we'll handle this specially
-    : userAssignedClasses.map(c => c.id);
+  let userAssignedClassIds: string[] = [];
 
-  // Fetch pupils in this form - user must have access to at least one of their classes to see the pupil
-  // But once they can see the pupil, they see ALL assignments (edit permission is per-class)
-  const pupils = await prisma.pupil.findMany({
-    where: {
-      form: decodedFormId,
-      isActive: true,
-      Assignment: {
-        some: userIsAdmin ? {} : {
-          Class: userIsHoD
-            ? { Subject: { User: { some: { id: userId } } } }
-            : { User: { some: { id: userId } } }
-        }
-      }
-    },
-    include: {
-      // Include ALL assignments - edit permission is controlled by userAssignedClassIds
-      Assignment: {
-        include: {
-          Class: {
-            include: {
-              Subject: {
-                include: {
-                  CommentGroup: {
-                    orderBy: { displayOrder: 'asc' },
-                    include: {
-                      CommentOption: true
-                    }
-                  }
-                }
-              }
-            }
-          },
-          PupilCode: {
-            include: {
-              CommentGroup: {
-                include: {
-                  CommentOption: true
-                }
-              }
-            },
-            orderBy: {
-              CommentGroup: { displayOrder: 'asc' }
-            }
-          }
-        }
-      }
-    }
-  });
+  if (!userIsAdmin && userId) {
+    const { rows: assignedClassRows } = await pool.query(
+      `SELECT c.id FROM "Class" c
+       JOIN "_ClassToUser" cu ON cu."A" = c.id
+       WHERE cu."B" = $1`,
+      [userId]
+    );
+    userAssignedClassIds = assignedClassRows.map((r: any) => r.id);
+  }
 
-  // If no pupils found, show not found or access denied
-  if (pupils.length === 0) {
+  // Fetch pupils in this form that the user has access to
+  let pupilsQuery: string;
+  let pupilsParams: unknown[];
+
+  if (userIsAdmin) {
+    pupilsQuery = `
+      SELECT p.*
+      FROM "Pupil" p
+      WHERE p.form = $1 AND p."isActive" = true
+        AND EXISTS (
+          SELECT 1 FROM "Assignment" a WHERE a."pupilId" = p."admissionNumber"
+        )
+      ORDER BY p."lastName" ASC, p."firstName" ASC
+    `;
+    pupilsParams = [decodedFormId];
+  } else if (userIsHoD) {
+    pupilsQuery = `
+      SELECT DISTINCT p.*
+      FROM "Pupil" p
+      JOIN "Assignment" a ON a."pupilId" = p."admissionNumber"
+      JOIN "Class" c ON c.id = a."classId"
+      JOIN "Subject" s ON s.id = c."subjectId"
+      JOIN "_SubjectToUser" su ON su."A" = s.id
+      WHERE p.form = $1 AND p."isActive" = true AND su."B" = $2
+      ORDER BY p."lastName" ASC, p."firstName" ASC
+    `;
+    pupilsParams = [decodedFormId, userId];
+  } else {
+    pupilsQuery = `
+      SELECT DISTINCT p.*
+      FROM "Pupil" p
+      JOIN "Assignment" a ON a."pupilId" = p."admissionNumber"
+      JOIN "_ClassToUser" cu ON cu."A" = a."classId"
+      WHERE p.form = $1 AND p."isActive" = true AND cu."B" = $2
+      ORDER BY p."lastName" ASC, p."firstName" ASC
+    `;
+    pupilsParams = [decodedFormId, userId];
+  }
+
+  const { rows: pupilRows } = await pool.query(pupilsQuery, pupilsParams);
+
+  if (pupilRows.length === 0) {
     return (
       <main className="flex-1 flex flex-col items-center justify-center min-h-screen bg-background-light dark:bg-background-dark">
         <div className="text-center">
@@ -89,14 +82,141 @@ export default async function FormPage({ params }: { params: Promise<{ formId: s
     );
   }
 
-  // Decrypt pupil names and sort
-  const decryptedPupils = pupils.map(pupil => ({
-    ...pupil,
+  const pupilIds = pupilRows.map((p: any) => p.admissionNumber);
+
+  // Fetch all assignments for these pupils with class, subject, and comment groups
+  const { rows: assignmentRows } = await pool.query(
+    `SELECT a.*,
+            c.id as class_id, c.name as class_name, c.year as class_year, c."subjectId" as class_subjectId,
+            s.id as s_id, s.code as s_code, s.title as s_title, s."commentFormat" as s_commentFormat,
+            s."studiedComment" as s_studiedComment
+     FROM "Assignment" a
+     JOIN "Class" c ON c.id = a."classId"
+     JOIN "Subject" s ON s.id = c."subjectId"
+     WHERE a."pupilId" = ANY($1::text[])
+     ORDER BY s.code ASC`,
+    [pupilIds]
+  );
+
+  const assignmentIds = assignmentRows.map((r: any) => r.id);
+
+  // Fetch comment groups for all subjects involved
+  const subjectIds = [...new Set(assignmentRows.map((r: any) => r.class_subjectId))] as string[];
+  let commentGroupsBySubject = new Map<string, any[]>();
+
+  if (subjectIds.length > 0) {
+    const { rows: groupRows } = await pool.query(
+      `SELECT * FROM "CommentGroup" WHERE "subjectId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
+      [subjectIds]
+    );
+
+    if (groupRows.length > 0) {
+      const groupIds = groupRows.map((g: any) => g.id);
+      const { rows: optionRows } = await pool.query(
+        `SELECT * FROM "CommentOption" WHERE "groupId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
+        [groupIds]
+      );
+      const optionsByGroup = new Map<string, any[]>();
+      for (const opt of optionRows) {
+        const arr = optionsByGroup.get(opt.groupId) ?? [];
+        arr.push(opt);
+        optionsByGroup.set(opt.groupId, arr);
+      }
+      for (const g of groupRows) {
+        (g as any).CommentOption = optionsByGroup.get(g.id) ?? [];
+        const arr = commentGroupsBySubject.get(g.subjectId) ?? [];
+        arr.push(g);
+        commentGroupsBySubject.set(g.subjectId, arr);
+      }
+    }
+  }
+
+  // Fetch PupilCodes for all assignments
+  let pupilCodesByAssignment = new Map<string, any[]>();
+
+  if (assignmentIds.length > 0) {
+    const { rows: pupilCodeRows } = await pool.query(
+      `SELECT pc.*, cg.id as cg_id, cg.name as cg_name, cg."displayOrder" as cg_displayOrder,
+              cg."subjectId" as cg_subjectId, cg.title as cg_title, cg."isLinked" as cg_isLinked,
+              cg."linkedField" as cg_linkedField
+       FROM "PupilCode" pc
+       JOIN "CommentGroup" cg ON cg.id = pc."groupId"
+       WHERE pc."assignmentId" = ANY($1::text[])
+       ORDER BY cg."displayOrder" ASC`,
+      [assignmentIds]
+    );
+
+    for (const row of pupilCodeRows) {
+      const pc = {
+        id: row.id,
+        assignmentId: row.assignmentId,
+        groupId: row.groupId,
+        code: row.code,
+        CommentGroup: {
+          id: row.cg_id,
+          name: row.cg_name,
+          displayOrder: row.cg_displayOrder,
+          subjectId: row.cg_subjectId,
+          title: row.cg_title,
+          isLinked: row.cg_isLinked,
+          linkedField: row.cg_linkedField,
+        }
+      };
+      const arr = pupilCodesByAssignment.get(row.assignmentId) ?? [];
+      arr.push(pc);
+      pupilCodesByAssignment.set(row.assignmentId, arr);
+    }
+  }
+
+  // Group assignments by pupilId
+  const assignmentsByPupil = new Map<string, any[]>();
+  for (const row of assignmentRows) {
+    const assignment = {
+      id: row.id,
+      pupilId: row.pupilId,
+      classId: row.classId,
+      eoyLevel: row.eoyLevel,
+      targetLevel: row.targetLevel,
+      actualLevel: row.actualLevel,
+      finalComment: row.finalComment,
+      linkedData: row.linkedData,
+      checkStatus: row.checkStatus,
+      checkNote: row.checkNote,
+      checkedAt: row.checkedAt,
+      checkedById: row.checkedById,
+      PupilCode: pupilCodesByAssignment.get(row.id) ?? [],
+      Class: {
+        id: row.class_id,
+        name: row.class_name,
+        year: row.class_year,
+        subjectId: row.class_subjectId,
+        Subject: {
+          id: row.s_id,
+          code: row.s_code,
+          title: row.s_title,
+          commentFormat: row.s_commentFormat,
+          studiedComment: row.s_studiedComment,
+          CommentGroup: commentGroupsBySubject.get(row.class_subjectId) ?? [],
+        }
+      }
+    };
+    const arr = assignmentsByPupil.get(row.pupilId) ?? [];
+    arr.push(assignment);
+    assignmentsByPupil.set(row.pupilId, arr);
+  }
+
+  // Decrypt pupil names and build full pupil objects
+  const decryptedPupils = pupilRows.map((pupil: any) => ({
+    admissionNumber: pupil.admissionNumber,
     firstName: decrypt(pupil.firstName),
-    lastName: decrypt(pupil.lastName)
+    lastName: decrypt(pupil.lastName),
+    gender: pupil.gender,
+    isActive: pupil.isActive,
+    form: pupil.form,
+    Assignment: assignmentsByPupil.get(pupil.admissionNumber) ?? [],
   }));
 
-  decryptedPupils.sort((a, b) =>
+  decryptedPupils.sort((a: any, b: any) =>
     a.lastName.localeCompare(b.lastName) || a.firstName.localeCompare(b.firstName)
   );
 
@@ -131,10 +251,10 @@ export default async function FormPage({ params }: { params: Promise<{ formId: s
 
           {/* Pupil Rows */}
           <div className="divide-y divide-slate-100 dark:divide-slate-800">
-            {decryptedPupils.map((pupil) => {
+            {decryptedPupils.map((pupil: any) => {
               // For admin users, get all class IDs from the pupil's assignments
               const editableClassIds = userIsAdmin
-                ? pupil.Assignment.map(a => a.Class.id)
+                ? pupil.Assignment.map((a: any) => a.Class.id)
                 : userAssignedClassIds;
 
               return (

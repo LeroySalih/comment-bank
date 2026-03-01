@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { GroupForm } from "./_components/group-form"
@@ -18,23 +18,50 @@ interface Props {
 export default async function SubjectPage({ params }: Props) {
   const { subjectId } = await params
 
-  const subject = await prisma.subject.findUnique({
-    where: { id: subjectId },
-    include: {
-      CommentGroup: {
-        orderBy: { displayOrder: 'asc' },
-        include: {
-          CommentOption: {
-            orderBy: { displayOrder: 'asc' },
-            select: { id: true, code: true, text: true, displayOrder: true }
-          },
-          _count: { select: { CommentOption: true } }
-        }
-      }
-    }
-  });
+  // Fetch subject
+  const { rows: subjectRows } = await pool.query(
+    `SELECT * FROM "Subject" WHERE id = $1`,
+    [subjectId]
+  )
 
-  if (!subject) notFound()
+  if (subjectRows.length === 0) notFound()
+  const subjectRow = subjectRows[0]
+
+  // Fetch comment groups with options and counts
+  const { rows: groupRows } = await pool.query(
+    `SELECT cg.*,
+            (SELECT COUNT(*) FROM "CommentOption" co WHERE co."groupId" = cg.id) as option_count
+     FROM "CommentGroup" cg
+     WHERE cg."subjectId" = $1
+     ORDER BY cg."displayOrder" ASC`,
+    [subjectId]
+  )
+
+  if (groupRows.length > 0) {
+    const groupIds = groupRows.map((g: any) => g.id)
+    const { rows: optRows } = await pool.query(
+      `SELECT id, code, text, "displayOrder", "groupId"
+       FROM "CommentOption"
+       WHERE "groupId" = ANY($1::text[])
+       ORDER BY "displayOrder" ASC`,
+      [groupIds]
+    )
+    const optsByGroup = new Map<string, any[]>()
+    for (const opt of optRows) {
+      const arr = optsByGroup.get(opt.groupId) ?? []
+      arr.push(opt)
+      optsByGroup.set(opt.groupId, arr)
+    }
+    for (const g of groupRows) {
+      (g as any).CommentOption = optsByGroup.get(g.id) ?? []
+      ;(g as any)._count = { CommentOption: Number(g.option_count) }
+    }
+  }
+
+  const subject = {
+    ...subjectRow,
+    CommentGroup: groupRows,
+  }
 
   // Get review statistics
   const reviewStats = await getReviewStats(subjectId)
@@ -114,7 +141,7 @@ export default async function SubjectPage({ params }: Props) {
         {/* Subject Comment Format */}
         <SubjectCommentFormat
           subjectId={subject.id}
-          initialFormat={(subject as any).commentFormat}
+          initialFormat={subject.commentFormat}
           groups={subject.CommentGroup}
         />
       </div>

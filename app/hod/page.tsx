@@ -1,5 +1,5 @@
 
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import Link from "next/link"
 import { getServerSession } from "next-auth"
 import { authOptions } from "@/app/api/auth/[...nextauth]/route"
@@ -14,54 +14,100 @@ export default async function HoDDashboard() {
     redirect("/login")
   }
 
-  // Admin sees all subjects? Or just assigned ones?
-  // Ideally Admin goes to Admin panel. HoD dashboard is for their assigned work.
-  // But Admin might want quick access here too.
-  // Let's show ALL for Admin, and ASSIGNED for others.
+  const allowAll = session.user.roles?.some((r: any) => r === 'admin' || r?.name === 'admin');
 
-  const allowAll = session.user.roles?.some((r: any) => r.name === 'admin');
+  // Fetch subjects with counts
+  let subjectsQuery: string
+  let subjectsParams: unknown[]
 
-  const subjects = await prisma.subject.findMany({
-    where: allowAll ? {} : {
-      User: { some: { id: session.user.id } }
-    },
-    orderBy: { code: 'asc' },
-    include: {
-      _count: {
-        select: { Class: true, CommentGroup: true }
-      }
+  if (allowAll) {
+    subjectsQuery = `
+      SELECT s.*,
+             (SELECT COUNT(*) FROM "Class" c WHERE c."subjectId" = s.id) as class_count,
+             (SELECT COUNT(*) FROM "CommentGroup" cg WHERE cg."subjectId" = s.id) as group_count
+      FROM "Subject" s
+      ORDER BY s.code ASC
+    `
+    subjectsParams = []
+  } else {
+    subjectsQuery = `
+      SELECT s.*,
+             (SELECT COUNT(*) FROM "Class" c WHERE c."subjectId" = s.id) as class_count,
+             (SELECT COUNT(*) FROM "CommentGroup" cg WHERE cg."subjectId" = s.id) as group_count
+      FROM "Subject" s
+      JOIN "_SubjectToUser" su ON su."A" = s.id
+      WHERE su."B" = $1
+      ORDER BY s.code ASC
+    `
+    subjectsParams = [session.user.id]
+  }
+
+  const { rows: subjectRows } = await pool.query(subjectsQuery, subjectsParams)
+
+  const subjects = subjectRows.map((s: any) => ({
+    ...s,
+    _count: {
+      Class: Number(s.class_count),
+      CommentGroup: Number(s.group_count)
     }
-  })
+  }))
 
   // Get classes with assignments needing review
-  const subjectIds = subjects.map(s => s.id)
+  const subjectIds = subjects.map((s: any) => s.id)
 
-  const classesWithPendingReviews = await prisma.class.findMany({
-    where: {
-      subjectId: { in: subjectIds },
-      Assignment: {
-        some: { checkStatus: 'required_check' }
-      }
-    },
-    include: {
-      Subject: true,
-      Assignment: {
-        where: { checkStatus: 'required_check' },
-        include: {
-          Pupil: true
-        },
-        take: 5 // Show up to 5 pending assignments per class
-      },
-      _count: {
-        select: {
-          Assignment: {
-            where: { checkStatus: 'required_check' }
+  let classesWithPendingReviews: any[] = []
+
+  if (subjectIds.length > 0) {
+    // Fetch classes in these subjects that have pending reviews
+    const { rows: classRows } = await pool.query(
+      `SELECT c.*,
+              s.id as s_id, s.code as s_code, s.title as s_title,
+              (SELECT COUNT(*) FROM "Assignment" a WHERE a."classId" = c.id AND a."checkStatus" = 'required_check') as pending_count
+       FROM "Class" c
+       JOIN "Subject" s ON s.id = c."subjectId"
+       WHERE c."subjectId" = ANY($1::text[])
+         AND EXISTS (
+           SELECT 1 FROM "Assignment" a
+           WHERE a."classId" = c.id AND a."checkStatus" = 'required_check'
+         )
+       ORDER BY c.name ASC`,
+      [subjectIds]
+    )
+
+    // For each class, fetch up to 5 pending assignments with pupils
+    for (const cls of classRows) {
+      const { rows: assignmentRows } = await pool.query(
+        `SELECT a.*, p."admissionNumber" as pupil_admissionNumber,
+                p."firstName" as pupil_firstName, p."lastName" as pupil_lastName,
+                p.gender as pupil_gender, p."isActive" as pupil_isActive, p.form as pupil_form
+         FROM "Assignment" a
+         JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
+         WHERE a."classId" = $1 AND a."checkStatus" = 'required_check'
+         LIMIT 5`,
+        [cls.id]
+      )
+
+      classesWithPendingReviews.push({
+        id: cls.id,
+        name: cls.name,
+        year: cls.year,
+        subjectId: cls.subjectId,
+        Subject: { id: cls.s_id, code: cls.s_code, title: cls.s_title },
+        _count: { Assignment: Number(cls.pending_count) },
+        Assignment: assignmentRows.map((a: any) => ({
+          ...a,
+          Pupil: {
+            admissionNumber: a.pupil_admissionNumber,
+            firstName: a.pupil_firstName,
+            lastName: a.pupil_lastName,
+            gender: a.pupil_gender,
+            isActive: a.pupil_isActive,
+            form: a.pupil_form,
           }
-        }
-      }
-    },
-    orderBy: { name: 'asc' }
-  })
+        }))
+      })
+    }
+  }
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark min-h-[calc(100vh-64px)]">
@@ -91,7 +137,7 @@ export default async function HoDDashboard() {
             <div>
               <h2 className="text-xl font-bold text-[#111418] dark:text-white">Comments Needing Review</h2>
               <p className="text-sm text-[#617289] dark:text-gray-400">
-                {classesWithPendingReviews.reduce((sum, c) => sum + c._count.Assignment, 0)} comments across {classesWithPendingReviews.length} {classesWithPendingReviews.length === 1 ? 'class' : 'classes'}
+                {classesWithPendingReviews.reduce((sum: number, c: any) => sum + c._count.Assignment, 0)} comments across {classesWithPendingReviews.length} {classesWithPendingReviews.length === 1 ? 'class' : 'classes'}
               </p>
             </div>
           </div>
@@ -163,7 +209,7 @@ export default async function HoDDashboard() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {subjects.map((subject: any) => (
-             <Link 
+             <Link
                key={subject.id}
                href={`/hod/subject/${subject.id}`}
                className="group flex flex-col bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm hover:shadow-md transition-all overflow-hidden"
@@ -175,12 +221,12 @@ export default async function HoDDashboard() {
                         </div>
                         <span className="material-symbols-outlined text-gray-300 dark:text-gray-600 group-hover:text-primary transition-colors">arrow_forward</span>
                     </div>
-                    
+
                     <h2 className="text-xl font-bold text-[#111418] dark:text-white mb-1 group-hover:text-primary transition-colors">{subject.code}</h2>
                     <h3 className="text-sm font-medium text-[#617289] dark:text-gray-400 mb-4">{subject.title}</h3>
-                    
+
                     <p className="text-sm text-gray-500 line-clamp-2 mb-6 flex-grow">{subject.studiedComment || "No introduction set."}</p>
-                    
+
                     <div className="flex gap-4 pt-4 border-t border-[#f0f2f4] dark:border-gray-800">
                         <div className="flex flex-col">
                             <span className="text-xs font-bold text-[#617289] dark:text-gray-500 uppercase tracking-wider">Classes</span>
@@ -201,7 +247,7 @@ export default async function HoDDashboard() {
                   <span className="material-symbols-outlined text-gray-400 text-3xl">sentiment_dissatisfied</span>
               </div>
               <h3 className="text-lg font-bold text-[#111418] dark:text-white mb-1">No subjects found</h3>
-              <p className="text-[#617289] dark:text-gray-400 max-w-sm mx-auto">You haven't been assigned to any subjects yet.</p>
+              <p className="text-[#617289] dark:text-gray-400 max-w-sm mx-auto">You haven&apos;t been assigned to any subjects yet.</p>
             </div>
           )}
         </div>

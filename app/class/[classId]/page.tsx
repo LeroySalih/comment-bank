@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma';
+import { pool } from '@/lib/db';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import Tooltip from '@/components/Tooltip';
@@ -12,36 +12,44 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const { classId } = await params;
   const session = await getServerSession(authOptions);
 
-  const cls = await prisma.class.findUnique({
-    where: { id: classId },
-    include: {
-      User: {
-        select: { id: true }
-      },
-      Subject: {
-        include: {
-            CommentGroup: {
-                orderBy: { displayOrder: 'asc' },
-                include: { CommentOption: true }
-            }
-        }
-      },
-      Assignment: {
-        where: {
-          Pupil: { isActive: true }
-        },
-        include: {
-          Pupil: true,
-          PupilCode: true,
-          CommonPupilCode: true
-        }
-      }
-    }
-  });
+  // Fetch class with subject and teachers
+  const { rows: classRows } = await pool.query(
+    `SELECT c.*,
+            s.id as s_id, s.code as s_code, s.title as s_title,
+            s."commentFormat" as s_commentFormat
+     FROM "Class" c
+     JOIN "Subject" s ON s.id = c."subjectId"
+     WHERE c.id = $1`,
+    [classId]
+  );
 
-  if (!cls) {
+  if (classRows.length === 0) {
     return <div>Class not found</div>;
   }
+
+  const classRow = classRows[0];
+
+  // Fetch teachers for this class
+  const { rows: teacherRows } = await pool.query(
+    `SELECT u.id FROM "User" u
+     JOIN "_ClassToUser" cu ON cu."B" = u.id
+     WHERE cu."A" = $1`,
+    [classId]
+  );
+
+  const cls = {
+    id: classRow.id,
+    name: classRow.name,
+    year: classRow.year,
+    subjectId: classRow.subjectId,
+    User: teacherRows,
+    Subject: {
+      id: classRow.s_id,
+      code: classRow.s_code,
+      title: classRow.s_title,
+      commentFormat: classRow.s_commentFormat,
+    }
+  };
 
   // Authorization check
   const userIsAdmin = isAdmin(session?.user);
@@ -49,48 +57,145 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
   const userIsTeacher = isTeacher(session?.user);
 
   if (userIsTeacher && !userIsAdmin && !userIsHoD) {
-    const isAssigned = cls.User.some((t) => t.id === session?.user?.id);
+    const isAssigned = cls.User.some((t: any) => t.id === session?.user?.id);
     if (!isAssigned) {
       return <div>Class not found or access denied</div>;
     }
   }
 
-  const groups = cls.Subject.CommentGroup;
+  // Fetch comment groups for subject
+  const { rows: groupRows } = await pool.query(
+    `SELECT * FROM "CommentGroup" WHERE "subjectId" = $1 ORDER BY "displayOrder" ASC`,
+    [cls.subjectId]
+  );
 
-  // Fetch Common Comment Groups
-  const commonGroups = await (prisma as any).commonCommentGroup.findMany({
-    orderBy: { displayOrder: 'asc' },
-    include: {
-      CommonCommentOption: {
-        orderBy: { displayOrder: 'asc' }
-      }
+  // Fetch comment options for all groups
+  if (groupRows.length > 0) {
+    const groupIds = groupRows.map((g: any) => g.id);
+    const { rows: optionRows } = await pool.query(
+      `SELECT * FROM "CommentOption" WHERE "groupId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
+      [groupIds]
+    );
+    const optionsByGroup = new Map<string, any[]>();
+    for (const opt of optionRows) {
+      const arr = optionsByGroup.get(opt.groupId) ?? [];
+      arr.push(opt);
+      optionsByGroup.set(opt.groupId, arr);
     }
-  });
+    for (const g of groupRows) {
+      (g as any).CommentOption = optionsByGroup.get(g.id) ?? [];
+    }
+  }
 
-  // Fetch format template
-  const formatSetting = await (prisma as any).appSetting.findUnique({
-    where: { key: 'comment_format_template' }
-  });
-  const formatTemplate = formatSetting?.value || '';
+  const groups = groupRows;
 
-  // Fetch subject comment format
-  const subjectFormat = (cls.Subject as any).commentFormat || null;
+  // Fetch assignments with active pupils
+  const { rows: assignmentRows } = await pool.query(
+    `SELECT a.*,
+            p."admissionNumber" as pupil_admissionNumber,
+            p."firstName" as pupil_firstName,
+            p."lastName" as pupil_lastName,
+            p.gender as pupil_gender,
+            p."isActive" as pupil_isActive,
+            p.form as pupil_form
+     FROM "Assignment" a
+     JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
+     WHERE a."classId" = $1 AND p."isActive" = true`,
+    [classId]
+  );
 
-  // Decrypt pupil names for display
-  const assignments = cls.Assignment.map((assignment: any) => ({
-    ...assignment,
+  // Fetch PupilCodes for all assignments
+  const assignmentIds = assignmentRows.map((r: any) => r.id);
+  let pupilCodesByAssignment = new Map<string, any[]>();
+
+  if (assignmentIds.length > 0) {
+    const { rows: pupilCodeRows } = await pool.query(
+      `SELECT * FROM "PupilCode" WHERE "assignmentId" = ANY($1::text[])`,
+      [assignmentIds]
+    );
+    for (const pc of pupilCodeRows) {
+      const arr = pupilCodesByAssignment.get(pc.assignmentId) ?? [];
+      arr.push(pc);
+      pupilCodesByAssignment.set(pc.assignmentId, arr);
+    }
+  }
+
+  // Fetch CommonPupilCodes for all assignments
+  let commonPupilCodesByAssignment = new Map<string, any[]>();
+
+  if (assignmentIds.length > 0) {
+    const { rows: commonPupilCodeRows } = await pool.query(
+      `SELECT * FROM "CommonPupilCode" WHERE "assignmentId" = ANY($1::text[])`,
+      [assignmentIds]
+    );
+    for (const cpc of commonPupilCodeRows) {
+      const arr = commonPupilCodesByAssignment.get(cpc.assignmentId) ?? [];
+      arr.push(cpc);
+      commonPupilCodesByAssignment.set(cpc.assignmentId, arr);
+    }
+  }
+
+  // Decrypt and assemble assignments
+  const assignments = assignmentRows.map((row: any) => ({
+    id: row.id,
+    pupilId: row.pupilId,
+    classId: row.classId,
+    eoyLevel: row.eoyLevel,
+    targetLevel: row.targetLevel,
+    actualLevel: row.actualLevel,
+    finalComment: row.finalComment ? decrypt(row.finalComment) : null,
+    linkedData: row.linkedData,
+    checkStatus: row.checkStatus,
+    checkNote: row.checkNote,
+    checkedAt: row.checkedAt,
+    checkedById: row.checkedById,
     Pupil: {
-      ...assignment.Pupil,
-      firstName: decrypt(assignment.Pupil.firstName),
-      lastName: decrypt(assignment.Pupil.lastName)
+      admissionNumber: row.pupil_admissionNumber,
+      firstName: decrypt(row.pupil_firstName),
+      lastName: decrypt(row.pupil_lastName),
+      gender: row.pupil_gender,
+      isActive: row.pupil_isActive,
+      form: row.pupil_form,
     },
-    finalComment: assignment.finalComment ? decrypt(assignment.finalComment) : null
+    PupilCode: pupilCodesByAssignment.get(row.id) ?? [],
+    CommonPupilCode: commonPupilCodesByAssignment.get(row.id) ?? [],
   }));
 
   // Re-sort because database sort was on encrypted strings
   assignments.sort((a: any, b: any) =>
     a.Pupil.lastName.localeCompare(b.Pupil.lastName)
   );
+
+  // Fetch Common Comment Groups
+  const { rows: commonGroupRows } = await pool.query(
+    `SELECT * FROM "CommonCommentGroup" ORDER BY "displayOrder" ASC`
+  );
+
+  if (commonGroupRows.length > 0) {
+    const cgIds = commonGroupRows.map((g: any) => g.id);
+    const { rows: cgOptionRows } = await pool.query(
+      `SELECT * FROM "CommonCommentOption" WHERE "groupId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
+      [cgIds]
+    );
+    const optionsByCg = new Map<string, any[]>();
+    for (const opt of cgOptionRows) {
+      const arr = optionsByCg.get(opt.groupId) ?? [];
+      arr.push(opt);
+      optionsByCg.set(opt.groupId, arr);
+    }
+    for (const g of commonGroupRows) {
+      (g as any).CommonCommentOption = optionsByCg.get(g.id) ?? [];
+    }
+  }
+
+  const commonGroups = commonGroupRows;
+
+  // Fetch format template
+  const { rows: settingRows } = await pool.query(
+    `SELECT value FROM "AppSetting" WHERE key = 'comment_format_template'`
+  );
+  const formatTemplate = settingRows[0]?.value || '';
+  const subjectFormat = cls.Subject.commentFormat || null;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark h-[calc(100vh-64px)] overflow-hidden">

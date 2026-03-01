@@ -1,103 +1,143 @@
-import { prisma } from '@/lib/prisma';
+import { pool } from '@/lib/db'
 import Link from 'next/link';
-import SignOutButton from '@/components/SignOutButton';
 import { getServerSession } from 'next-auth';
 import { authOptions } from './api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
 
 export default async function Home() {
   const session = await getServerSession(authOptions);
-  
+
   const userIsAdmin = isAdmin(session?.user);
   const userIsHoD = isHoD(session?.user);
   const userIsTeacher = isTeacher(session?.user);
   const userId = session?.user?.id;
 
-  // Get distinct forms for pupils the user has access to
-  const formsData = await prisma.pupil.findMany({
-    where: {
-      form: { not: null },
-      isActive: true,
-      Assignment: {
-        some: userIsAdmin ? {} : {
-          Class: userIsHoD
-            ? { Subject: { User: { some: { id: userId } } } }
-            : { User: { some: { id: userId } } }
-        }
-      }
-    },
-    select: {
-      form: true,
-    },
-    distinct: ['form'],
-    orderBy: { form: 'asc' }
-  });
+  // Get distinct forms for pupils the user has access to, with pupil counts
+  let formsQuery: string;
+  let formsParams: unknown[];
 
-  // Get pupil counts per form
-  const formCounts = await prisma.pupil.groupBy({
-    by: ['form'],
-    where: {
-      form: { not: null },
-      isActive: true,
-      Assignment: {
-        some: userIsAdmin ? {} : {
-          Class: userIsHoD
-            ? { Subject: { User: { some: { id: userId } } } }
-            : { User: { some: { id: userId } } }
-        }
-      }
-    },
-    _count: { admissionNumber: true }
-  });
+  if (userIsAdmin) {
+    formsQuery = `
+      SELECT p.form, COUNT(*) as pupil_count
+      FROM "Pupil" p
+      WHERE p.form IS NOT NULL AND p."isActive" = true
+        AND EXISTS (
+          SELECT 1 FROM "Assignment" a WHERE a."pupilId" = p."admissionNumber"
+        )
+      GROUP BY p.form
+      ORDER BY p.form ASC
+    `;
+    formsParams = [];
+  } else if (userIsHoD) {
+    formsQuery = `
+      SELECT p.form, COUNT(*) as pupil_count
+      FROM "Pupil" p
+      WHERE p.form IS NOT NULL AND p."isActive" = true
+        AND EXISTS (
+          SELECT 1 FROM "Assignment" a
+          JOIN "Class" c ON c.id = a."classId"
+          JOIN "Subject" s ON s.id = c."subjectId"
+          JOIN "_SubjectToUser" su ON su."A" = s.id
+          WHERE a."pupilId" = p."admissionNumber" AND su."B" = $1
+        )
+      GROUP BY p.form
+      ORDER BY p.form ASC
+    `;
+    formsParams = [userId];
+  } else {
+    formsQuery = `
+      SELECT p.form, COUNT(*) as pupil_count
+      FROM "Pupil" p
+      WHERE p.form IS NOT NULL AND p."isActive" = true
+        AND EXISTS (
+          SELECT 1 FROM "Assignment" a
+          JOIN "Class" c ON c.id = a."classId"
+          JOIN "_ClassToUser" cu ON cu."A" = c.id
+          WHERE a."pupilId" = p."admissionNumber" AND cu."B" = $1
+        )
+      GROUP BY p.form
+      ORDER BY p.form ASC
+    `;
+    formsParams = [userId];
+  }
 
-  const forms = formsData.map(f => ({
-    form: f.form!,
-    pupilCount: formCounts.find(fc => fc.form === f.form)?._count.admissionNumber || 0
+  const { rows: formsRows } = await pool.query(formsQuery, formsParams);
+  const forms = formsRows.map((r: any) => ({
+    form: r.form as string,
+    pupilCount: Number(r.pupil_count)
   }));
 
-  // Filter logic:
-  // Admin sees all subjects.
-  // Others see subjects they are assigned to (via Subject or Class).
-  const subjects = await prisma.subject.findMany({
-    where: userIsAdmin ? {} : {
-      OR: [
-        { User: { some: { id: userId } } },
-        { Class: { some: { User: { some: { id: userId } } } } }
-      ]
-    },
-    include: {
-      Class: {
-        where: userIsAdmin ? {} : {
-          // If assigned to Subject, see all classes.
-          // If assigned to Class only, see only that class.
-          // This nested where is tricky because we can't reference parent subject assignment easily in nested where.
-          // Correct logic: return class IF (user in Subject.users) OR (user in Class.teachers).
-          // Prisma doesn't support "parent" reference in nested include filter easily.
-          // However, if I fetch ALL classes, I can filter in memory? Or keep it simple.
-          // If I am a Teacher assigned to 1 class, I shouldn't see other classes in the subject?
-          // "If a user is linked to a specific Class but not the Subject, they only have access to that specific class."
-          // So I MUST filter classes.
-          // BUT if I am linked to Subject, I see ALL classes.
-          // Prisma query for this:
-          OR: [
-             { Subject: { User: { some: { id: userId } } } },
-             { User: { some: { id: userId } } }
-          ]
-        },
-        orderBy: { name: 'asc' },
-        include: {
-          Assignment: {
-            select: {
-              PupilCode: {
-                select: { id: true }
-              }
-            }
-          }
-        }
-      }
-    },
-    orderBy: { code: 'asc' }
-  });
+  // Fetch subjects and their classes with assignment counts
+  let subjectsQuery: string;
+  let subjectsParams: unknown[];
+
+  if (userIsAdmin) {
+    subjectsQuery = `
+      SELECT s.id as s_id, s.code as s_code, s.title as s_title,
+             c.id as c_id, c.name as c_name, c.year as c_year,
+             COUNT(DISTINCT a.id) as assignment_count,
+             COUNT(DISTINCT CASE WHEN pc_count.pc_cnt > 0 THEN a.id END) as started_count
+      FROM "Subject" s
+      LEFT JOIN "Class" c ON c."subjectId" = s.id
+      LEFT JOIN "Assignment" a ON a."classId" = c.id
+      LEFT JOIN (
+        SELECT "assignmentId", COUNT(*) as pc_cnt
+        FROM "PupilCode"
+        GROUP BY "assignmentId"
+      ) pc_count ON pc_count."assignmentId" = a.id
+      GROUP BY s.id, s.code, s.title, c.id, c.name, c.year
+      ORDER BY s.code ASC, c.name ASC
+    `;
+    subjectsParams = [];
+  } else {
+    subjectsQuery = `
+      SELECT s.id as s_id, s.code as s_code, s.title as s_title,
+             c.id as c_id, c.name as c_name, c.year as c_year,
+             COUNT(DISTINCT a.id) as assignment_count,
+             COUNT(DISTINCT CASE WHEN pc_count.pc_cnt > 0 THEN a.id END) as started_count
+      FROM "Subject" s
+      LEFT JOIN "_SubjectToUser" su ON su."A" = s.id
+      LEFT JOIN "Class" c ON c."subjectId" = s.id
+      LEFT JOIN "_ClassToUser" cu ON cu."A" = c.id
+      LEFT JOIN "Assignment" a ON a."classId" = c.id
+      LEFT JOIN (
+        SELECT "assignmentId", COUNT(*) as pc_cnt
+        FROM "PupilCode"
+        GROUP BY "assignmentId"
+      ) pc_count ON pc_count."assignmentId" = a.id
+      WHERE su."B" = $1 OR cu."B" = $1
+      GROUP BY s.id, s.code, s.title, c.id, c.name, c.year
+      ORDER BY s.code ASC, c.name ASC
+    `;
+    subjectsParams = [userId];
+  }
+
+  const { rows: subjectRows } = await pool.query(subjectsQuery, subjectsParams);
+
+  // Group rows into subjects with nested classes
+  const subjectMap = new Map<string, any>();
+  for (const row of subjectRows) {
+    if (!subjectMap.has(row.s_id)) {
+      subjectMap.set(row.s_id, {
+        id: row.s_id,
+        code: row.s_code,
+        title: row.s_title,
+        Class: []
+      });
+    }
+    const subject = subjectMap.get(row.s_id)!;
+    if (row.c_id) {
+      subject.Class.push({
+        id: row.c_id,
+        name: row.c_name,
+        year: row.c_year,
+        Assignment: Array(Number(row.assignment_count)).fill(null).map((_, i) => ({
+          PupilCode: i < Number(row.started_count) ? [{ id: 'x' }] : []
+        }))
+      });
+    }
+  }
+  const subjects = Array.from(subjectMap.values());
 
   // Calculate aggregated stats
   let totalStudents = 0;
@@ -115,13 +155,13 @@ export default async function Home() {
   const completionRate = totalAssignments > 0 ? Math.round((startedAssignments / totalAssignments) * 100) : 0;
 
   // Get next upcoming deadline
-  const nextDeadline = await prisma.deadline.findFirst({
-    where: {
-      isActive: true,
-      date: { gte: new Date() }
-    },
-    orderBy: { date: 'asc' }
-  });
+  const { rows: deadlineRows } = await pool.query(
+    `SELECT * FROM "Deadline"
+     WHERE "isActive" = true AND date >= NOW()
+     ORDER BY date ASC
+     LIMIT 1`
+  );
+  const nextDeadline = deadlineRows[0] ?? null;
 
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark">
@@ -203,7 +243,7 @@ export default async function Home() {
                   </div>
                 </div>
               </div>
-              
+
               <div className="p-5 space-y-4">
                 <div className="space-y-3">
                   {subject.Class.length > 0 ? subject.Class.map((cls: any) => {
@@ -214,7 +254,7 @@ export default async function Home() {
                      let statusBg = "bg-primary";
                      let statusText = "On Track";
                      let badgeBg = "bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-400";
-                     
+
                      if (percent === 100) {
                         statusColor = "text-emerald-500";
                         statusBg = "bg-emerald-500";
@@ -226,7 +266,7 @@ export default async function Home() {
                         statusText = "In Progress";
                         badgeBg = "bg-orange-100 dark:bg-orange-900/30 text-orange-700 dark:text-orange-400";
                      }
-                     
+
                      // Only show class links for teachers
                      if (!userIsTeacher) {
                        return (
@@ -247,7 +287,7 @@ export default async function Home() {
                          </div>
                        );
                      }
-                     
+
                      return (
                       <Link key={cls.id} href={`/class/${cls.id}`} className="block hover:bg-slate-50 dark:hover:bg-slate-800/50 p-2 rounded-lg transition-colors -mx-2">
                         <div className="flex flex-col gap-2">

@@ -1,6 +1,6 @@
 import NextAuth from "next-auth"
 import CredentialsProvider from "next-auth/providers/credentials"
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { compare } from "bcryptjs"
 import { logAuthEvent } from "@/lib/audit-log"
 
@@ -26,14 +26,21 @@ export const authOptions: NextAuthOptions = {
           return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            username: credentials.username
-          },
-          include: {
-            Role: true
-          }
-        })
+        const { rows: userRows } = await pool.query(
+          `SELECT u.*, json_agg(json_build_object('id', r.id, 'name', r.name)) FILTER (WHERE r.id IS NOT NULL) as roles
+           FROM "User" u
+           LEFT JOIN "_RoleToUser" ru ON ru."B" = u.id
+           LEFT JOIN "Role" r ON r.id = ru."A"
+           WHERE u.username = $1
+           GROUP BY u.id`,
+          [credentials.username]
+        )
+
+        const userRow = userRows[0] ?? null
+        const user = userRow ? {
+          ...userRow,
+          Role: userRow.roles ?? []
+        } : null
 
         if (!user) {
           // Log failed sign-in attempt - user not found

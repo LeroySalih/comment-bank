@@ -1,4 +1,4 @@
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { getAssignmentsForReview, getReviewStats } from "@/lib/server-actions/comment-check"
@@ -20,11 +20,14 @@ export default async function ReviewPage({ params, searchParams }: Props) {
   const { subjectId } = await params
   const { status: statusFilter } = await searchParams
 
-  const subject = await prisma.subject.findUnique({
-    where: { id: subjectId }
-  })
+  // Fetch subject
+  const { rows: subjectRows } = await pool.query(
+    `SELECT * FROM "Subject" WHERE id = $1`,
+    [subjectId]
+  )
 
-  if (!subject) notFound()
+  if (subjectRows.length === 0) notFound()
+  const subject = subjectRows[0]
 
   // Get review statistics
   const stats = await getReviewStats(subjectId)

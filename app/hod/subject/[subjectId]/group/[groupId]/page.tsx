@@ -1,5 +1,5 @@
 
-import { prisma } from "@/lib/prisma"
+import { pool } from "@/lib/db"
 import { notFound } from "next/navigation"
 import Link from "next/link"
 import { CommentForm } from "./_components/comment-form"
@@ -17,23 +17,39 @@ interface Props {
 
 export default async function GroupPage({ params }: Props) {
   const { subjectId, groupId } = await params
-  
-  const group = await prisma.commentGroup.findUnique({
-    where: { id: groupId },
-    include: {
-      CommentOption: {
-        orderBy: [
-          { displayOrder: 'asc' },
-          { code: 'asc' }
-        ]
-      },
-      Subject: true
-    }
-  });
 
-  if (!group || group.subjectId !== subjectId) notFound()
+  // Fetch comment group with subject
+  const { rows: groupRows } = await pool.query(
+    `SELECT cg.*, s.id as s_id, s.code as s_code, s.title as s_title
+     FROM "CommentGroup" cg
+     JOIN "Subject" s ON s.id = cg."subjectId"
+     WHERE cg.id = $1`,
+    [groupId]
+  )
 
-  const totalWords = group.CommentOption.reduce((acc: number, opt) => acc + countWords(opt.text), 0)
+  if (groupRows.length === 0 || groupRows[0].subjectId !== subjectId) notFound()
+
+  const groupRow = groupRows[0]
+
+  // Fetch comment options
+  const { rows: optionRows } = await pool.query(
+    `SELECT * FROM "CommentOption" WHERE "groupId" = $1 ORDER BY "displayOrder" ASC, code ASC`,
+    [groupId]
+  )
+
+  const group = {
+    id: groupRow.id,
+    name: groupRow.name,
+    displayOrder: groupRow.displayOrder,
+    subjectId: groupRow.subjectId,
+    title: groupRow.title,
+    isLinked: groupRow.isLinked,
+    linkedField: groupRow.linkedField,
+    CommentOption: optionRows,
+    Subject: { id: groupRow.s_id, code: groupRow.s_code, title: groupRow.s_title },
+  }
+
+  const totalWords = group.CommentOption.reduce((acc: number, opt: any) => acc + countWords(opt.text), 0)
   const avgWords = group.CommentOption.length > 0 ? (totalWords / group.CommentOption.length).toFixed(1) : 0
 
   return (
@@ -61,7 +77,7 @@ export default async function GroupPage({ params }: Props) {
         </div>
 
         <div className="grid grid-cols-1 gap-4">
-          <CommentList 
+          <CommentList
             initialComments={group.CommentOption.map((o: any) => ({ ...o, order: o.displayOrder }))}
             subjectId={subjectId}
             groupId={groupId}
@@ -74,4 +90,3 @@ export default async function GroupPage({ params }: Props) {
     </div>
   )
 }
-
