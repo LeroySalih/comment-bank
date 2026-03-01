@@ -1,6 +1,6 @@
 "use server"
 
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { handleServerActionError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
@@ -46,40 +46,53 @@ export const getAuditLogs = withRole('admin', async (
   try {
     const skip = (page - 1) * pageSize
 
-    // Build where clause from filters
-    const where: any = {}
+    // Build dynamic WHERE clause from filters
+    const conditions: string[] = []
+    const params: any[] = []
+    let paramIdx = 1
 
     if (filters?.action) {
-      where.action = filters.action
+      conditions.push(`action = $${paramIdx++}`)
+      params.push(filters.action)
     }
 
     if (filters?.entityType) {
-      where.entityType = filters.entityType
+      conditions.push(`"entityType" = $${paramIdx++}`)
+      params.push(filters.entityType)
     }
 
     if (filters?.userId) {
-      where.userId = filters.userId
+      conditions.push(`"userId" = $${paramIdx++}`)
+      params.push(filters.userId)
     }
 
-    if (filters?.startDate || filters?.endDate) {
-      where.createdAt = {}
-      if (filters.startDate) {
-        where.createdAt.gte = filters.startDate
-      }
-      if (filters.endDate) {
-        where.createdAt.lte = filters.endDate
-      }
+    if (filters?.startDate) {
+      conditions.push(`"createdAt" >= $${paramIdx++}`)
+      params.push(filters.startDate)
     }
 
-    const [logs, total] = await Promise.all([
-      prisma.auditLog.findMany({
-        where,
-        orderBy: { createdAt: 'desc' },
-        skip,
-        take: pageSize
-      }),
-      prisma.auditLog.count({ where })
-    ])
+    if (filters?.endDate) {
+      conditions.push(`"createdAt" <= $${paramIdx++}`)
+      params.push(filters.endDate)
+    }
+
+    const whereClause = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : ''
+
+    // Fetch paginated logs
+    const logsParams = [...params, pageSize, skip]
+    const limitIdx = paramIdx
+    const offsetIdx = paramIdx + 1
+    const { rows: logs } = await pool.query(
+      `SELECT * FROM "AuditLog" ${whereClause} ORDER BY "createdAt" DESC LIMIT $${limitIdx} OFFSET $${offsetIdx}`,
+      logsParams
+    )
+
+    // Fetch total count using same WHERE clause
+    const { rows: countRows } = await pool.query(
+      `SELECT COUNT(*) as count FROM "AuditLog" ${whereClause}`,
+      params
+    )
+    const total = Number(countRows[0].count)
 
     // Parse details JSON
     const parsedLogs: AuditLogEntry[] = logs.map(log => ({
@@ -108,14 +121,13 @@ export const getAuditLogs = withRole('admin', async (
  */
 export const getAuditLogActions = withRole('admin', async () => {
   try {
-    const actions = await prisma.auditLog.groupBy({
-      by: ['action'],
-      orderBy: { action: 'asc' }
-    })
+    const { rows } = await pool.query(
+      `SELECT DISTINCT action FROM "AuditLog" ORDER BY action ASC`
+    )
 
     return {
       success: true as const,
-      actions: actions.map(a => a.action)
+      actions: rows.map(r => r.action as string)
     }
   } catch (error) {
     logger.error('Failed to get audit log actions', { error })
@@ -128,15 +140,13 @@ export const getAuditLogActions = withRole('admin', async () => {
  */
 export const getAuditLogEntityTypes = withRole('admin', async () => {
   try {
-    const entityTypes = await prisma.auditLog.groupBy({
-      by: ['entityType'],
-      where: { entityType: { not: null } },
-      orderBy: { entityType: 'asc' }
-    })
+    const { rows } = await pool.query(
+      `SELECT DISTINCT "entityType" FROM "AuditLog" WHERE "entityType" IS NOT NULL ORDER BY "entityType" ASC`
+    )
 
     return {
       success: true as const,
-      entityTypes: entityTypes.map(e => e.entityType).filter(Boolean) as string[]
+      entityTypes: rows.map(r => r.entityType as string)
     }
   } catch (error) {
     logger.error('Failed to get audit log entity types', { error })
@@ -153,36 +163,27 @@ export const getAuditLogStats = withRole('admin', async () => {
     const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
     const weekAgo = new Date(today.getTime() - 7 * 24 * 60 * 60 * 1000)
 
-    const [totalLogs, todayLogs, weekLogs, recentSignIns, recentChanges] = await Promise.all([
-      prisma.auditLog.count(),
-      prisma.auditLog.count({
-        where: { createdAt: { gte: today } }
-      }),
-      prisma.auditLog.count({
-        where: { createdAt: { gte: weekAgo } }
-      }),
-      prisma.auditLog.count({
-        where: {
-          action: 'sign_in',
-          createdAt: { gte: today }
-        }
-      }),
-      prisma.auditLog.count({
-        where: {
-          action: { notIn: ['sign_in', 'sign_out', 'sign_in_failed'] },
-          createdAt: { gte: today }
-        }
-      })
-    ])
+    const { rows } = await pool.query(
+      `SELECT
+        COUNT(*) FILTER (WHERE true) as total,
+        COUNT(*) FILTER (WHERE "createdAt" >= $1) as today,
+        COUNT(*) FILTER (WHERE "createdAt" >= $2) as week,
+        COUNT(*) FILTER (WHERE action = 'sign_in' AND "createdAt" >= $1) as sign_ins,
+        COUNT(*) FILTER (WHERE action NOT IN ('sign_in', 'sign_out', 'sign_in_failed') AND "createdAt" >= $1) as changes
+       FROM "AuditLog"`,
+      [today, weekAgo]
+    )
+
+    const stats = rows[0]
 
     return {
       success: true as const,
       stats: {
-        totalLogs,
-        todayLogs,
-        weekLogs,
-        recentSignIns,
-        recentChanges
+        totalLogs: Number(stats.total),
+        todayLogs: Number(stats.today),
+        weekLogs: Number(stats.week),
+        recentSignIns: Number(stats.sign_ins),
+        recentChanges: Number(stats.changes)
       }
     }
   } catch (error) {
