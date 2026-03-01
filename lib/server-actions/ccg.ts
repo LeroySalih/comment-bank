@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from 'next/cache'
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { createId } from '@paralleldrive/cuid2'
 import { handleServerActionError } from '@/lib/errors'
@@ -40,20 +40,24 @@ export const createCommonCommentGroup = withRole('admin', async (
 
     const validated = validation.data
 
-    const maxOrder = await (prisma as any).commonCommentGroup.aggregate({
-      _max: { displayOrder: true }
-    })
+    const { rows: maxRows } = await pool.query<{ max: number | null }>(
+      `SELECT MAX("displayOrder") as max FROM "CommonCommentGroup"`
+    )
+    const nextOrder = (maxRows[0].max ?? -1) + 1
 
-    const group = await (prisma as any).commonCommentGroup.create({
-      data: {
-        id: createId(),
-        name: validated.name,
-        title: validated.title,
-        displayOrder: (maxOrder._max.displayOrder ?? -1) + 1,
-        isLinked: validated.isLinked,
-        linkedField: validated.isLinked ? validated.linkedField : null
-      }
-    })
+    const { rows: groupRows } = await pool.query(
+      `INSERT INTO "CommonCommentGroup" (id, name, title, "displayOrder", "isLinked", "linkedField")
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
+      [
+        createId(),
+        validated.name,
+        validated.title,
+        nextOrder,
+        validated.isLinked,
+        validated.isLinked ? validated.linkedField : null
+      ]
+    )
+    const group = groupRows[0]
 
     await createAuditLog({
       action: 'create_common_comment_group',
@@ -88,17 +92,25 @@ export const updateCommonCommentGroup = withRole('admin', async (
     }
 
     const validated = validation.data
-    const currentGroup = await (prisma as any).commonCommentGroup.findUnique({ where: { id: groupId } })
 
-    await (prisma as any).commonCommentGroup.update({
-      where: { id: groupId },
-      data: {
-        name: validated.name,
-        title: validated.title,
-        isLinked: validated.isLinked ?? false,
-        linkedField: validated.isLinked ? validated.linkedField : null,
-      }
-    })
+    const { rows: currentRows } = await pool.query(
+      `SELECT * FROM "CommonCommentGroup" WHERE id = $1`,
+      [groupId]
+    )
+    const currentGroup = currentRows[0] ?? null
+
+    await pool.query(
+      `UPDATE "CommonCommentGroup"
+       SET name = $1, title = $2, "isLinked" = $3, "linkedField" = $4
+       WHERE id = $5`,
+      [
+        validated.name,
+        validated.title,
+        validated.isLinked ?? false,
+        validated.isLinked ? validated.linkedField : null,
+        groupId
+      ]
+    )
 
     await logDataChange(
       'update_common_comment_group',
@@ -127,11 +139,13 @@ export const deleteCommonCommentGroup = withRole('admin', async (
       return validation
     }
 
-    const currentGroup = await (prisma as any).commonCommentGroup.findUnique({ where: { id: groupId } })
+    const { rows: currentRows } = await pool.query(
+      `SELECT * FROM "CommonCommentGroup" WHERE id = $1`,
+      [groupId]
+    )
+    const currentGroup = currentRows[0] ?? null
 
-    await (prisma as any).commonCommentGroup.delete({
-      where: { id: groupId }
-    })
+    await pool.query(`DELETE FROM "CommonCommentGroup" WHERE id = $1`, [groupId])
 
     await createAuditLog({
       action: 'delete_common_comment_group',
@@ -161,14 +175,22 @@ export const reorderCommonCommentGroups = withRole('admin', async (
       return validation
     }
 
-    await Promise.all(
-      items.map(item =>
-        (prisma as any).commonCommentGroup.update({
-          where: { id: item.id },
-          data: { displayOrder: item.order }
-        })
-      )
-    )
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const item of items) {
+        await client.query(
+          `UPDATE "CommonCommentGroup" SET "displayOrder" = $1 WHERE id = $2`,
+          [item.order, item.id]
+        )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     await createAuditLog({
       action: 'reorder_common_comment_groups',
@@ -205,20 +227,24 @@ export const createCommonCommentOption = withRole('admin', async (
 
     const validated = validation.data
 
-    const maxOrder = await (prisma as any).commonCommentOption.aggregate({
-      where: { groupId },
-      _max: { displayOrder: true }
-    })
+    const { rows: maxRows } = await pool.query<{ max: number | null }>(
+      `SELECT MAX("displayOrder") as max FROM "CommonCommentOption" WHERE "groupId" = $1`,
+      [groupId]
+    )
+    const nextOrder = (maxRows[0].max ?? -1) + 1
 
-    const option = await (prisma as any).commonCommentOption.create({
-      data: {
-        id: createId(),
-        code: validated.code,
-        text: validated.text,
-        groupId: validated.groupId,
-        displayOrder: (maxOrder._max.displayOrder ?? -1) + 1
-      }
-    })
+    const { rows: optionRows } = await pool.query(
+      `INSERT INTO "CommonCommentOption" (id, code, text, "groupId", "displayOrder")
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [
+        createId(),
+        validated.code,
+        validated.text,
+        validated.groupId,
+        nextOrder
+      ]
+    )
+    const option = optionRows[0]
 
     await createAuditLog({
       action: 'create_common_comment_option',
@@ -251,15 +277,17 @@ export const updateCommonCommentOption = withRole('admin', async (
     }
 
     const validated = validation.data
-    const currentOption = await (prisma as any).commonCommentOption.findUnique({ where: { id: optionId } })
 
-    await (prisma as any).commonCommentOption.update({
-      where: { id: optionId },
-      data: {
-        code: validated.code,
-        text: validated.text,
-      }
-    })
+    const { rows: currentRows } = await pool.query(
+      `SELECT * FROM "CommonCommentOption" WHERE id = $1`,
+      [optionId]
+    )
+    const currentOption = currentRows[0] ?? null
+
+    await pool.query(
+      `UPDATE "CommonCommentOption" SET code = $1, text = $2 WHERE id = $3`,
+      [validated.code, validated.text, optionId]
+    )
 
     await logDataChange(
       'update_common_comment_option',
@@ -288,11 +316,13 @@ export const deleteCommonCommentOption = withRole('admin', async (
       return validation
     }
 
-    const currentOption = await (prisma as any).commonCommentOption.findUnique({ where: { id: optionId } })
+    const { rows: currentRows } = await pool.query(
+      `SELECT * FROM "CommonCommentOption" WHERE id = $1`,
+      [optionId]
+    )
+    const currentOption = currentRows[0] ?? null
 
-    await (prisma as any).commonCommentOption.delete({
-      where: { id: optionId }
-    })
+    await pool.query(`DELETE FROM "CommonCommentOption" WHERE id = $1`, [optionId])
 
     await createAuditLog({
       action: 'delete_common_comment_option',
@@ -324,14 +354,22 @@ export const reorderCommonCommentOptions = withRole('admin', async (
       return validation
     }
 
-    await Promise.all(
-      items.map(item =>
-        (prisma as any).commonCommentOption.update({
-          where: { id: item.id },
-          data: { displayOrder: item.order }
-        })
-      )
-    )
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const item of items) {
+        await client.query(
+          `UPDATE "CommonCommentOption" SET "displayOrder" = $1 WHERE id = $2`,
+          [item.order, item.id]
+        )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     await createAuditLog({
       action: 'reorder_common_comment_options',
@@ -364,11 +402,11 @@ export const updateCommentFormatTemplate = withRole('admin', async (
 
     const validated = validation.data
 
-    await (prisma as any).appSetting.upsert({
-      where: { key: 'comment_format_template' },
-      update: { value: validated.value },
-      create: { key: 'comment_format_template', value: validated.value }
-    })
+    await pool.query(
+      `INSERT INTO "AppSetting" (key, value) VALUES ($1, $2)
+       ON CONFLICT (key) DO UPDATE SET value = EXCLUDED.value`,
+      ['comment_format_template', validated.value]
+    )
 
     await createAuditLog({
       action: 'update_comment_format_template',
