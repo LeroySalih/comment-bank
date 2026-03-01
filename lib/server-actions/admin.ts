@@ -982,9 +982,24 @@ export const updateDeadline = withRole('admin', async (
     const { rows: deadlineRows } = await pool.query(`SELECT * FROM "Deadline" WHERE id = $1`, [validated.deadlineId])
     const currentDeadline = deadlineRows[0] ?? null
 
+    const sets: string[] = []
+    const params: any[] = []
+    let idx = 1
+
+    if (validated.title !== undefined) { sets.push(`title = $${idx++}`); params.push(validated.title) }
+    if (validated.date !== undefined) { sets.push(`date = $${idx++}`); params.push(new Date(validated.date)) }
+    if (validated.description !== undefined) { sets.push(`description = $${idx++}`); params.push(validated.description) }
+    if (validated.isActive !== undefined) { sets.push(`"isActive" = $${idx++}`); params.push(validated.isActive) }
+
+    if (sets.length === 0) {
+      // nothing to update — return success without hitting DB
+      return { success: true }
+    }
+
+    params.push(validated.deadlineId)
     await pool.query(
-      `UPDATE "Deadline" SET title = $1, date = $2, description = $3, "isActive" = $4 WHERE id = $5`,
-      [validated.title, validated.date ? new Date(validated.date) : undefined, validated.description, validated.isActive, validated.deadlineId]
+      `UPDATE "Deadline" SET ${sets.join(', ')} WHERE id = $${idx}`,
+      params
     )
 
     // Audit log
