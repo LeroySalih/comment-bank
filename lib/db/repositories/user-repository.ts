@@ -121,7 +121,7 @@ export class UserRepository {
       for (const roleName of roleNames) {
         await client.query(
           `INSERT INTO "Role" (id, name) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
-          [roleName, roleName]
+          [createId(), roleName]
         )
         const roleResult = await client.query<DbRole>(
           `SELECT id, name FROM "Role" WHERE name = $1`,
@@ -170,7 +170,7 @@ export class UserRepository {
       for (const roleName of roleNames) {
         await client.query(
           `INSERT INTO "Role" (id, name) VALUES ($1, $2) ON CONFLICT (name) DO NOTHING`,
-          [roleName, roleName]
+          [createId(), roleName]
         )
         const roleResult = await client.query<DbRole>(
           `SELECT id, name FROM "Role" WHERE name = $1`,

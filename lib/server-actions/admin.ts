@@ -793,17 +793,13 @@ export const getClassPupils = withRole('admin', async (classId: string) => {
  */
 export const getAllForms = withRole('admin', async () => {
   try {
-    console.log('getAllForms: Starting query')
     const { rows } = await pool.query(
       `SELECT DISTINCT form FROM "Pupil" WHERE form IS NOT NULL AND "isActive" = true ORDER BY form ASC`
     )
-    console.log('getAllForms: Query result', rows)
 
     const forms = rows.map((r: any) => r.form).filter(Boolean) as string[]
-    console.log('getAllForms: Returning forms', forms)
     return { success: true as const, forms }
   } catch (error) {
-    console.error('getAllForms: Error', error)
     logger.error('Failed to get forms', { error })
     return handleServerActionError(error)
   }
