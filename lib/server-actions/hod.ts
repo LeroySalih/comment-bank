@@ -214,7 +214,7 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
       `SELECT MAX("displayOrder") as max FROM "CommentGroup" WHERE "subjectId" = $1`,
       [subjectId]
     )
-    const nextOrder = (maxRows[0].max ?? -1) + 1
+    const nextOrder = (maxRows[0].max ?? 0) + 1
 
     const { rows: groupRows } = await pool.query(
       `INSERT INTO "CommentGroup" (id, name, title, "subjectId", "displayOrder", "isLinked", "linkedField")
@@ -461,7 +461,7 @@ export const createComment = withRole(['admin', 'hod'], async (
       `SELECT MAX("displayOrder") as max FROM "CommentOption" WHERE "groupId" = $1`,
       [groupId]
     )
-    const nextOrder = (maxRows[0].max ?? -1) + 1
+    const nextOrder = (maxRows[0].max ?? 0) + 1
 
     const { rows: optionRows } = await pool.query(
       `INSERT INTO "CommentOption" (id, code, text, "groupId", "displayOrder")
