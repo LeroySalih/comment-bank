@@ -120,6 +120,10 @@ export class PupilRepository {
       setClauses.push(`"isActive" = $${params.length}`)
     }
 
+    if (setClauses.length === 0) {
+      throw new Error('update called with no fields to update')
+    }
+
     params.push(admissionNumber)
     const whereParam = `$${params.length}`
 
@@ -135,8 +139,8 @@ export class PupilRepository {
     const pupil = rows[0]
     return {
       ...pupil,
-      firstName: data.firstName ? data.firstName : decrypt(pupil.firstName),
-      lastName: data.lastName ? data.lastName : decrypt(pupil.lastName)
+      firstName: data.firstName !== undefined ? data.firstName : decrypt(pupil.firstName),
+      lastName: data.lastName !== undefined ? data.lastName : decrypt(pupil.lastName)
     }
   }
 
