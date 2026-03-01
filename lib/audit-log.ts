@@ -1,4 +1,4 @@
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { createId } from '@paralleldrive/cuid2'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/app/api/auth/[...nextauth]/route'
@@ -136,19 +136,21 @@ export async function createAuditLog(params: CreateAuditLogParams): Promise<void
       // Headers not available
     }
 
-    await prisma.auditLog.create({
-      data: {
-        id: createId(),
-        userId,
-        username,
-        action: params.action,
-        entityType: params.entityType,
-        entityId: params.entityId,
-        details: params.details ? encrypt(JSON.stringify(params.details)) : null,
-        ipAddress,
-        userAgent
-      }
-    })
+    await pool.query(
+      `INSERT INTO "AuditLog" (id, "userId", username, action, "entityType", "entityId", details, "ipAddress", "userAgent")
+       VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+      [
+        createId(),
+        userId ?? null,
+        username ?? null,
+        params.action,
+        params.entityType ?? null,
+        params.entityId ?? null,
+        params.details ? encrypt(JSON.stringify(params.details)) : null,
+        ipAddress ?? null,
+        userAgent ?? null
+      ]
+    )
   } catch (error) {
     // Log but don't throw - audit logging shouldn't break the main operation
     console.error('Failed to create audit log:', error)
