@@ -4,8 +4,6 @@ import { revalidatePath } from 'next/cache'
 import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { createId } from '@paralleldrive/cuid2'
-import { subjectRepository } from '@/lib/db/repositories/subject-repository'
-import { classRepository } from '@/lib/db/repositories/class-repository'
 import { handleServerActionError, ForbiddenError } from '@/lib/errors'
 import { logger } from '@/lib/logger'
 import { createAuditLog, logDataChange } from '@/lib/audit-log'
@@ -360,14 +358,22 @@ export const reorderCommentGroups = withRole(['admin', 'hod'], async (
     }
 
     // Update display order for each group
-    await Promise.all(
-      items.map(item =>
-        pool.query(
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const item of items) {
+        await client.query(
           `UPDATE "CommentGroup" SET "displayOrder" = $1 WHERE id = $2`,
           [item.order, item.id]
         )
-      )
-    )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     // Audit log
     await createAuditLog({
@@ -598,14 +604,22 @@ export const reorderComments = withRole(['admin', 'hod'], async (
     }
 
     // Update display order for each option
-    await Promise.all(
-      items.map(item =>
-        pool.query(
+    const client = await pool.connect()
+    try {
+      await client.query('BEGIN')
+      for (const item of items) {
+        await client.query(
           `UPDATE "CommentOption" SET "displayOrder" = $1 WHERE id = $2`,
           [item.order, item.id]
         )
-      )
-    )
+      }
+      await client.query('COMMIT')
+    } catch (err) {
+      await client.query('ROLLBACK')
+      throw err
+    } finally {
+      client.release()
+    }
 
     // Audit log
     await createAuditLog({
