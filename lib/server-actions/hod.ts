@@ -1,7 +1,7 @@
 "use server"
 
 import { revalidatePath } from 'next/cache'
-import { prisma } from '@/lib/prisma'
+import { pool } from '@/lib/db'
 import { withRole } from '@/lib/auth/with-role'
 import { createId } from '@paralleldrive/cuid2'
 import { subjectRepository } from '@/lib/db/repositories/subject-repository'
@@ -39,16 +39,14 @@ async function checkSubjectAccess(subjectId: string): Promise<void> {
   }
 
   // Check if user is HOD of this subject
-  const subject = await prisma.subject.findFirst({
-    where: {
-      id: subjectId,
-      User: {
-        some: { id: session.user.id }
-      }
-    }
-  })
+  const { rows } = await pool.query(
+    `SELECT 1 FROM "Subject" s
+     JOIN "_SubjectToUser" su ON su."A" = s.id
+     WHERE s.id = $1 AND su."B" = $2`,
+    [subjectId, session.user.id]
+  )
 
-  if (!subject) {
+  if (rows.length === 0) {
     throw new ForbiddenError('You do not have access to this subject')
   }
 }
@@ -78,14 +76,11 @@ export const createClass = withRole(['admin', 'hod'], async (
       }
     }
 
-    const newClass = await prisma.class.create({
-      data: {
-        id: createId(),
-        name,
-        year,
-        subjectId
-      }
-    })
+    const { rows } = await pool.query(
+      `INSERT INTO "Class" (id, name, year, "subjectId") VALUES ($1, $2, $3, $4) RETURNING *`,
+      [createId(), name, year || null, subjectId]
+    )
+    const newClass = rows[0]
 
     // Audit log
     await createAuditLog({
@@ -120,12 +115,10 @@ export const updateClass = withRole(['admin', 'hod'], async (
     const year = formData.get('year') as string
 
     // Get current class for audit log
-    const currentClass = await prisma.class.findUnique({ where: { id: classId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const currentClass = currentRows[0] ?? null
 
-    await prisma.class.update({
-      where: { id: classId },
-      data: { name, year }
-    })
+    await pool.query(`UPDATE "Class" SET name = $1, year = $2 WHERE id = $3`, [name, year || null, classId])
 
     // Audit log
     await logDataChange(
@@ -157,11 +150,10 @@ export const deleteClass = withRole(['admin', 'hod'], async (
     await checkSubjectAccess(subjectId)
 
     // Get current class for audit log
-    const currentClass = await prisma.class.findUnique({ where: { id: classId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "Class" WHERE id = $1`, [classId])
+    const currentClass = currentRows[0] ?? null
 
-    await prisma.class.delete({
-      where: { id: classId }
-    })
+    await pool.query(`DELETE FROM "Class" WHERE id = $1`, [classId])
 
     // Audit log
     await createAuditLog({
@@ -218,22 +210,18 @@ export const createCommentGroup = withRole(['admin', 'hod'], async (
     const validated = validation.data
 
     // Get the current max displayOrder
-    const maxOrder = await prisma.commentGroup.aggregate({
-      where: { subjectId },
-      _max: { displayOrder: true }
-    })
+    const { rows: maxRows } = await pool.query<{ max: number | null }>(
+      `SELECT MAX("displayOrder") as max FROM "CommentGroup" WHERE "subjectId" = $1`,
+      [subjectId]
+    )
+    const nextOrder = (maxRows[0].max ?? -1) + 1
 
-    const commentGroup = await prisma.commentGroup.create({
-      data: {
-        id: createId(),
-        name: validated.name,
-        title: validated.title,
-        subjectId: validated.subjectId,
-        displayOrder: (maxOrder._max.displayOrder || 0) + 1,
-        isLinked: validated.isLinked,
-        linkedField: validated.isLinked ? validated.linkedField : null
-      }
-    })
+    const { rows: groupRows } = await pool.query(
+      `INSERT INTO "CommentGroup" (id, name, title, "subjectId", "displayOrder", "isLinked", "linkedField")
+       VALUES ($1, $2, $3, $4, $5, $6, $7) RETURNING *`,
+      [createId(), validated.name, validated.title, validated.subjectId, nextOrder, validated.isLinked, validated.isLinked ? validated.linkedField : null]
+    )
+    const commentGroup = groupRows[0]
 
     // Audit log
     await createAuditLog({
@@ -287,24 +275,20 @@ export const updateCommentGroup = withRole(['admin', 'hod'], async (
     const validated = validation.data
 
     // Get current group for audit log
-    const currentGroup = await prisma.commentGroup.findUnique({ where: { id: groupId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "CommentGroup" WHERE id = $1`, [groupId])
+    const currentGroup = currentRows[0] ?? null
 
-    await prisma.commentGroup.update({
-      where: { id: groupId },
-      data: {
-        name: validated.name,
-        title: validated.title,
-        isLinked: validated.isLinked ?? false,
-        linkedField: validated.isLinked ? validated.linkedField : null
-      }
-    })
+    await pool.query(
+      `UPDATE "CommentGroup" SET name = $1, title = $2, "isLinked" = $3, "linkedField" = $4 WHERE id = $5`,
+      [validated.name, validated.title, validated.isLinked ?? false, validated.isLinked ? validated.linkedField : null, groupId]
+    )
 
     // Audit log
     await logDataChange(
       'update_comment_group',
       'comment_group',
       groupId,
-      currentGroup ? { name: currentGroup.name, title: currentGroup.title, isLinked: (currentGroup as any).isLinked, linkedField: (currentGroup as any).linkedField } : null,
+      currentGroup ? { name: currentGroup.name, title: currentGroup.title, isLinked: currentGroup.isLinked, linkedField: currentGroup.linkedField } : null,
       { name: validated.name, title: validated.title, isLinked: validated.isLinked, linkedField: validated.linkedField }
     )
 
@@ -334,11 +318,10 @@ export const deleteCommentGroup = withRole(['admin', 'hod'], async (
     }
 
     // Get current group for audit log
-    const currentGroup = await prisma.commentGroup.findUnique({ where: { id: groupId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "CommentGroup" WHERE id = $1`, [groupId])
+    const currentGroup = currentRows[0] ?? null
 
-    await prisma.commentGroup.delete({
-      where: { id: groupId }
-    })
+    await pool.query(`DELETE FROM "CommentGroup" WHERE id = $1`, [groupId])
 
     // Audit log
     await createAuditLog({
@@ -379,10 +362,10 @@ export const reorderCommentGroups = withRole(['admin', 'hod'], async (
     // Update display order for each group
     await Promise.all(
       items.map(item =>
-        prisma.commentGroup.update({
-          where: { id: item.id },
-          data: { displayOrder: item.order }
-        })
+        pool.query(
+          `UPDATE "CommentGroup" SET "displayOrder" = $1 WHERE id = $2`,
+          [item.order, item.id]
+        )
       )
     )
 
@@ -419,18 +402,19 @@ export const updateSubjectCommentFormat = withRole(['admin', 'hod'], async (
       return validation
     }
 
-    const currentSubject = await prisma.subject.findUnique({ where: { id: subjectId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "Subject" WHERE id = $1`, [subjectId])
+    const currentSubject = currentRows[0] ?? null
 
-    await prisma.subject.update({
-      where: { id: subjectId },
-      data: { commentFormat: commentFormat || null }
-    })
+    await pool.query(
+      `UPDATE "Subject" SET "commentFormat" = $1 WHERE id = $2`,
+      [commentFormat || null, subjectId]
+    )
 
     await logDataChange(
       'update_subject_comment_format',
       'subject',
       subjectId,
-      { commentFormat: (currentSubject as any)?.commentFormat },
+      { commentFormat: currentSubject?.commentFormat },
       { commentFormat }
     )
 
@@ -473,20 +457,18 @@ export const createComment = withRole(['admin', 'hod'], async (
     const validated = validation.data
 
     // Get the current max displayOrder
-    const maxOrder = await prisma.commentOption.aggregate({
-      where: { groupId },
-      _max: { displayOrder: true }
-    })
+    const { rows: maxRows } = await pool.query<{ max: number | null }>(
+      `SELECT MAX("displayOrder") as max FROM "CommentOption" WHERE "groupId" = $1`,
+      [groupId]
+    )
+    const nextOrder = (maxRows[0].max ?? -1) + 1
 
-    const commentOption = await prisma.commentOption.create({
-      data: {
-        id: createId(),
-        code: validated.code,
-        text: validated.text,
-        groupId: validated.groupId,
-        displayOrder: (maxOrder._max.displayOrder || 0) + 1
-      }
-    })
+    const { rows: optionRows } = await pool.query(
+      `INSERT INTO "CommentOption" (id, code, text, "groupId", "displayOrder")
+       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [createId(), validated.code, validated.text, validated.groupId, nextOrder]
+    )
+    const commentOption = optionRows[0]
 
     // Audit log
     await createAuditLog({
@@ -532,15 +514,13 @@ export const updateComment = withRole(['admin', 'hod'], async (
     const validated = validation.data
 
     // Get current option for audit log
-    const currentOption = await prisma.commentOption.findUnique({ where: { id: commentId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "CommentOption" WHERE id = $1`, [commentId])
+    const currentOption = currentRows[0] ?? null
 
-    await prisma.commentOption.update({
-      where: { id: commentId },
-      data: {
-        code: validated.code,
-        text: validated.text
-      }
-    })
+    await pool.query(
+      `UPDATE "CommentOption" SET code = $1, text = $2 WHERE id = $3`,
+      [validated.code, validated.text, commentId]
+    )
 
     // Audit log
     await logDataChange(
@@ -578,11 +558,10 @@ export const deleteComment = withRole(['admin', 'hod'], async (
     }
 
     // Get current option for audit log
-    const currentOption = await prisma.commentOption.findUnique({ where: { id: commentId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "CommentOption" WHERE id = $1`, [commentId])
+    const currentOption = currentRows[0] ?? null
 
-    await prisma.commentOption.delete({
-      where: { id: commentId }
-    })
+    await pool.query(`DELETE FROM "CommentOption" WHERE id = $1`, [commentId])
 
     // Audit log
     await createAuditLog({
@@ -621,10 +600,10 @@ export const reorderComments = withRole(['admin', 'hod'], async (
     // Update display order for each option
     await Promise.all(
       items.map(item =>
-        prisma.commentOption.update({
-          where: { id: item.id },
-          data: { displayOrder: item.order }
-        })
+        pool.query(
+          `UPDATE "CommentOption" SET "displayOrder" = $1 WHERE id = $2`,
+          [item.order, item.id]
+        )
       )
     )
 
@@ -638,12 +617,12 @@ export const reorderComments = withRole(['admin', 'hod'], async (
     logger.info('Comment options reordered', { groupId, count: items.length })
 
     // Get subject ID for revalidation
-    const group = await prisma.commentGroup.findUnique({
-      where: { id: groupId },
-      select: { subjectId: true }
-    })
-    if (group) {
-      revalidatePath(`/hod/subject/${group.subjectId}`)
+    const { rows: groupRows } = await pool.query(
+      `SELECT "subjectId" FROM "CommentGroup" WHERE id = $1`,
+      [groupId]
+    )
+    if (groupRows.length > 0) {
+      revalidatePath(`/hod/subject/${groupRows[0].subjectId}`)
     }
 
     return { success: true }
@@ -677,15 +656,11 @@ export const createAssignment = withRole(['admin', 'hod'], async (
       }
     }
 
-    const assignment = await prisma.assignment.create({
-      data: {
-        id: createId(),
-        pupilId,
-        classId,
-        eoyLevel,
-        targetLevel
-      }
-    })
+    const { rows } = await pool.query(
+      `INSERT INTO "Assignment" (id, "pupilId", "classId", "eoyLevel", "targetLevel") VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      [createId(), pupilId, classId, eoyLevel || null, targetLevel || null]
+    )
+    const assignment = rows[0]
 
     // Audit log
     await createAuditLog({
@@ -715,20 +690,17 @@ export const updateAssignment = withRole(['admin', 'hod'], async (
 ) => {
   try {
     const eoyLevel = formData.get('eoyLevel') as string
-    const targetLevel = formData.get('targetLevel') as string
     const actualLevel = formData.get('actualLevel') as string
+    const targetLevel = formData.get('targetLevel') as string
 
     // Get current assignment for audit log
-    const currentAssignment = await prisma.assignment.findUnique({ where: { id: assignmentId } })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "Assignment" WHERE id = $1`, [assignmentId])
+    const currentAssignment = currentRows[0] ?? null
 
-    await prisma.assignment.update({
-      where: { id: assignmentId },
-      data: {
-        eoyLevel,
-        targetLevel,
-        actualLevel
-      }
-    })
+    await pool.query(
+      `UPDATE "Assignment" SET "eoyLevel" = $1, "targetLevel" = $2, "actualLevel" = $3 WHERE id = $4`,
+      [eoyLevel || null, targetLevel || null, actualLevel || null, assignmentId]
+    )
 
     // Audit log
     await logDataChange(
@@ -758,21 +730,17 @@ export const deleteAssignment = withRole(['admin', 'hod'], async (
 ) => {
   try {
     // Get current assignment for audit log
-    const currentAssignment = await prisma.assignment.findUnique({
-      where: { id: assignmentId },
-      select: { pupilId: true, classId: true }
-    })
+    const { rows: currentRows } = await pool.query(`SELECT * FROM "Assignment" WHERE id = $1`, [assignmentId])
+    const currentAssignment = currentRows[0] ?? null
 
-    await prisma.assignment.delete({
-      where: { id: assignmentId }
-    })
+    await pool.query(`DELETE FROM "Assignment" WHERE id = $1`, [assignmentId])
 
     // Audit log
     await createAuditLog({
       action: 'delete_assignment',
       entityType: 'assignment',
       entityId: assignmentId,
-      details: currentAssignment ? { before: currentAssignment } : undefined
+      details: currentAssignment ? { before: { pupilId: currentAssignment.pupilId, classId: currentAssignment.classId } } : undefined
     })
 
     logger.info('Assignment deleted', { assignmentId })
