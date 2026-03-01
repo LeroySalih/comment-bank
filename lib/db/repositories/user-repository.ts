@@ -157,6 +157,7 @@ export class UserRepository {
    */
   async updateRoles(userId: string, roleNames: string[]): Promise<DbUserWithRoles> {
     const client = await pool.connect()
+    const roles: DbRole[] = []
 
     try {
       await client.query('BEGIN')
@@ -165,8 +166,6 @@ export class UserRepository {
         `DELETE FROM "_RoleToUser" WHERE "B" = $1`,
         [userId]
       )
-
-      const roles: DbRole[] = []
 
       for (const roleName of roleNames) {
         await client.query(
@@ -187,34 +186,30 @@ export class UserRepository {
       }
 
       await client.query('COMMIT')
-
-      const userResult = await pool.query<DbUser>(
-        `SELECT * FROM "User" WHERE id = $1`,
-        [userId]
-      )
-
-      if (userResult.rows.length === 0) {
-        throw new NotFoundError(`User with ID ${userId} not found`)
-      }
-
-      return { ...userResult.rows[0], Role: roles }
     } catch (err) {
       await client.query('ROLLBACK')
       throw err
     } finally {
       client.release()
     }
+
+    const { rows } = await pool.query<DbUser>('SELECT * FROM "User" WHERE id = $1', [userId])
+    if (rows.length === 0) throw new NotFoundError(`User with ID ${userId} not found`)
+    return { ...rows[0], Role: roles }
   }
 
   /**
    * Delete a user
    */
   async delete(userId: string): Promise<DbUser> {
-    const result = await pool.query<DbUser>(
+    const { rows } = await pool.query<DbUser>(
       `DELETE FROM "User" WHERE id = $1 RETURNING *`,
       [userId]
     )
-    return result.rows[0]
+    if (rows.length === 0) {
+      throw new NotFoundError(`User with ID ${userId} not found`)
+    }
+    return rows[0]
   }
 }
 
