@@ -14,13 +14,13 @@ import { pool } from '@/lib/db'
  * @example
  * export const deleteUser = withRole('admin', async (userId: string) => {
  *   // Only admins can execute this
- *   await prisma.user.delete({ where: { id: userId } })
+ *   await pool.query('DELETE FROM "User" WHERE id = $1', [userId])
  * })
  *
  * @example
  * export const updateSubject = withRole(['admin', 'hod'], async (subjectId: string, data: any) => {
  *   // Both admins and HODs can execute this
- *   await prisma.subject.update({ where: { id: subjectId }, data })
+ *   await pool.query('UPDATE "Subject" SET ... WHERE id = $1', [subjectId])
  * })
  */
 export function withRole<T extends any[], R>(
