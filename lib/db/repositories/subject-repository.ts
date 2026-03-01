@@ -171,6 +171,10 @@ export class SubjectRepository {
       values.push(data.studiedComment)
     }
 
+    if (fields.length === 0) {
+      throw new Error('update called with no fields to update')
+    }
+
     values.push(id)
 
     const { rows } = await pool.query<DbSubject>(
