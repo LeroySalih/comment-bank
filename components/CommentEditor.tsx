@@ -180,21 +180,32 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
         return group.CommonCommentOption.find(o => o.id === selectedOptionId)?.text || "";
     };
 
+    // Identify subject groups that override CCG variables
+    const ccgGroupNames = new Set((commonGroups ?? []).map(g => g.name));
+    const overrideGroupsByName = new Map(
+        groups
+            .filter(g => ccgGroupNames.has(g.name))
+            .map(g => [g.name, g] as [string, typeof groups[number]])
+    );
+
     // Build the subject content
     const buildSubjectContent = (): string => {
         const parts: string[] = [];
         if (subject.studiedComment) parts.push(subject.studiedComment);
+
+        // Exclude CCG override groups from SCG content
+        const pureScgGroups = groups.filter(g => !ccgGroupNames.has(g.name));
 
         let orderedGroups: CommentGroup[];
         if (subjectFormat) {
             const codes = subjectFormat.split(/\s+/).filter(Boolean);
             orderedGroups = [];
             for (const code of codes) {
-                const group = groups.find(g => g.name === code);
+                const group = pureScgGroups.find(g => g.name === code);
                 if (group) orderedGroups.push(group);
             }
         } else {
-            orderedGroups = [...groups].sort((a, b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
+            orderedGroups = [...pureScgGroups].sort((a, b) => ((a as any).displayOrder || 0) - ((b as any).displayOrder || 0));
         }
 
         const groupTexts: string[] = [];
@@ -210,9 +221,17 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
       // Format template-based generation
       let result = formatTemplate;
 
-      // Replace each CCG group tag
+      // Replace each CCG group tag — use subject override if available, fall back to CCG
       for (const group of commonGroups) {
-        const text = getCommonOptText(group);
+        const overrideGroup = overrideGroupsByName.get(group.name);
+        let text: string;
+        if (overrideGroup) {
+            const selectedId = selections[overrideGroup.id];
+            text = selectedId ? (overrideGroup.CommentOption.find(o => o.id === selectedId)?.text ?? '') : '';
+            if (!text) text = getCommonOptText(group); // fallback to CCG
+        } else {
+            text = getCommonOptText(group);
+        }
         result = result.replaceAll(`<${group.name}>`, text);
       }
 
@@ -236,7 +255,15 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     } else {
       // Has common groups but no template: join common then subject
       const paragraphs: string[] = [];
-      const commonTexts = commonGroups.map(g => getCommonOptText(g)).filter(Boolean);
+      const commonTexts = commonGroups.map(g => {
+          const overrideGroup = overrideGroupsByName.get(g.name);
+          if (overrideGroup) {
+              const selectedId = selections[overrideGroup.id];
+              const text = selectedId ? (overrideGroup.CommentOption.find(o => o.id === selectedId)?.text ?? '') : '';
+              return text || getCommonOptText(g);
+          }
+          return getCommonOptText(g);
+      }).filter(Boolean);
       if (commonTexts.length > 0) paragraphs.push(commonTexts.join(" "));
 
       const subjectContent = buildSubjectContent();
@@ -444,6 +471,11 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const commonGroupsMapped = (commonGroups || []).map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommonCommentOption }));
   const subjectGroupsMapped = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
 
+  // Split subject groups into CCG overrides and pure SCG groups
+  const ccgNamesSet = new Set((commonGroups || []).map(g => g.name));
+  const overrideGroupsMapped = subjectGroupsMapped.filter(g => ccgNamesSet.has(g.name));
+  const pureScgGroupsMapped = subjectGroupsMapped.filter(g => !ccgNamesSet.has(g.name));
+
   // Split CCG groups into before-SCG and after-SCG based on where <SCG> appears in the template
   let ccgBeforeSCG = commonGroupsMapped;
   let ccgAfterSCG: typeof commonGroupsMapped = [];
@@ -480,7 +512,8 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                 )}
                 <div className="flex flex-col gap-4">
                     {renderGroupSection('Common', ccgBeforeSCG, commonSelections, handleCommonSelection, true)}
-                    {renderGroupSection('Subject', subjectGroupsMapped, selections, handleSelection, false)}
+                    {overrideGroupsMapped.length > 0 && renderGroupSection('Subject Overrides', overrideGroupsMapped, selections, handleSelection, false)}
+                    {renderGroupSection('Subject', pureScgGroupsMapped, selections, handleSelection, false)}
                     {renderGroupSection('Common', ccgAfterSCG, commonSelections, handleCommonSelection, true)}
                 </div>
             </div>
