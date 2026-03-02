@@ -1,11 +1,14 @@
 -- AlterTable
-ALTER TABLE "Assignment" ADD COLUMN     "checkNote" TEXT,
-ADD COLUMN     "checkStatus" TEXT NOT NULL DEFAULT 'not_required',
-ADD COLUMN     "checkedAt" TIMESTAMP(3),
-ADD COLUMN     "checkedById" TEXT;
+ALTER TABLE "Assignment" ADD COLUMN IF NOT EXISTS "checkNote" TEXT;
+ALTER TABLE "Assignment" ADD COLUMN IF NOT EXISTS "checkStatus" TEXT NOT NULL DEFAULT 'not_required';
+ALTER TABLE "Assignment" ADD COLUMN IF NOT EXISTS "checkedAt" TIMESTAMP(3);
+ALTER TABLE "Assignment" ADD COLUMN IF NOT EXISTS "checkedById" TEXT;
 
 -- CreateIndex
-CREATE INDEX "Assignment_checkStatus_idx" ON "Assignment"("checkStatus");
+CREATE INDEX IF NOT EXISTS "Assignment_checkStatus_idx" ON "Assignment"("checkStatus");
 
 -- AddForeignKey
-ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_checkedById_fkey" FOREIGN KEY ("checkedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_checkedById_fkey" FOREIGN KEY ("checkedById") REFERENCES "User"("id") ON DELETE SET NULL ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

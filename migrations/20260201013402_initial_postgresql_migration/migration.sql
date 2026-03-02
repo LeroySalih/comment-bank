@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "User" (
+CREATE TABLE IF NOT EXISTS "User" (
     "id" TEXT NOT NULL,
     "username" TEXT NOT NULL,
     "password" TEXT NOT NULL,
@@ -8,7 +8,7 @@ CREATE TABLE "User" (
 );
 
 -- CreateTable
-CREATE TABLE "Role" (
+CREATE TABLE IF NOT EXISTS "Role" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
 
@@ -16,7 +16,7 @@ CREATE TABLE "Role" (
 );
 
 -- CreateTable
-CREATE TABLE "Subject" (
+CREATE TABLE IF NOT EXISTS "Subject" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "title" TEXT,
@@ -26,7 +26,7 @@ CREATE TABLE "Subject" (
 );
 
 -- CreateTable
-CREATE TABLE "Class" (
+CREATE TABLE IF NOT EXISTS "Class" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "year" TEXT,
@@ -36,7 +36,7 @@ CREATE TABLE "Class" (
 );
 
 -- CreateTable
-CREATE TABLE "Pupil" (
+CREATE TABLE IF NOT EXISTS "Pupil" (
     "admissionNumber" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
@@ -47,7 +47,7 @@ CREATE TABLE "Pupil" (
 );
 
 -- CreateTable
-CREATE TABLE "Assignment" (
+CREATE TABLE IF NOT EXISTS "Assignment" (
     "id" TEXT NOT NULL,
     "pupilId" TEXT NOT NULL,
     "classId" TEXT NOT NULL,
@@ -60,7 +60,7 @@ CREATE TABLE "Assignment" (
 );
 
 -- CreateTable
-CREATE TABLE "PupilCode" (
+CREATE TABLE IF NOT EXISTS "PupilCode" (
     "id" TEXT NOT NULL,
     "assignmentId" TEXT NOT NULL,
     "groupId" TEXT NOT NULL,
@@ -70,7 +70,7 @@ CREATE TABLE "PupilCode" (
 );
 
 -- CreateTable
-CREATE TABLE "CommentGroup" (
+CREATE TABLE IF NOT EXISTS "CommentGroup" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "displayOrder" INTEGER NOT NULL DEFAULT 0,
@@ -80,7 +80,7 @@ CREATE TABLE "CommentGroup" (
 );
 
 -- CreateTable
-CREATE TABLE "CommentOption" (
+CREATE TABLE IF NOT EXISTS "CommentOption" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "text" TEXT NOT NULL,
@@ -91,7 +91,7 @@ CREATE TABLE "CommentOption" (
 );
 
 -- CreateTable
-CREATE TABLE "_RoleToUser" (
+CREATE TABLE IF NOT EXISTS "_RoleToUser" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
@@ -99,7 +99,7 @@ CREATE TABLE "_RoleToUser" (
 );
 
 -- CreateTable
-CREATE TABLE "_SubjectToUser" (
+CREATE TABLE IF NOT EXISTS "_SubjectToUser" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
@@ -107,7 +107,7 @@ CREATE TABLE "_SubjectToUser" (
 );
 
 -- CreateTable
-CREATE TABLE "_ClassToUser" (
+CREATE TABLE IF NOT EXISTS "_ClassToUser" (
     "A" TEXT NOT NULL,
     "B" TEXT NOT NULL,
 
@@ -115,102 +115,144 @@ CREATE TABLE "_ClassToUser" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
+CREATE UNIQUE INDEX IF NOT EXISTS "User_username_key" ON "User"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Role_name_key" ON "Role"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Role_name_key" ON "Role"("name");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Subject_code_key" ON "Subject"("code");
+CREATE UNIQUE INDEX IF NOT EXISTS "Subject_code_key" ON "Subject"("code");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Class_name_key" ON "Class"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "Class_name_key" ON "Class"("name");
 
 -- CreateIndex
-CREATE INDEX "Class_subjectId_idx" ON "Class"("subjectId");
+CREATE INDEX IF NOT EXISTS "Class_subjectId_idx" ON "Class"("subjectId");
 
 -- CreateIndex
-CREATE INDEX "Assignment_classId_idx" ON "Assignment"("classId");
+CREATE INDEX IF NOT EXISTS "Assignment_classId_idx" ON "Assignment"("classId");
 
 -- CreateIndex
-CREATE INDEX "Assignment_pupilId_idx" ON "Assignment"("pupilId");
+CREATE INDEX IF NOT EXISTS "Assignment_pupilId_idx" ON "Assignment"("pupilId");
 
 -- CreateIndex
-CREATE INDEX "PupilCode_assignmentId_idx" ON "PupilCode"("assignmentId");
+CREATE INDEX IF NOT EXISTS "PupilCode_assignmentId_idx" ON "PupilCode"("assignmentId");
 
 -- CreateIndex
-CREATE INDEX "PupilCode_groupId_idx" ON "PupilCode"("groupId");
+CREATE INDEX IF NOT EXISTS "PupilCode_groupId_idx" ON "PupilCode"("groupId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "PupilCode_assignmentId_groupId_key" ON "PupilCode"("assignmentId", "groupId");
+CREATE UNIQUE INDEX IF NOT EXISTS "PupilCode_assignmentId_groupId_key" ON "PupilCode"("assignmentId", "groupId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CommentGroup_subjectId_name_key" ON "CommentGroup"("subjectId", "name");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommentGroup_subjectId_name_key" ON "CommentGroup"("subjectId", "name");
 
 -- CreateIndex
-CREATE INDEX "CommentOption_groupId_idx" ON "CommentOption"("groupId");
+CREATE INDEX IF NOT EXISTS "CommentOption_groupId_idx" ON "CommentOption"("groupId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CommentOption_groupId_code_key" ON "CommentOption"("groupId", "code");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommentOption_groupId_code_key" ON "CommentOption"("groupId", "code");
 
 -- CreateIndex
-CREATE INDEX "_RoleToUser_B_index" ON "_RoleToUser"("B");
+CREATE INDEX IF NOT EXISTS "_RoleToUser_B_index" ON "_RoleToUser"("B");
 
 -- CreateIndex
-CREATE INDEX "_SubjectToUser_B_index" ON "_SubjectToUser"("B");
+CREATE INDEX IF NOT EXISTS "_SubjectToUser_B_index" ON "_SubjectToUser"("B");
 
 -- CreateIndex
-CREATE INDEX "_ClassToUser_B_index" ON "_ClassToUser"("B");
+CREATE INDEX IF NOT EXISTS "_ClassToUser_B_index" ON "_ClassToUser"("B");
 
 -- AddForeignKey
-ALTER TABLE "Class" ADD CONSTRAINT "Class_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Class" ADD CONSTRAINT "Class_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_pupilId_fkey" FOREIGN KEY ("pupilId") REFERENCES "Pupil"("admissionNumber") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_pupilId_fkey" FOREIGN KEY ("pupilId") REFERENCES "Pupil"("admissionNumber") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "Assignment" ADD CONSTRAINT "Assignment_classId_fkey" FOREIGN KEY ("classId") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "PupilCode" ADD CONSTRAINT "PupilCode_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "PupilCode" ADD CONSTRAINT "PupilCode_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "PupilCode" ADD CONSTRAINT "PupilCode_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "PupilCode" ADD CONSTRAINT "PupilCode_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "CommentGroup" ADD CONSTRAINT "CommentGroup_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CommentGroup" ADD CONSTRAINT "CommentGroup_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "CommentOption" ADD CONSTRAINT "CommentOption_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CommentOption" ADD CONSTRAINT "CommentOption_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_RoleToUser" ADD CONSTRAINT "_RoleToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Role"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_RoleToUser" ADD CONSTRAINT "_RoleToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Role"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_RoleToUser" ADD CONSTRAINT "_RoleToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_RoleToUser" ADD CONSTRAINT "_RoleToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_SubjectToUser" ADD CONSTRAINT "_SubjectToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_SubjectToUser" ADD CONSTRAINT "_SubjectToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Subject"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_SubjectToUser" ADD CONSTRAINT "_SubjectToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_SubjectToUser" ADD CONSTRAINT "_SubjectToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_A_fkey" FOREIGN KEY ("A") REFERENCES "Class"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "_ClassToUser" ADD CONSTRAINT "_ClassToUser_B_fkey" FOREIGN KEY ("B") REFERENCES "User"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- Seed: Create roles
 INSERT INTO "Role" ("id", "name") VALUES
   ('role_admin_001', 'admin'),
   ('role_hod_001', 'hod'),
-  ('role_teacher_001', 'teacher');
+  ('role_teacher_001', 'teacher')
+ON CONFLICT DO NOTHING;
 
 -- Seed: Create admin user (password: 'password')
 INSERT INTO "User" ("id", "username", "password") VALUES
-  ('user_admin_001', 'admin', '$2b$10$Gu0rCLBDr8RikhF26aGhguJMpOgjOlyQ7JGCHwRJVpUOFKfanFPtG');
+  ('user_admin_001', 'admin', '$2b$10$Gu0rCLBDr8RikhF26aGhguJMpOgjOlyQ7JGCHwRJVpUOFKfanFPtG')
+ON CONFLICT DO NOTHING;
 
 -- Seed: Assign admin role to admin user
 INSERT INTO "_RoleToUser" ("A", "B") VALUES
-  ('role_admin_001', 'user_admin_001');
+  ('role_admin_001', 'user_admin_001')
+ON CONFLICT DO NOTHING;

@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "CommentGroup" ADD COLUMN     "title" TEXT NOT NULL DEFAULT '';
+ALTER TABLE "CommentGroup" ADD COLUMN IF NOT EXISTS "title" TEXT NOT NULL DEFAULT '';

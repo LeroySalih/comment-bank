@@ -1,10 +1,10 @@
 -- AlterTable
-ALTER TABLE "Assignment" ADD COLUMN     "linkedData" JSONB;
+ALTER TABLE "Assignment" ADD COLUMN IF NOT EXISTS "linkedData" JSONB;
 
 -- AlterTable
-ALTER TABLE "CommentGroup" ADD COLUMN     "isLinked" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "linkedField" TEXT;
+ALTER TABLE "CommentGroup" ADD COLUMN IF NOT EXISTS "isLinked" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "CommentGroup" ADD COLUMN IF NOT EXISTS "linkedField" TEXT;
 
 -- AlterTable
-ALTER TABLE "CommonCommentGroup" ADD COLUMN     "isLinked" BOOLEAN NOT NULL DEFAULT false,
-ADD COLUMN     "linkedField" TEXT;
+ALTER TABLE "CommonCommentGroup" ADD COLUMN IF NOT EXISTS "isLinked" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "CommonCommentGroup" ADD COLUMN IF NOT EXISTS "linkedField" TEXT;

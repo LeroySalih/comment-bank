@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "Deadline" (
+CREATE TABLE IF NOT EXISTS "Deadline" (
     "id" TEXT NOT NULL,
     "title" TEXT NOT NULL,
     "date" TIMESTAMP(3) NOT NULL,

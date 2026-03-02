@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "CommonCommentGroup" (
+CREATE TABLE IF NOT EXISTS "CommonCommentGroup" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "title" TEXT NOT NULL DEFAULT '',
@@ -10,7 +10,7 @@ CREATE TABLE "CommonCommentGroup" (
 );
 
 -- CreateTable
-CREATE TABLE "CommonCommentOption" (
+CREATE TABLE IF NOT EXISTS "CommonCommentOption" (
     "id" TEXT NOT NULL,
     "code" TEXT NOT NULL,
     "text" TEXT NOT NULL,
@@ -21,7 +21,7 @@ CREATE TABLE "CommonCommentOption" (
 );
 
 -- CreateTable
-CREATE TABLE "CommonPupilCode" (
+CREATE TABLE IF NOT EXISTS "CommonPupilCode" (
     "id" TEXT NOT NULL,
     "assignmentId" TEXT NOT NULL,
     "commonGroupId" TEXT NOT NULL,
@@ -31,7 +31,7 @@ CREATE TABLE "CommonPupilCode" (
 );
 
 -- CreateTable
-CREATE TABLE "AppSetting" (
+CREATE TABLE IF NOT EXISTS "AppSetting" (
     "key" TEXT NOT NULL,
     "value" TEXT NOT NULL,
 
@@ -39,28 +39,37 @@ CREATE TABLE "AppSetting" (
 );
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CommonCommentGroup_name_key" ON "CommonCommentGroup"("name");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommonCommentGroup_name_key" ON "CommonCommentGroup"("name");
 
 -- CreateIndex
-CREATE INDEX "CommonCommentOption_groupId_idx" ON "CommonCommentOption"("groupId");
+CREATE INDEX IF NOT EXISTS "CommonCommentOption_groupId_idx" ON "CommonCommentOption"("groupId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CommonCommentOption_groupId_code_key" ON "CommonCommentOption"("groupId", "code");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommonCommentOption_groupId_code_key" ON "CommonCommentOption"("groupId", "code");
 
 -- CreateIndex
-CREATE INDEX "CommonPupilCode_assignmentId_idx" ON "CommonPupilCode"("assignmentId");
+CREATE INDEX IF NOT EXISTS "CommonPupilCode_assignmentId_idx" ON "CommonPupilCode"("assignmentId");
 
 -- CreateIndex
-CREATE INDEX "CommonPupilCode_commonGroupId_idx" ON "CommonPupilCode"("commonGroupId");
+CREATE INDEX IF NOT EXISTS "CommonPupilCode_commonGroupId_idx" ON "CommonPupilCode"("commonGroupId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "CommonPupilCode_assignmentId_commonGroupId_key" ON "CommonPupilCode"("assignmentId", "commonGroupId");
+CREATE UNIQUE INDEX IF NOT EXISTS "CommonPupilCode_assignmentId_commonGroupId_key" ON "CommonPupilCode"("assignmentId", "commonGroupId");
 
 -- AddForeignKey
-ALTER TABLE "CommonCommentOption" ADD CONSTRAINT "CommonCommentOption_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommonCommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CommonCommentOption" ADD CONSTRAINT "CommonCommentOption_groupId_fkey" FOREIGN KEY ("groupId") REFERENCES "CommonCommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "CommonPupilCode" ADD CONSTRAINT "CommonPupilCode_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CommonPupilCode" ADD CONSTRAINT "CommonPupilCode_assignmentId_fkey" FOREIGN KEY ("assignmentId") REFERENCES "Assignment"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;
 
 -- AddForeignKey
-ALTER TABLE "CommonPupilCode" ADD CONSTRAINT "CommonPupilCode_commonGroupId_fkey" FOREIGN KEY ("commonGroupId") REFERENCES "CommonCommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+DO $$ BEGIN
+  ALTER TABLE "CommonPupilCode" ADD CONSTRAINT "CommonPupilCode_commonGroupId_fkey" FOREIGN KEY ("commonGroupId") REFERENCES "CommonCommentGroup"("id") ON DELETE CASCADE ON UPDATE CASCADE;
+EXCEPTION WHEN duplicate_object THEN NULL;
+END $$;

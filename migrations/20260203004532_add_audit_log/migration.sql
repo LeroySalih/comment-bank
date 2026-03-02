@@ -1,5 +1,5 @@
 -- CreateTable
-CREATE TABLE "AuditLog" (
+CREATE TABLE IF NOT EXISTS "AuditLog" (
     "id" TEXT NOT NULL,
     "userId" TEXT,
     "username" TEXT,
@@ -15,13 +15,13 @@ CREATE TABLE "AuditLog" (
 );
 
 -- CreateIndex
-CREATE INDEX "AuditLog_userId_idx" ON "AuditLog"("userId");
+CREATE INDEX IF NOT EXISTS "AuditLog_userId_idx" ON "AuditLog"("userId");
 
 -- CreateIndex
-CREATE INDEX "AuditLog_action_idx" ON "AuditLog"("action");
+CREATE INDEX IF NOT EXISTS "AuditLog_action_idx" ON "AuditLog"("action");
 
 -- CreateIndex
-CREATE INDEX "AuditLog_entityType_idx" ON "AuditLog"("entityType");
+CREATE INDEX IF NOT EXISTS "AuditLog_entityType_idx" ON "AuditLog"("entityType");
 
 -- CreateIndex
-CREATE INDEX "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");
+CREATE INDEX IF NOT EXISTS "AuditLog_createdAt_idx" ON "AuditLog"("createdAt");

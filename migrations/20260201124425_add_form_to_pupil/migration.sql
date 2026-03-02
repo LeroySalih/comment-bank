@@ -1,2 +1,2 @@
 -- AlterTable
-ALTER TABLE "Pupil" ADD COLUMN     "form" TEXT;
+ALTER TABLE "Pupil" ADD COLUMN IF NOT EXISTS "form" TEXT;
