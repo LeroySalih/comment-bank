@@ -226,9 +226,7 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
         const overrideGroup = overrideGroupsByName.get(group.name);
         let text: string;
         if (overrideGroup) {
-            const selectedId = selections[overrideGroup.id];
-            text = selectedId ? (overrideGroup.CommentOption.find(o => o.id === selectedId)?.text ?? '') : '';
-            if (!text) text = getCommonOptText(group); // fallback to CCG
+            text = getOptText(overrideGroup) || getCommonOptText(group);
         } else {
             text = getCommonOptText(group);
         }
@@ -258,9 +256,7 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
       const commonTexts = commonGroups.map(g => {
           const overrideGroup = overrideGroupsByName.get(g.name);
           if (overrideGroup) {
-              const selectedId = selections[overrideGroup.id];
-              const text = selectedId ? (overrideGroup.CommentOption.find(o => o.id === selectedId)?.text ?? '') : '';
-              return text || getCommonOptText(g);
+              return getOptText(overrideGroup) || getCommonOptText(g);
           }
           return getCommonOptText(g);
       }).filter(Boolean);
@@ -472,9 +468,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const subjectGroupsMapped = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
 
   // Split subject groups into CCG overrides and pure SCG groups
-  const ccgNamesSet = new Set((commonGroups || []).map(g => g.name));
-  const overrideGroupsMapped = subjectGroupsMapped.filter(g => ccgNamesSet.has(g.name));
-  const pureScgGroupsMapped = subjectGroupsMapped.filter(g => !ccgNamesSet.has(g.name));
+  const ccgGroupNames = new Set((commonGroups || []).map(g => g.name));
+  const overrideGroupsMapped = subjectGroupsMapped.filter(g => ccgGroupNames.has(g.name));
+  const pureScgGroupsMapped = subjectGroupsMapped.filter(g => !ccgGroupNames.has(g.name));
 
   // Split CCG groups into before-SCG and after-SCG based on where <SCG> appears in the template
   let ccgBeforeSCG = commonGroupsMapped;
