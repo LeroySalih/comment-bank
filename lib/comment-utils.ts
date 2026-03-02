@@ -106,6 +106,11 @@ export function generateComment(
         return option?.text || "";
     };
 
+    // Identify subject groups that override a CCG group (name matches a CCG group name)
+    const ccgGroupNames = new Set((commonGroups ?? []).map(g => g.name));
+    const overrideGroups = groups.filter(g => ccgGroupNames.has(g.name));
+    const overrideGroupsByName = new Map(overrideGroups.map(g => [g.name, g]));
+
     // Build the subject content
     const buildSubjectContent = (): string => {
         const parts: string[] = [];
@@ -113,18 +118,21 @@ export function generateComment(
             parts.push(subject.studiedComment);
         }
 
+        // Pure SCG groups only — exclude any group that overrides a CCG variable
+        const pureScgGroups = groups.filter(g => !ccgGroupNames.has(g.name));
+
         let orderedGroups: MinimalGroup[];
         if (subjectFormat) {
             // Use the subject's comment format to order groups
             const codes = subjectFormat.split(/\s+/).filter(Boolean);
             orderedGroups = [];
             for (const code of codes) {
-                const group = groups.find(g => g.name === code);
+                const group = pureScgGroups.find(g => g.name === code);
                 if (group) orderedGroups.push(group);
             }
         } else {
             // Default: all groups in display order
-            orderedGroups = groups;
+            orderedGroups = pureScgGroups;
         }
 
         const groupTexts: string[] = [];
@@ -140,9 +148,16 @@ export function generateComment(
     if (formatTemplate && commonGroups && commonGroups.length > 0) {
         let result = formatTemplate;
 
-        // Replace each CCG group tag
+        // Replace each CCG group tag — use subject override if available, fall back to CCG
         for (const group of commonGroups) {
-            const text = getCommonOptionText(group);
+            const overrideGroup = overrideGroupsByName.get(group.name);
+            let text: string;
+            if (overrideGroup) {
+                text = getOptionTextForGroup(overrideGroup);
+                if (!text) text = getCommonOptionText(group); // fallback to CCG
+            } else {
+                text = getCommonOptionText(group);
+            }
             result = result.replaceAll(`<${group.name}>`, text);
         }
 
@@ -187,7 +202,14 @@ export function generateComment(
     // Has common groups but no template: join common groups then subject groups
     const paragraphs: string[] = [];
 
-    const commonTexts = commonGroups.map(g => getCommonOptionText(g)).filter(Boolean);
+    const commonTexts = commonGroups.map(g => {
+        const overrideGroup = overrideGroupsByName.get(g.name);
+        if (overrideGroup) {
+            const text = getOptionTextForGroup(overrideGroup);
+            return text || getCommonOptionText(g);
+        }
+        return getCommonOptionText(g);
+    }).filter(Boolean);
     if (commonTexts.length > 0) paragraphs.push(commonTexts.join(" "));
 
     const subjectContent = buildSubjectContent();
