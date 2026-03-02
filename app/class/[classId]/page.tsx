@@ -210,6 +210,11 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
     commonGroupsAfter = (commonGroups as any[]).filter((g: any) => namesAfterSCG.has(g.name)).sort(byPos);
   }
 
+  // Remove CCG columns that are overridden by a subject-specific CommentGroup with the same name
+  const subjectCcgOverrideNames = new Set(groups.filter((g: any) => commonGroups.some((cg: any) => cg.name === g.name)).map((g: any) => g.name));
+  commonGroupsBefore = commonGroupsBefore.filter((g: any) => !subjectCcgOverrideNames.has(g.name));
+  commonGroupsAfter = commonGroupsAfter.filter((g: any) => !subjectCcgOverrideNames.has(g.name));
+
   return (
     <main className="flex-1 flex flex-col min-w-0 bg-background-light dark:bg-background-dark h-[calc(100vh-64px)] overflow-hidden">
         {/* Page Heading */}
