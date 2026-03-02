@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation"
 
 type CcgGroup = { id: string; name: string; title: string }
 
-export function GroupForm({ subjectId, ccgGroups }: { subjectId: string; ccgGroups: CcgGroup[] }) {
+export function GroupForm({ subjectId, ccgGroups = [] }: { subjectId: string; ccgGroups?: CcgGroup[] }) {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const router = useRouter()
