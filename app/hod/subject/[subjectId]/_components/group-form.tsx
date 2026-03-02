@@ -4,7 +4,9 @@ import { useState } from "react"
 import { createCommentGroup } from "@/lib/server-actions/hod"
 import { useRouter } from "next/navigation"
 
-export function GroupForm({ subjectId }: { subjectId: string }) {
+type CcgGroup = { id: string; name: string; title: string }
+
+export function GroupForm({ subjectId, ccgGroups }: { subjectId: string; ccgGroups: CcgGroup[] }) {
   const [error, setError] = useState<string | null>(null)
   const [open, setOpen] = useState(false)
   const router = useRouter()
@@ -57,6 +59,23 @@ export function GroupForm({ subjectId }: { subjectId: string }) {
             />
           </div>
         </div>
+        {ccgGroups.length > 0 && (
+          <div className="rounded-md bg-indigo-50 dark:bg-indigo-900/20 border border-indigo-200 dark:border-indigo-800 p-3">
+            <p className="text-xs font-medium text-indigo-700 dark:text-indigo-300 mb-1">
+              Override a Common Group
+            </p>
+            <p className="text-xs text-indigo-600 dark:text-indigo-400 mb-2">
+              Use one of these codes as the group Code to override that CCG variable for this subject:
+            </p>
+            <div className="flex flex-wrap gap-1">
+              {ccgGroups.map(cg => (
+                <span key={cg.id} className="text-[11px] font-mono bg-indigo-100 dark:bg-indigo-800 text-indigo-700 dark:text-indigo-300 px-2 py-0.5 rounded">
+                  {cg.name} <span className="font-normal opacity-70">({cg.title})</span>
+                </span>
+              ))}
+            </div>
+          </div>
+        )}
         <div className="flex gap-2 justify-end">
           <button
             type="button"

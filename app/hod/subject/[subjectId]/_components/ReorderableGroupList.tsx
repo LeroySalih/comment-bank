@@ -26,9 +26,12 @@ interface Group {
   }
 }
 
+type CcgGroup = { id: string; name: string; title: string }
+
 interface Props {
   subjectId: string
   initialGroups: Group[]
+  ccgGroups?: CcgGroup[]
 }
 
 function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; subjectId: string; onClose: () => void }) {
@@ -347,7 +350,7 @@ function CommentsList({ group, subjectId }: { group: Group; subjectId: string })
   )
 }
 
-export function ReorderableGroupList({ subjectId, initialGroups }: Props) {
+export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups }: Props) {
   const [groups, setGroups] = useState(initialGroups)
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -420,7 +423,14 @@ export function ReorderableGroupList({ subjectId, initialGroups }: Props) {
                       <span className="bg-gray-200 dark:bg-gray-700 text-gray-600 dark:text-gray-300 text-xs font-bold px-2 py-1 rounded">
                         {group.name}
                       </span>
-                      <span className="font-bold text-[#111418] dark:text-white flex-1">{group.title}</span>
+                      <span className="font-bold text-[#111418] dark:text-white flex-1">
+                        {group.title}
+                        {ccgGroups?.some(cg => cg.name === group.name) && (
+                          <span className="text-[10px] font-medium text-indigo-600 bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 px-1.5 py-0.5 rounded ml-1">
+                            CCG Override
+                          </span>
+                        )}
+                      </span>
                       <EditGroupForm
                         groupId={group.id}
                         subjectId={subjectId}

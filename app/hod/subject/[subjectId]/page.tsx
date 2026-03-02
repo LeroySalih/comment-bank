@@ -63,6 +63,12 @@ export default async function SubjectPage({ params }: Props) {
     CommentGroup: groupRows,
   }
 
+  // Fetch CCG group names so HODs can see which names enable overrides
+  const { rows: ccgRows } = await pool.query(
+    `SELECT id, name, title FROM "CommonCommentGroup" ORDER BY "displayOrder" ASC`
+  )
+  const ccgGroups = ccgRows as { id: string; name: string; title: string }[]
+
   // Get review statistics
   const reviewStats = await getReviewStats(subjectId)
 
@@ -127,13 +133,14 @@ export default async function SubjectPage({ params }: Props) {
                     </div>
                     <h2 className="text-lg font-bold text-[#111418] dark:text-white">Comment Bank</h2>
                 </div>
-                <GroupForm subjectId={subject.id} />
+                <GroupForm subjectId={subject.id} ccgGroups={ccgGroups} />
             </div>
 
             <div className="p-6">
                  <ReorderableGroupList
                     subjectId={subject.id}
                     initialGroups={subject.CommentGroup}
+                    ccgGroups={ccgGroups}
                   />
             </div>
         </section>
