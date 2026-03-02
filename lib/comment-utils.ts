@@ -108,8 +108,11 @@ export function generateComment(
 
     // Identify subject groups that override a CCG group (name matches a CCG group name)
     const ccgGroupNames = new Set((commonGroups ?? []).map(g => g.name));
-    const overrideGroups = groups.filter(g => ccgGroupNames.has(g.name));
-    const overrideGroupsByName = new Map(overrideGroups.map(g => [g.name, g]));
+    const overrideGroupsByName = new Map(
+        groups
+            .filter(g => ccgGroupNames.has(g.name))
+            .map(g => [g.name, g] as [string, MinimalGroup])
+    );
 
     // Build the subject content
     const buildSubjectContent = (): string => {
