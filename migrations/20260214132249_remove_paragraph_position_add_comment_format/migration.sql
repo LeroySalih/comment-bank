@@ -5,10 +5,10 @@
 
 */
 -- AlterTable
-ALTER TABLE "CommonCommentGroup" DROP COLUMN "paragraphPosition";
+ALTER TABLE "CommonCommentGroup" DROP COLUMN IF EXISTS "paragraphPosition";
 
 -- AlterTable
-ALTER TABLE "Subject" ADD COLUMN     "commentFormat" TEXT;
+ALTER TABLE "Subject" ADD COLUMN IF NOT EXISTS "commentFormat" TEXT;
 
 -- Rename AppSetting key from p2_wrapper_template to comment_format_template
 UPDATE "AppSetting" SET "key" = 'comment_format_template' WHERE "key" = 'p2_wrapper_template';
