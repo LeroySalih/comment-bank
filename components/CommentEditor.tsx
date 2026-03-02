@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useMemo } from 'react';
 import { useRouter } from 'next/navigation';
 import { parseComment, countWords } from '@/lib/utils';
 import { updateAssignmentCode, updateCommonAssignmentCode, updateAssignmentCommentText, revertAssignmentComment } from '@/app/actions';
@@ -102,6 +102,12 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const [rejectionNote, setRejectionNote] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
 
+  // Memoised set of CCG group names — used for override detection in preview and sidebar
+  const ccgGroupNames = useMemo(
+      () => new Set((commonGroups ?? []).map(g => g.name)),
+      [commonGroups]
+  );
+
   // Initialize selections with assignment's pre-assigned codes
   useEffect(() => {
     const initialSelections: Record<string, string> = {};
@@ -181,7 +187,6 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     };
 
     // Identify subject groups that override CCG variables
-    const ccgGroupNames = new Set((commonGroups ?? []).map(g => g.name));
     const overrideGroupsByName = new Map(
         groups
             .filter(g => ccgGroupNames.has(g.name))
@@ -468,7 +473,6 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const subjectGroupsMapped = groups.map(g => ({ id: g.id, name: g.name, isLinked: g.isLinked, linkedField: g.linkedField, options: g.CommentOption }));
 
   // Split subject groups into CCG overrides and pure SCG groups
-  const ccgGroupNames = new Set((commonGroups || []).map(g => g.name));
   const overrideGroupsMapped = subjectGroupsMapped.filter(g => ccgGroupNames.has(g.name));
   const pureScgGroupsMapped = subjectGroupsMapped.filter(g => !ccgGroupNames.has(g.name));
 

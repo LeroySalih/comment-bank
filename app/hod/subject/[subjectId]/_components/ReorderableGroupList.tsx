@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import { useState, useEffect, useMemo } from "react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
 import { reorderCommentGroups, createComment, updateComment, deleteComment, reorderComments } from "@/lib/server-actions/hod"
 import { EditGroupForm } from "./edit-group-form"
@@ -355,6 +355,11 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups }: Pr
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
 
+  const ccgGroupNameSet = useMemo(
+      () => new Set((ccgGroups ?? []).map(cg => cg.name)),
+      [ccgGroups]
+  )
+
   useEffect(() => {
     setGroups(initialGroups)
   }, [initialGroups])
@@ -425,7 +430,7 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups }: Pr
                       </span>
                       <span className="font-bold text-[#111418] dark:text-white flex-1">
                         {group.title}
-                        {ccgGroups?.some(cg => cg.name === group.name) && (
+                        {ccgGroupNameSet.has(group.name) && (
                           <span className="text-[10px] font-medium text-indigo-600 bg-indigo-100 dark:bg-indigo-900/30 dark:text-indigo-300 px-1.5 py-0.5 rounded ml-1">
                             CCG Override
                           </span>
