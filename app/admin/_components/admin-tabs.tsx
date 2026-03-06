@@ -27,12 +27,12 @@ export function AdminTabs({ users, roles, subjects, deadlines, classes = [], com
   const tabs = [
     { key: 'users' as const, label: 'Users' },
     { key: 'pupils' as const, label: 'Pupils' },
-    { key: 'subjects' as const, label: 'Subjects' },
     { key: 'classes' as const, label: 'Classes' },
-    { key: 'deadlines' as const, label: 'Deadlines' },
-    { key: 'linked-data' as const, label: 'Linked Data' },
     { key: 'ccg' as const, label: 'CCG' },
+    { key: 'subjects' as const, label: 'Subjects' },
     { key: 'format' as const, label: 'Format' },
+    { key: 'linked-data' as const, label: 'Linked Data' },
+    { key: 'deadlines' as const, label: 'Deadlines' },
     { key: 'activity' as const, label: 'Activity Log' },
   ]
 
