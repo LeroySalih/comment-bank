@@ -95,8 +95,12 @@ export function FormatManagement({ initialTemplate, commonGroups, subjects }: Pr
     let result = template
 
     // Replace each CCG group tag with a random option's text (variables pre-resolved)
+    // If the selected subject has a group with the same name (CCG override), use that instead
     for (const group of commonGroups) {
-      const options = group.CommonCommentOption || []
+      const subjectOverride = selectedSubject?.CommentGroup?.find((g: SubjectCommentGroup) => g.name === group.name)
+      const options = subjectOverride
+        ? (subjectOverride.CommentOption || [])
+        : (group.CommonCommentOption || [])
       const option = pickRandom(options)
       const replacement = option ? resolveVars(option.text) : ''
       result = result.replaceAll(`<${group.name}>`, replacement)
@@ -107,7 +111,7 @@ export function FormatManagement({ initialTemplate, commonGroups, subjects }: Pr
       const groups = selectedSubject.CommentGroup || []
       let subjectParts: string[]
       if (selectedSubject.commentFormat && groups.length > 0) {
-        const codes = selectedSubject.commentFormat.split(/\s+/)
+        const codes = selectedSubject.commentFormat.split(/\s+/).map(c => c.replace(/^<|>$/g, ''))
         subjectParts = codes.map(code => {
           const g = groups.find(g => g.name === code)
           if (!g) return ''
