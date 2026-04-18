@@ -40,18 +40,33 @@ fi
 echo "==> Using DATABASE_URL pointing to comment_bank_test"
 
 # Drop and recreate the test database
+# Pre-flight: verify container is running
+if ! docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q true; then
+  echo "ABORT: Docker container '$CONTAINER' is not running."
+  exit 1
+fi
+
 echo "==> Dropping and recreating $DB_NAME..."
-docker exec "$CONTAINER" psql -U "$DB_USER" -c "DROP DATABASE IF EXISTS $DB_NAME;"
-docker exec "$CONTAINER" psql -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"
+if ! docker exec "$CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $DB_NAME;"; then
+  echo "FAILED: could not drop $DB_NAME"
+  exit 1
+fi
+if ! docker exec "$CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DB_NAME;"; then
+  echo "FAILED: could not create $DB_NAME"
+  exit 1
+fi
 
 # Apply all migrations
 echo "==> Applying migrations..."
-"$PROJECT_DIR/migrations/migrate.sh" "$CONTAINER" "$DB_NAME" "$DB_USER"
+if ! "$PROJECT_DIR/migrations/migrate.sh" "$CONTAINER" "$DB_NAME" "$DB_USER"; then
+  echo ""
+  echo "FAILED: migrations failed."
+  exit 1
+fi
 
 # Seed test data
 echo "==> Seeding test database..."
-cd "$PROJECT_DIR"
-if ! DATABASE_URL="$DATABASE_URL" npx tsx prisma/seed.ts; then
+if ! (cd "$PROJECT_DIR" && DATABASE_URL="$DATABASE_URL" npx tsx prisma/seed.ts); then
   echo ""
   echo "FAILED: seed script failed."
   exit 1
