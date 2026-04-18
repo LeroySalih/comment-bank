@@ -4,14 +4,18 @@ set -euo pipefail
 # Setup test database environment
 # Usage: ./scripts/setup-test-db.sh
 #
-# This script:
 # 1. Loads env vars from .env.test
-# 2. Validates DATABASE_URL points to the test database (safety check)
-# 3. Drops and recreates the test database via prisma migrate reset
-# 4. Seeds with test data from prisma/seed.ts
+# 2. Validates DATABASE_URL points to comment_bank_test (safety check)
+# 3. Drops and recreates comment_bank_test via Docker
+# 4. Applies all SQL migrations via migrations/migrate.sh
+# 5. Seeds test data via prisma/seed.ts
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 PROJECT_DIR="$(dirname "$SCRIPT_DIR")"
+
+CONTAINER="postgres17"
+DB_NAME="comment_bank_test"
+DB_USER="postgres"
 
 echo "==> Setting up test database..."
 
@@ -35,19 +39,19 @@ fi
 
 echo "==> Using DATABASE_URL pointing to comment_bank_test"
 
-# Drop, recreate, and apply all migrations
-echo "==> Resetting test database (drop + migrate)..."
-cd "$PROJECT_DIR"
-if ! PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION="yes" npx prisma migrate reset --force --skip-generate --skip-seed; then
-  echo ""
-  echo "FAILED: prisma migrate reset failed."
-  exit 1
-fi
+# Drop and recreate the test database
+echo "==> Dropping and recreating $DB_NAME..."
+docker exec "$CONTAINER" psql -U "$DB_USER" -c "DROP DATABASE IF EXISTS $DB_NAME;"
+docker exec "$CONTAINER" psql -U "$DB_USER" -c "CREATE DATABASE $DB_NAME;"
 
-# Run seed explicitly
-echo ""
+# Apply all migrations
+echo "==> Applying migrations..."
+"$PROJECT_DIR/migrations/migrate.sh" "$CONTAINER" "$DB_NAME" "$DB_USER"
+
+# Seed test data
 echo "==> Seeding test database..."
-if ! npx tsx prisma/seed.ts; then
+cd "$PROJECT_DIR"
+if ! DATABASE_URL="$DATABASE_URL" npx tsx prisma/seed.ts; then
   echo ""
   echo "FAILED: seed script failed."
   exit 1
@@ -57,4 +61,4 @@ echo ""
 echo "==> Test database ready."
 echo "    - Migrations applied"
 echo "    - Test data seeded"
-echo "    - Database: comment_bank_test"
+echo "    - Database: $DB_NAME"
