@@ -1,0 +1,10 @@
+name: comment-bank
+
+services:
+  app:
+    build: .
+    container_name: comment-bank-app
+    restart: unless-stopped
+    ports:
+      - "3003:3003"
+    env_file: .env
