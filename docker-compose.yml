@@ -8,3 +8,9 @@ services:
     ports:
       - "3003:3003"
     env_file: .env
+    networks:
+      - app-net
+
+networks:
+  app-net:
+    external: true
