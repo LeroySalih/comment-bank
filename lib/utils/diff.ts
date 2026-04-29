@@ -1,5 +1,5 @@
 // lib/utils/diff.ts
-import type { DiffToken } from '@/lib/types/ai-check';
+import type { DiffToken, DiffSegment } from '@/lib/types/ai-check';
 
 function tokenize(text: string): string[] {
   // Split on whitespace, preserving punctuation attached to words
@@ -43,4 +43,32 @@ export function computeDiff(original: string, improved: string): DiffToken[] {
   }
 
   return path.reverse();
+}
+
+export function groupChanges(diff: DiffToken[]): DiffSegment[] {
+  const segments: DiffSegment[] = [];
+  let changeId = 0;
+  let i = 0;
+
+  while (i < diff.length) {
+    if (diff[i].type === 'unchanged') {
+      const tokens: DiffToken[] = [];
+      while (i < diff.length && diff[i].type === 'unchanged') {
+        tokens.push(diff[i]);
+        i++;
+      }
+      segments.push({ type: 'unchanged', tokens });
+    } else {
+      const removed: DiffToken[] = [];
+      const added: DiffToken[] = [];
+      while (i < diff.length && diff[i].type !== 'unchanged') {
+        if (diff[i].type === 'removed') removed.push(diff[i]);
+        else added.push(diff[i]);
+        i++;
+      }
+      segments.push({ type: 'change', group: { id: changeId++, removed, added } });
+    }
+  }
+
+  return segments;
 }
