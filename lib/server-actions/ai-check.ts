@@ -5,6 +5,11 @@ import { computeDiff } from '@/lib/utils/diff';
 
 const AI_WEBHOOK_URL = 'https://n8n.mr-salih.org/webhook-test/comment-bank/ai-suggestion';
 
+/** Remove [cite: N] and [cite: N, M, ...] references injected by the AI workflow */
+function stripCitations(text: string): string {
+  return text.replace(/\s*\[cite:[^\]]+\]/g, '');
+}
+
 export async function requestAiCheck(
   assignmentId: string,
   commentText: string
@@ -14,6 +19,7 @@ export async function requestAiCheck(
   }
 
   let improved: string;
+  let ruleChecks: Record<string, boolean> = {};
 
   try {
     const response = await fetch(AI_WEBHOOK_URL, {
@@ -32,7 +38,11 @@ export async function requestAiCheck(
       return { success: false, error: 'Unexpected response from AI service' };
     }
 
-    improved = data.improved;
+    improved = stripCitations(data.improved);
+
+    if (data.rule_checks && typeof data.rule_checks === 'object') {
+      ruleChecks = data.rule_checks as Record<string, boolean>;
+    }
   } catch {
     return { success: false, error: 'Could not reach AI service' };
   }
@@ -45,6 +55,7 @@ export async function requestAiCheck(
       original: commentText,
       improved,
       diff,
+      ruleChecks,
     },
   };
 }
