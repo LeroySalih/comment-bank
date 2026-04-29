@@ -13,7 +13,10 @@ interface AiSuggestionPanelProps {
 type ChangeState = 'pending' | 'accepted';
 
 function humanizeKey(key: string): string {
-  return key.replace(/([A-Z])/g, ' $1').trim();
+  return key
+    .replace(/_/g, ' ')
+    .replace(/([A-Z])/g, ' $1')
+    .trim();
 }
 
 function buildFinalText(segments: DiffSegment[], states: Record<number, ChangeState>): string {
@@ -47,7 +50,7 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
 
   const handleAcceptAll = () => {
     const all: Record<number, ChangeState> = {};
-    changeGroups.forEach(seg => {
+    segments.forEach(seg => {
       if (seg.type === 'change') all[seg.group.id] = 'accepted';
     });
     setChangeStates(all);
