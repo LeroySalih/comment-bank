@@ -320,6 +320,7 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setPreview(e.target.value);
     setIsManuallyEdited(true);
+    setCheckStatus('required_check');
   };
 
   const handleTextBlur = async () => {
