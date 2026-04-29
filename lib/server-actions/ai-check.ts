@@ -38,6 +38,7 @@ export async function requestAiCheck(
     const data = unwrapped?.output ?? unwrapped;
 
     if (typeof data?.improved !== 'string') {
+      console.error('[ai-check] Unexpected response shape:', JSON.stringify(raw, null, 2));
       return { success: false, error: `Unexpected response shape: ${JSON.stringify(raw).slice(0, 200)}` };
     }
 
