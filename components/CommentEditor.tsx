@@ -7,6 +7,9 @@ import { updateAssignmentCode, updateCommonAssignmentCode, updateAssignmentComme
 import { reviewComment } from '@/lib/server-actions/comment-check';
 import CommentStatusBadge from './CommentStatusBadge';
 import ConfirmModal from './ConfirmModal';
+import { requestAiCheck } from '@/lib/server-actions/ai-check';
+import AiSuggestionPanel from './AiSuggestionPanel';
+import type { AiSuggestion } from '@/lib/types/ai-check';
 
 type CommentOption = {
   id: string;
@@ -101,6 +104,10 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   // HoD review state
   const [rejectionNote, setRejectionNote] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
+
+  // AI check state
+  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
+  const [isAiChecking, setIsAiChecking] = useState(false);
 
   // Memoised set of CCG group names — used for override detection in preview and sidebar
   const ccgGroupNames = useMemo(
@@ -392,6 +399,33 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     setIsReviewing(false);
   };
 
+  const handleAiCheck = async () => {
+    if (!preview.trim()) return;
+    setIsAiChecking(true);
+    try {
+      const result = await requestAiCheck(assignment.id, preview);
+      if (result.success) {
+        setAiSuggestion(result.suggestion);
+      } else {
+        alert('AI check failed: ' + result.error);
+      }
+    } catch {
+      alert('AI check failed');
+    }
+    setIsAiChecking(false);
+  };
+
+  const handleAiAccept = (improved: string) => {
+    setPreview(improved);
+    setIsManuallyEdited(true);
+    setAiSuggestion(null);
+    updateAssignmentCommentText(assignment.id, improved).catch(console.error);
+  };
+
+  const handleAiDismiss = () => {
+    setAiSuggestion(null);
+  };
+
   const wordCount = countWords(preview);
   const targetWordCount = 100;
   const percent = Math.min(100, Math.round((wordCount / targetWordCount) * 100));
@@ -564,6 +598,15 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                             Revert
                         </button>
                     )}
+                    <button
+                        onClick={handleAiCheck}
+                        disabled={isAiChecking || !preview.trim()}
+                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+                        title="Request AI grammar and vocabulary check"
+                    >
+                        <span className="material-symbols-outlined text-sm">auto_fix_high</span>
+                        {isAiChecking ? 'Checking...' : 'AI Check'}
+                    </button>
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
@@ -631,6 +674,15 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
 
                 </div>
             </div>
+
+            {/* AI Suggestion Panel */}
+            {aiSuggestion && (
+                <AiSuggestionPanel
+                    suggestion={aiSuggestion}
+                    onAccept={handleAiAccept}
+                    onDismiss={handleAiDismiss}
+                />
+            )}
 
             {/* HoD Review Panel */}
             {isHoD && checkStatus === 'required_check' && (
