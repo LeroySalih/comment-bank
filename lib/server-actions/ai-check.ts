@@ -31,10 +31,13 @@ export async function requestAiCheck(
       return { success: false, error: `AI service returned ${response.status}` };
     }
 
-    const data = await response.json();
+    const raw = await response.json();
+
+    // n8n wraps workflow output in an array — unwrap if needed
+    const data = Array.isArray(raw) ? raw[0] : raw;
 
     if (typeof data?.improved !== 'string') {
-      return { success: false, error: 'Unexpected response from AI service' };
+      return { success: false, error: `Unexpected response shape: ${JSON.stringify(raw).slice(0, 200)}` };
     }
 
     improved = stripCitations(data.improved);
