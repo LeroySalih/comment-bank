@@ -45,8 +45,9 @@ export function computeDiff(original: string, improved: string): DiffToken[] {
   return path.reverse();
 }
 
-export function groupChanges(diff: DiffToken[]): DiffSegment[] {
-  const segments: DiffSegment[] = [];
+export function groupChanges(diff: DiffToken[], maxGap = 4): DiffSegment[] {
+  // Pass 1: basic grouping of consecutive non-unchanged tokens
+  const raw: DiffSegment[] = [];
   let changeId = 0;
   let i = 0;
 
@@ -57,7 +58,7 @@ export function groupChanges(diff: DiffToken[]): DiffSegment[] {
         tokens.push(diff[i]);
         i++;
       }
-      segments.push({ type: 'unchanged', tokens });
+      raw.push({ type: 'unchanged', tokens });
     } else {
       const removed: DiffToken[] = [];
       const added: DiffToken[] = [];
@@ -66,9 +67,43 @@ export function groupChanges(diff: DiffToken[]): DiffSegment[] {
         else added.push(diff[i]);
         i++;
       }
-      segments.push({ type: 'change', group: { id: changeId++, removed, added } });
+      raw.push({ type: 'change', group: { id: changeId++, removed, added } });
     }
   }
 
-  return segments;
+  // Pass 2: merge change groups separated by a small unchanged gap
+  const merged: DiffSegment[] = [];
+
+  for (const seg of raw) {
+    const last = merged[merged.length - 1];
+
+    if (
+      seg.type === 'change' &&
+      last?.type === 'unchanged' &&
+      merged.length >= 2 &&
+      merged[merged.length - 2].type === 'change'
+    ) {
+      // Count non-whitespace tokens in the gap
+      const gapWords = last.tokens.filter(t => t.text.trim().length > 0).length;
+
+      if (gapWords <= maxGap) {
+        // Absorb the gap into the previous change group and merge
+        merged.pop(); // remove the gap segment
+        const prev = merged[merged.length - 1] as Extract<DiffSegment, { type: 'change' }>;
+        merged[merged.length - 1] = {
+          type: 'change',
+          group: {
+            id: prev.group.id,
+            removed: [...prev.group.removed, ...last.tokens, ...seg.group.removed],
+            added:   [...prev.group.added,   ...last.tokens, ...seg.group.added],
+          },
+        };
+        continue;
+      }
+    }
+
+    merged.push(seg);
+  }
+
+  return merged;
 }

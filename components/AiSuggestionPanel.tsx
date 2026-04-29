@@ -98,12 +98,22 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
               <span
                 key={i}
                 onClick={() => handleToggle(group.id)}
-                className="bg-amber-50 dark:bg-amber-900/20 border border-dashed border-amber-400 dark:border-amber-600 rounded px-1 cursor-pointer"
+                className="inline cursor-pointer"
                 title="Click to accept this change"
               >
-                <span className="text-red-600 dark:text-red-400 line-through">{group.removed.map(t => t.text).join('')}</span>
-                {group.removed.length > 0 && group.added.length > 0 && ' '}
-                <span className="text-green-700 dark:text-green-400">{group.added.map(t => t.text).join('')}</span>
+                {group.removed.length > 0 && (
+                  <span className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through rounded px-1 border border-red-200 dark:border-red-800 mx-0.5">
+                    {group.removed.map(t => t.text).join('')}
+                  </span>
+                )}
+                {group.removed.length > 0 && group.added.length > 0 && (
+                  <span className="text-gray-400 text-xs mx-0.5">→</span>
+                )}
+                {group.added.length > 0 && (
+                  <span className="bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 rounded px-1 border border-dashed border-green-300 dark:border-green-700 mx-0.5">
+                    {group.added.map(t => t.text).join('')}
+                  </span>
+                )}
               </span>
             );
           })}
