@@ -2,7 +2,6 @@ import { pool } from '@/lib/db';
 import Link from 'next/link';
 import { ArrowLeft } from 'lucide-react';
 import CommentEditor from '@/components/CommentEditor';
-import CommentStatusBadge from '@/components/CommentStatusBadge';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '../../api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
@@ -204,7 +203,6 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
         <div className="flex min-w-72 flex-col gap-1">
             <div className="flex items-center gap-3">
                 <h1 className="text-[#111418] dark:text-white text-4xl font-black leading-tight tracking-[-0.033em]">Edit Report: {pupil.firstName} {pupil.lastName}</h1>
-                <CommentStatusBadge status={row.checkStatus || 'not_required'} size="md" />
             </div>
             <p className="text-[#617289] dark:text-gray-400 text-base font-normal">{subject.title} • {pupil.gender}</p>
         </div>
