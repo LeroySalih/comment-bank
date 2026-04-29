@@ -416,12 +416,14 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     }
   };
 
-  const handleAiAccept = (improved: string) => {
+  const handleAiAccept = (improved: string, allAccepted: boolean) => {
     setPreview(improved);
     setIsManuallyEdited(true);
-    setCheckStatus('required_check');
+    if (!allAccepted) {
+      setCheckStatus('required_check');
+    }
     setAiSuggestion(null);
-    updateAssignmentCommentText(assignment.id, improved).catch(console.error);
+    updateAssignmentCommentText(assignment.id, improved, allAccepted).catch(console.error);
   };
 
   const handleAiDismiss = () => {

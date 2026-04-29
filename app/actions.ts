@@ -137,7 +137,7 @@ export async function updateCommonAssignmentCode(
   }
 }
 
-export async function updateAssignmentCommentText(assignmentId: string, comment: string) {
+export async function updateAssignmentCommentText(assignmentId: string, comment: string, skipStatusUpdate = false) {
   try {
     // Get current assignment to check status
     const { rows: currentRows } = await pool.query(
@@ -155,7 +155,7 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
     const currentStatus = currentAssignment.checkStatus || 'not_required'
     let newStatus = currentStatus
 
-    if (currentStatus === 'not_required' || currentStatus === 'checked_rejected' || currentStatus === 'checked_ok') {
+    if (!skipStatusUpdate && (currentStatus === 'not_required' || currentStatus === 'checked_rejected' || currentStatus === 'checked_ok')) {
       newStatus = 'required_check'
     }
 

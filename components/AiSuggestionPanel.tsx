@@ -6,7 +6,7 @@ import { groupChanges } from '@/lib/utils/diff';
 
 interface AiSuggestionPanelProps {
   suggestion: AiSuggestion;
-  onAccept: (improved: string) => void;
+  onAccept: (improved: string, allAccepted: boolean) => void;
   onDismiss: () => void;
 }
 
@@ -57,7 +57,8 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
   };
 
   const handleApply = () => {
-    onAccept(buildFinalText(segments, changeStates));
+    const allAccepted = acceptedCount === totalChanges;
+    onAccept(buildFinalText(segments, changeStates), allAccepted);
   };
 
   return (
