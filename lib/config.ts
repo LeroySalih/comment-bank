@@ -20,6 +20,9 @@ const ConfigSchema = z.object({
     .min(32, 'NEXTAUTH_SECRET must be at least 32 characters'),
   NEXTAUTH_URL: z.string().url('NEXTAUTH_URL must be a valid URL'),
   
+  // AI webhook
+  AI_WEBHOOK_URL: z.string().url('AI_WEBHOOK_URL must be a valid URL'),
+
   // Site configuration
   SITE_NAME: z.string().optional().default('Comment Bank'),
   

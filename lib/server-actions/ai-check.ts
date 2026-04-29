@@ -2,8 +2,7 @@
 
 import type { AiSuggestion } from '@/lib/types/ai-check';
 import { computeDiff } from '@/lib/utils/diff';
-
-const AI_WEBHOOK_URL = 'https://n8n.mr-salih.org/webhook-test/comment-bank/ai-suggestion';
+import { config } from '@/lib/config';
 
 /** Remove [cite: N] and [cite: N, M, ...] references injected by the AI workflow */
 function stripCitations(text: string): string {
@@ -22,7 +21,7 @@ export async function requestAiCheck(
   let ruleChecks: Record<string, boolean> = {};
 
   try {
-    const response = await fetch(AI_WEBHOOK_URL, {
+    const response = await fetch(config.AI_WEBHOOK_URL, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ comment: commentText }),
