@@ -422,7 +422,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     if (isLastChange) {
       setCheckStatus('not_required');
       setAiSuggestion(null);
-      updateAssignmentCommentText(assignment.id, newText, 'not_required').catch(console.error);
+      updateAssignmentCommentText(assignment.id, newText, 'not_required')
+        .then(() => router.refresh())
+        .catch(console.error);
     } else {
       setCheckStatus('required_check');
       updateAssignmentCommentText(assignment.id, newText, 'required_check').catch(console.error);
@@ -434,7 +436,9 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     setIsManuallyEdited(true);
     setCheckStatus('not_required');
     setAiSuggestion(null);
-    updateAssignmentCommentText(assignment.id, improvedText, 'not_required').catch(console.error);
+    updateAssignmentCommentText(assignment.id, improvedText, 'not_required')
+      .then(() => router.refresh())
+      .catch(console.error);
   };
 
   const handleAiDismiss = () => {
