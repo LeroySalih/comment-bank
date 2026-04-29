@@ -6,11 +6,10 @@ import { groupChanges } from '@/lib/utils/diff';
 
 interface AiSuggestionPanelProps {
   suggestion: AiSuggestion;
-  onAccept: (improved: string, allAccepted: boolean) => void;
+  onApplyChange: (newText: string, isLastChange: boolean) => void;
+  onApplyAll: (improvedText: string) => void;
   onDismiss: () => void;
 }
-
-type ChangeState = 'pending' | 'accepted';
 
 function humanizeKey(key: string): string {
   return key
@@ -19,46 +18,43 @@ function humanizeKey(key: string): string {
     .trim();
 }
 
-function buildFinalText(segments: DiffSegment[], states: Record<number, ChangeState>): string {
+function buildText(segments: DiffSegment[], appliedIds: Set<number>): string {
   return segments
     .map(seg => {
       if (seg.type === 'unchanged') return seg.tokens.map(t => t.text).join('');
-      const state = states[seg.group.id] ?? 'pending';
-      if (state === 'accepted') return seg.group.added.map(t => t.text).join('');
+      if (appliedIds.has(seg.group.id)) return seg.group.added.map(t => t.text).join('');
       return seg.group.removed.map(t => t.text).join('');
     })
     .join('');
 }
 
-export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: AiSuggestionPanelProps) {
+export default function AiSuggestionPanel({ suggestion, onApplyChange, onApplyAll, onDismiss }: AiSuggestionPanelProps) {
   const segments = useMemo(() => groupChanges(suggestion.diff), [suggestion.diff]);
-  const [changeStates, setChangeStates] = useState<Record<number, ChangeState>>({});
+  const [appliedIds, setAppliedIds] = useState<Set<number>>(new Set());
 
-  const changeGroups = segments.filter(s => s.type === 'change');
+  const changeGroups = useMemo(() => segments.filter(s => s.type === 'change'), [segments]);
   const totalChanges = changeGroups.length;
-  const acceptedCount = Object.values(changeStates).filter(s => s === 'accepted').length;
+  const remainingGroups = changeGroups.filter(s => s.type === 'change' && !appliedIds.has((s as Extract<DiffSegment, {type:'change'}>).group.id));
 
   const ruleEntries = Object.entries(suggestion.ruleChecks);
   const passedCount = ruleEntries.filter(([, v]) => v).length;
 
-  const handleToggle = (id: number) => {
-    setChangeStates(prev => ({
-      ...prev,
-      [id]: prev[id] === 'accepted' ? 'pending' : 'accepted',
-    }));
+  const handleApplyChange = (id: number) => {
+    const newApplied = new Set([...appliedIds, id]);
+    setAppliedIds(newApplied);
+    const isLast = changeGroups.every(
+      s => s.type === 'change' && newApplied.has(s.group.id)
+    );
+    onApplyChange(buildText(segments, newApplied), isLast);
   };
 
-  const handleAcceptAll = () => {
-    const all: Record<number, ChangeState> = {};
-    segments.forEach(seg => {
-      if (seg.type === 'change') all[seg.group.id] = 'accepted';
-    });
-    setChangeStates(all);
-  };
-
-  const handleApply = () => {
-    const allAccepted = acceptedCount === totalChanges;
-    onAccept(buildFinalText(segments, changeStates), allAccepted);
+  const handleApplyAll = () => {
+    const allIds = new Set(
+      changeGroups
+        .filter(s => s.type === 'change')
+        .map(s => (s as Extract<DiffSegment, {type:'change'}>).group.id)
+    );
+    onApplyAll(buildText(segments, allIds));
   };
 
   return (
@@ -68,39 +64,38 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
       <div className="bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800 px-4 py-3 flex items-center gap-2">
         <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-base">auto_fix_high</span>
         <strong className="text-blue-700 dark:text-blue-400 text-sm">AI Suggestion</strong>
-        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 italic">Click a change to accept it</span>
+        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 italic">
+          {remainingGroups.length > 0
+            ? `${remainingGroups.length} of ${totalChanges} changes remaining — click to apply`
+            : 'All changes applied'}
+        </span>
       </div>
 
       {/* Diff section */}
       <div className="px-4 py-3 border-b border-gray-100 dark:border-gray-800">
-        <p className="text-[10px] font-bold uppercase tracking-widest text-gray-400 mb-2">
-          Suggested changes — {acceptedCount} of {totalChanges} accepted
-        </p>
         <div className="bg-gray-50 dark:bg-gray-950 border border-gray-200 dark:border-gray-700 rounded-lg p-3 text-base leading-loose font-display">
           {segments.map((seg, i) => {
             if (seg.type === 'unchanged') {
               return <span key={i}>{seg.tokens.map(t => t.text).join('')}</span>;
             }
             const { group } = seg;
-            const state = changeStates[group.id] ?? 'pending';
-            if (state === 'accepted') {
+
+            if (appliedIds.has(group.id)) {
+              // Applied — show new text, no interaction
               return (
-                <span
-                  key={i}
-                  onClick={() => handleToggle(group.id)}
-                  className="bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-400 border border-green-300 dark:border-green-700 rounded px-1 cursor-pointer"
-                  title="Accepted — click to undo"
-                >
-                  {group.added.map(t => t.text).join('')} ✓
+                <span key={i} className="text-green-700 dark:text-green-400">
+                  {group.added.map(t => t.text).join('')}
                 </span>
               );
             }
+
+            // Unapplied — show old→new, click to apply
             return (
               <span
                 key={i}
-                onClick={() => handleToggle(group.id)}
+                onClick={() => handleApplyChange(group.id)}
                 className="inline cursor-pointer"
-                title="Click to accept this change"
+                title="Click to apply this change"
               >
                 {group.removed.length > 0 && (
                   <span className="bg-red-50 dark:bg-red-900/30 text-red-600 dark:text-red-400 line-through rounded px-1 border border-red-200 dark:border-red-800 mx-0.5">
@@ -119,16 +114,12 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
             );
           })}
         </div>
-        <div className="flex items-center gap-4 mt-2 text-xs text-gray-400">
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded border border-dashed border-amber-400 bg-amber-50 inline-block"></span>
-            Pending — click to accept
-          </span>
-          <span className="flex items-center gap-1">
-            <span className="w-3 h-3 rounded border border-green-300 bg-green-100 inline-block"></span>
-            Accepted
-          </span>
-        </div>
+        {remainingGroups.length > 0 && (
+          <p className="mt-2 text-xs text-gray-400 flex items-center gap-1">
+            <span className="material-symbols-outlined text-sm">touch_app</span>
+            Click any highlighted change to apply it individually
+          </p>
+        )}
       </div>
 
       {/* Rule checks section */}
@@ -157,21 +148,15 @@ export default function AiSuggestionPanel({ suggestion, onAccept, onDismiss }: A
 
       {/* Actions */}
       <div className="px-4 py-3 flex items-center gap-2">
-        <button
-          onClick={handleAcceptAll}
-          className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
-        >
-          <span className="material-symbols-outlined text-sm">done_all</span>
-          Accept all changes
-        </button>
-        <button
-          onClick={handleApply}
-          disabled={acceptedCount === 0}
-          className="flex items-center gap-1.5 px-3 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-300 dark:disabled:bg-gray-700 disabled:cursor-not-allowed text-white text-xs font-semibold rounded-lg transition-colors"
-        >
-          <span className="material-symbols-outlined text-sm">check</span>
-          {acceptedCount > 0 ? `Apply (${acceptedCount} accepted)` : 'Apply'}
-        </button>
+        {remainingGroups.length > 0 && (
+          <button
+            onClick={handleApplyAll}
+            className="flex items-center gap-1.5 px-3 py-2 bg-blue-600 hover:bg-blue-700 text-white text-xs font-semibold rounded-lg transition-colors"
+          >
+            <span className="material-symbols-outlined text-sm">done_all</span>
+            Apply all
+          </button>
+        )}
         <button
           onClick={onDismiss}
           className="flex items-center gap-1.5 px-3 py-2 ml-auto bg-white dark:bg-gray-900 hover:bg-gray-50 dark:hover:bg-gray-800 text-gray-600 dark:text-gray-400 text-xs font-medium rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"

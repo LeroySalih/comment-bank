@@ -137,7 +137,7 @@ export async function updateCommonAssignmentCode(
   }
 }
 
-export async function updateAssignmentCommentText(assignmentId: string, comment: string, skipStatusUpdate = false) {
+export async function updateAssignmentCommentText(assignmentId: string, comment: string, targetStatus?: 'required_check' | 'not_required') {
   try {
     // Get current assignment to check status
     const { rows: currentRows } = await pool.query(
@@ -151,12 +151,16 @@ export async function updateAssignmentCommentText(assignmentId: string, comment:
 
     const currentAssignment = currentRows[0]
 
-    // Determine if status needs to change to required_check
+    // Determine if status needs to change
     const currentStatus = currentAssignment.checkStatus || 'not_required'
-    let newStatus = currentStatus
+    let newStatus: string
 
-    if (!skipStatusUpdate && (currentStatus === 'not_required' || currentStatus === 'checked_rejected' || currentStatus === 'checked_ok')) {
+    if (targetStatus) {
+      newStatus = targetStatus
+    } else if (currentStatus === 'not_required' || currentStatus === 'checked_rejected' || currentStatus === 'checked_ok') {
       newStatus = 'required_check'
+    } else {
+      newStatus = currentStatus
     }
 
     const clearCheckData = newStatus === 'required_check' && currentStatus !== 'required_check'

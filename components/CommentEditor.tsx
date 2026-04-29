@@ -416,14 +416,25 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     }
   };
 
-  const handleAiAccept = (improved: string, allAccepted: boolean) => {
-    setPreview(improved);
+  const handleApplyAiChange = (newText: string, isLastChange: boolean) => {
+    setPreview(newText);
     setIsManuallyEdited(true);
-    if (!allAccepted) {
+    if (isLastChange) {
+      setCheckStatus('not_required');
+      setAiSuggestion(null);
+      updateAssignmentCommentText(assignment.id, newText, 'not_required').catch(console.error);
+    } else {
       setCheckStatus('required_check');
+      updateAssignmentCommentText(assignment.id, newText, 'required_check').catch(console.error);
     }
+  };
+
+  const handleApplyAllAi = (improvedText: string) => {
+    setPreview(improvedText);
+    setIsManuallyEdited(true);
+    setCheckStatus('not_required');
     setAiSuggestion(null);
-    updateAssignmentCommentText(assignment.id, improved, allAccepted).catch(console.error);
+    updateAssignmentCommentText(assignment.id, improvedText, 'not_required').catch(console.error);
   };
 
   const handleAiDismiss = () => {
@@ -683,7 +694,8 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
             {aiSuggestion && (
                 <AiSuggestionPanel
                     suggestion={aiSuggestion}
-                    onAccept={handleAiAccept}
+                    onApplyChange={handleApplyAiChange}
+                    onApplyAll={handleApplyAllAi}
                     onDismiss={handleAiDismiss}
                 />
             )}
