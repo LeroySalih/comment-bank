@@ -411,13 +411,15 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
       }
     } catch {
       alert('AI check failed');
+    } finally {
+      setIsAiChecking(false);
     }
-    setIsAiChecking(false);
   };
 
   const handleAiAccept = (improved: string) => {
     setPreview(improved);
     setIsManuallyEdited(true);
+    setCheckStatus('required_check');
     setAiSuggestion(null);
     updateAssignmentCommentText(assignment.id, improved).catch(console.error);
   };
