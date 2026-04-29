@@ -33,8 +33,9 @@ export async function requestAiCheck(
 
     const raw = await response.json();
 
-    // n8n wraps workflow output in an array — unwrap if needed
-    const data = Array.isArray(raw) ? raw[0] : raw;
+    // n8n may wrap output in an array and/or an "output" envelope — unwrap both
+    const unwrapped = Array.isArray(raw) ? raw[0] : raw;
+    const data = unwrapped?.output ?? unwrapped;
 
     if (typeof data?.improved !== 'string') {
       return { success: false, error: `Unexpected response shape: ${JSON.stringify(raw).slice(0, 200)}` };
