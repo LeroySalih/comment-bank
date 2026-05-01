@@ -64,81 +64,92 @@ export function EditSubjectForm({ subject }: EditSubjectFormProps) {
 
   if (isEditing) {
     return (
-      <div className="mt-4 border-t pt-4" onClick={(e) => e.stopPropagation()}>
-        <form onSubmit={handleUpdate} className="space-y-3">
-          <div className="flex gap-2">
-            <div className="w-1/3">
-              <label className="block text-xs font-medium text-gray-500 uppercase">Code</label>
-              <input
-                type="text"
-                value={code}
-                onChange={(e) => setCode(e.target.value)}
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 px-4"
+        onClick={() => setIsEditing(false)}
+      >
+        <div
+          className="bg-white dark:bg-gray-900 rounded-lg shadow-xl w-full max-w-xl p-6"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <h3 className="text-lg font-semibold mb-4 text-gray-900 dark:text-gray-100">Edit Subject</h3>
+          <form onSubmit={handleUpdate} className="space-y-3">
+            <div className="flex gap-2">
+              <div className="w-1/3">
+                <label className="block text-xs font-medium text-gray-500 uppercase">Code</label>
+                <input
+                  type="text"
+                  value={code}
+                  onChange={(e) => setCode(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
+                  required
+                  autoFocus
+                />
+              </div>
+              <div className="w-2/3">
+                <label className="block text-xs font-medium text-gray-500 uppercase">Title</label>
+                <input
+                  type="text"
+                  value={title}
+                  onChange={(e) => setTitle(e.target.value)}
+                  className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
+                />
+              </div>
+            </div>
+            <div>
+              <label className="block text-xs font-medium text-gray-500 uppercase">Introduction (Optional)</label>
+              <textarea
+                value={introduction}
+                onChange={(e) => setIntroduction(e.target.value)}
                 className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
-                required
-                autoFocus
+                rows={3}
               />
             </div>
-            <div className="w-2/3">
-              <label className="block text-xs font-medium text-gray-500 uppercase">Title</label>
-              <input
-                type="text"
-                value={title}
-                onChange={(e) => setTitle(e.target.value)}
-                className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
-              />
+
+            <VariablePreview text={introduction} subjectName={title || code} />
+
+            <div className="flex gap-2 pt-2">
+              <button
+                type="submit"
+                className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-700 transition-colors"
+              >
+                <Check size={16} /> Save Changes
+              </button>
+              <button
+                type="button"
+                onClick={() => setIsEditing(false)}
+                className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-200 transition-colors"
+              >
+                <X size={16} /> Cancel
+              </button>
             </div>
-          </div>
-          <div>
-            <label className="block text-xs font-medium text-gray-500 uppercase">Introduction (Optional)</label>
-            <textarea
-              value={introduction}
-              onChange={(e) => setIntroduction(e.target.value)}
-              className="mt-1 block w-full rounded-md border-gray-300 shadow-sm border p-2 text-sm"
-              rows={2}
-            />
-          </div>
-
-          <VariablePreview text={introduction} subjectName={title || code} />
-
-          <div className="flex gap-2">
-            <button 
-              type="submit"
-              className="flex items-center gap-1 bg-green-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-green-700 transition-colors"
-            >
-              <Check size={16} /> Save Changes
-            </button>
-            <button 
-              type="button" 
-              onClick={() => setIsEditing(false)}
-              className="flex items-center gap-1 bg-gray-100 text-gray-700 px-3 py-1.5 rounded-md text-sm hover:bg-gray-200 transition-colors"
-            >
-              <X size={16} /> Cancel
-            </button>
-          </div>
-          {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
-        </form>
+            {error && <p className="text-red-600 text-xs mt-1">{error}</p>}
+          </form>
+        </div>
       </div>
     )
   }
 
   return (
-    <div className="absolute top-4 right-4 flex gap-1 transition-opacity opacity-0 group-hover:opacity-100" onClick={(e) => e.stopPropagation()}>
-      <button 
+    <div className="inline-flex gap-1" onClick={(e) => e.stopPropagation()}>
+      <button
         onClick={() => setIsEditing(true)}
-        className="p-2 text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-full transition-all"
-        title="Edit Subject"
+        className="p-2 text-gray-500 dark:text-gray-400 hover:text-indigo-600 hover:bg-indigo-50 dark:hover:bg-indigo-900/30 rounded transition-colors"
+        title="Edit subject"
+        aria-label="Edit subject"
       >
-        <Pencil size={18} />
+        <Pencil size={16} />
       </button>
-      <button 
+      <button
         onClick={handleDelete}
         disabled={isDeleting}
-        className="p-2 text-gray-400 hover:text-red-600 hover:bg-red-50 rounded-full transition-all"
-        title="Delete Subject"
+        className="p-2 text-gray-500 dark:text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-900/30 rounded transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+        title="Delete subject"
+        aria-label="Delete subject"
       >
-        <Trash2 size={18} />
+        <Trash2 size={16} />
       </button>
-      {error && <p className="absolute top-full right-0 text-red-600 text-[10px] mt-1 whitespace-nowrap">{error}</p>}
+      {error && <span className="text-red-600 text-xs ml-2 self-center">{error}</span>}
     </div>
   )
 }

@@ -29,7 +29,7 @@ export function AdminTabs({ users, roles, subjects, deadlines, classes = [], com
     { key: 'classes' as const, label: 'Classes' },
     { key: 'pupils' as const, label: 'Pupils' },
     { key: 'ccg' as const, label: 'Common Comments' },
-    { key: 'subjects' as const, label: 'Subject Comments' },
+    { key: 'subjects' as const, label: 'Subjects' },
     { key: 'format' as const, label: 'Template' },
   ]
 
