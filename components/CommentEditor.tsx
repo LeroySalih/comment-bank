@@ -7,9 +7,13 @@ import { updateAssignmentCode, updateCommonAssignmentCode, updateAssignmentComme
 import { reviewComment } from '@/lib/server-actions/comment-check';
 import CommentStatusBadge from './CommentStatusBadge';
 import ConfirmModal from './ConfirmModal';
-import { requestAiCheck } from '@/lib/server-actions/ai-check';
-import AiSuggestionPanel from './AiSuggestionPanel';
-import type { AiSuggestion } from '@/lib/types/ai-check';
+import { requestSpagCheck, requestStandardsCheck } from '@/lib/server-actions/ai-check';
+import { addIgnoredWord } from '@/lib/server-actions/ignored-words';
+import { updateAiStage } from '@/lib/server-actions/ai-stage';
+import SpagPanel, { type SpagResolution } from './SpagPanel';
+import SpagSidebar from './SpagSidebar';
+import StandardsPanel from './StandardsPanel';
+import type { SpagMatch, StandardsResult } from '@/lib/types/ai-check';
 
 type CommentOption = {
   id: string;
@@ -68,6 +72,7 @@ type Assignment = {
   checkStatus?: string;
   checkNote?: string | null;
   linkedData?: any;
+  aiStage?: string | null;
   Class?: {
     name: string;
     year?: string | null;
@@ -105,9 +110,22 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
   const [rejectionNote, setRejectionNote] = useState('');
   const [isReviewing, setIsReviewing] = useState(false);
 
-  // AI check state
-  const [aiSuggestion, setAiSuggestion] = useState<AiSuggestion | null>(null);
-  const [isAiChecking, setIsAiChecking] = useState(false);
+  // Two-step AI check state
+  const [aiStage, setAiStage] = useState<string | null>(assignment.aiStage ?? null);
+
+  // SPAG state
+  const [spagMatches, setSpagMatches] = useState<SpagMatch[] | null>(null);
+  const [spagResolutions, setSpagResolutions] = useState<Map<number, SpagResolution>>(new Map());
+  const [spagOriginalText, setSpagOriginalText] = useState('');
+  const [isSpagChecking, setIsSpagChecking] = useState(false);
+  const [showSpagSidebar, setShowSpagSidebar] = useState(true);
+
+  // Standards state (second-step check)
+  const [standardsResult, setStandardsResult] = useState<StandardsResult | null>(null);
+  const [isStandardsChecking, setIsStandardsChecking] = useState(false);
+
+  // Shared all-clear banner (only used by SPAG when no LT matches)
+  const [aiAllClear, setAiAllClear] = useState(false);
 
   // Memoised set of CCG group names — used for override detection in preview and sidebar
   const ccgGroupNames = useMemo(
@@ -321,7 +339,34 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     setPreview(e.target.value);
     setIsManuallyEdited(true);
     setCheckStatus('required_check');
+    if (aiStage !== null) {
+      setAiStage(null);
+      setSpagMatches(null);
+      setSpagResolutions(new Map());
+      setStandardsResult(null);
+      setAiAllClear(false);
+      updateAiStage(assignment.id, null).catch(console.error);
+    }
   };
+
+  function buildPreviewFromSpagResolutions(
+    original: string,
+    resolutions: Map<number, SpagResolution>
+  ): string {
+    // Apply resolutions in reverse offset order so earlier offsets remain valid
+    const entries = [...resolutions.values()].sort((a, b) => b.match.offset - a.match.offset);
+    let text = original;
+    for (const r of entries) {
+      const start = r.match.offset;
+      const end = start + r.match.length;
+      let replacement = '';
+      if (r.action === 'accepted' || r.action === 'edited') replacement = r.replacement;
+      else if (r.action === 'deleted') replacement = '';
+      else replacement = r.match.word; // ignored — keep original
+      text = text.slice(0, start) + replacement + text.slice(end);
+    }
+    return text;
+  }
 
   const handleTextBlur = async () => {
     if (!isManuallyEdited) return;
@@ -400,50 +445,189 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
     setIsReviewing(false);
   };
 
-  const handleAiCheck = async () => {
-    if (!preview.trim()) return;
-    setIsAiChecking(true);
-    try {
-      const result = await requestAiCheck(assignment.id, preview);
-      if (result.success) {
-        setAiSuggestion(result.suggestion);
-      } else {
-        alert('AI check failed: ' + result.error);
-      }
-    } catch {
-      alert('AI check failed');
-    } finally {
-      setIsAiChecking(false);
+  // ── Stage advance helpers ───────────────────────────────────────────────────
+
+  const advanceStage = (target: 'spag' | 'tone') => {
+    setAiStage(target);
+    updateAiStage(assignment.id, target).catch(console.error);
+    if (target === 'tone') {
+      setCheckStatus('not_required');
+      updateAssignmentCommentText(assignment.id, preview, 'not_required')
+        .then(() => router.refresh())
+        .catch(console.error);
     }
   };
 
-  const handleApplyAiChange = (newText: string, isLastChange: boolean) => {
-    setPreview(newText);
-    setIsManuallyEdited(true);
-    if (isLastChange) {
-      setCheckStatus('not_required');
-      setAiSuggestion(null);
-      updateAssignmentCommentText(assignment.id, newText, 'not_required')
-        .then(() => router.refresh())
-        .catch(console.error);
-    } else {
-      setCheckStatus('required_check');
+  // ── SPAG handlers ───────────────────────────────────────────────────────────
+
+  const handleSpagCheck = async () => {
+    if (!preview.trim()) return;
+    setIsSpagChecking(true);
+    setSpagMatches(null);
+    setSpagResolutions(new Map());
+    setAiAllClear(false);
+    setSpagOriginalText(preview);
+    setShowSpagSidebar(true);
+
+    try {
+      const result = await requestSpagCheck(preview);
+
+      console.group('[SPAG check] result');
+      console.log('Original text:', preview);
+      console.log('Full result:', result);
+      if (result.success && result.result) {
+        console.log('Match count:', result.result.matches.length);
+        console.table(result.result.matches.map(m => ({
+          word: m.word,
+          offset: m.offset,
+          length: m.length,
+          firstReplacement: m.replacements[0] ?? '(none)',
+          totalReplacements: m.replacements.length,
+        })));
+      } else if (result.success && !result.result) {
+        console.log('No issues found — comment is clean');
+      } else if (!result.success) {
+        console.log('Failed:', result.error);
+      }
+      console.groupEnd();
+
+      if (result.success) {
+        if (result.result) {
+          setSpagMatches(result.result.matches);
+          setAiStage(null);
+          updateAiStage(assignment.id, null).catch(console.error);
+        } else {
+          setAiAllClear(true);
+          advanceStage('spag');
+        }
+      } else {
+        alert('SPAG check failed: ' + result.error);
+      }
+    } catch (err) {
+      console.error('[SPAG check] Exception:', err);
+      alert('SPAG check failed');
+    } finally {
+      setIsSpagChecking(false);
+    }
+  };
+
+  const handleSpagResolve = (resolution: SpagResolution) => {
+    if (resolution.action === 'ignored') {
+      addIgnoredWord(resolution.match.word).catch(console.error);
+    }
+
+    const next = new Map(spagResolutions);
+    next.set(resolution.match.offset, resolution);
+    setSpagResolutions(next);
+
+    // If this resolution changes the text, update preview
+    if (resolution.action !== 'ignored') {
+      const newText = buildPreviewFromSpagResolutions(spagOriginalText, next);
+      setPreview(newText);
+      setIsManuallyEdited(true);
       updateAssignmentCommentText(assignment.id, newText, 'required_check').catch(console.error);
     }
   };
 
-  const handleApplyAllAi = (improvedText: string) => {
-    setPreview(improvedText);
+  const handleSpagAcceptAll = () => {
+    if (!spagMatches) return;
+    const next = new Map(spagResolutions);
+    for (const m of spagMatches) {
+      if (next.has(m.offset)) continue;
+      const replacement = m.replacements[0];
+      if (!replacement) continue; // can't auto-accept words without replacement
+      next.set(m.offset, { match: m, action: 'accepted', replacement });
+    }
+    setSpagResolutions(next);
+    const newText = buildPreviewFromSpagResolutions(spagOriginalText, next);
+    setPreview(newText);
     setIsManuallyEdited(true);
-    setCheckStatus('not_required');
-    setAiSuggestion(null);
-    updateAssignmentCommentText(assignment.id, improvedText, 'not_required')
-      .then(() => router.refresh())
-      .catch(console.error);
+    updateAssignmentCommentText(assignment.id, newText, 'required_check').catch(console.error);
   };
 
-  const handleAiDismiss = () => {
-    setAiSuggestion(null);
+  const handleSpagRejectAll = () => {
+    if (!spagMatches) return;
+    const next = new Map(spagResolutions);
+    for (const m of spagMatches) {
+      if (next.has(m.offset)) continue;
+      addIgnoredWord(m.word).catch(console.error);
+      next.set(m.offset, { match: m, action: 'ignored' });
+    }
+    setSpagResolutions(next);
+  };
+
+  const handleSpagAllResolved = () => {
+    setSpagMatches(null);
+    setSpagResolutions(new Map());
+    advanceStage('spag');
+  };
+
+  const handleSpagDismiss = () => {
+    setSpagMatches(null);
+    setSpagResolutions(new Map());
+  };
+
+  const handleSpagSidebarDismiss = () => {
+    setShowSpagSidebar(false);
+  };
+
+  const handleSpagJumpTo = (match: SpagMatch) => {
+    if (typeof document === 'undefined') return;
+    const el = document.querySelector(`[data-spag-offset="${match.offset}"]`) as HTMLElement | null;
+    if (!el) return;
+    el.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    // Open the popup by dispatching a click on the underlined word
+    el.click();
+  };
+
+  const handleSpagRerun = () => {
+    setSpagMatches(null);
+    setSpagResolutions(new Map());
+    handleSpagCheck();
+  };
+
+  // ── Standards handlers ──────────────────────────────────────────────────────
+
+  const handleStandardsCheck = async () => {
+    if (!preview.trim()) return;
+    setIsStandardsChecking(true);
+    setStandardsResult(null);
+
+    try {
+      const result = await requestStandardsCheck(preview);
+
+      console.group('[Standards check] result');
+      console.log('Full result:', result);
+      console.groupEnd();
+
+      if (result.success) {
+        setStandardsResult(result.result);
+      } else {
+        alert('Standards check failed: ' + result.error);
+      }
+    } catch (err) {
+      console.error('[Standards check] Exception:', err);
+      alert('Standards check failed');
+    } finally {
+      setIsStandardsChecking(false);
+    }
+  };
+
+  const handleStandardsAllPassed = () => {
+    setStandardsResult(null);
+    advanceStage('tone');
+  };
+
+  const handleStandardsDismiss = () => {
+    setStandardsResult(null);
+  };
+
+  const handleStandardsRerun = () => {
+    handleStandardsCheck();
+  };
+
+  const handleAllClearDismiss = () => {
+    setAiAllClear(false);
   };
 
   const wordCount = countWords(preview);
@@ -618,15 +802,28 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                             Revert
                         </button>
                     )}
-                    <button
-                        onClick={handleAiCheck}
-                        disabled={isAiChecking || !preview.trim()}
-                        className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
-                        title="Request AI grammar and vocabulary check"
-                    >
-                        <span className="material-symbols-outlined text-sm">auto_fix_high</span>
-                        {isAiChecking ? 'Checking...' : 'AI Check'}
-                    </button>
+                    {aiStage !== 'tone' && (
+                        <button
+                            onClick={handleSpagCheck}
+                            disabled={isSpagChecking || !preview.trim()}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-amber-600 hover:text-amber-700 hover:bg-amber-50 dark:hover:bg-amber-900/20 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+                            title="Check spelling and grammar"
+                        >
+                            <span className="material-symbols-outlined text-sm">spellcheck</span>
+                            {isSpagChecking ? 'Checking...' : 'Check SPAG'}
+                        </button>
+                    )}
+                    {aiStage === 'spag' && (
+                        <button
+                            onClick={handleStandardsCheck}
+                            disabled={isStandardsChecking || !preview.trim()}
+                            className="flex items-center gap-1 px-2 py-1 text-xs font-medium text-blue-600 hover:text-blue-700 hover:bg-blue-50 dark:hover:bg-blue-900/20 disabled:opacity-40 disabled:cursor-not-allowed rounded transition-colors"
+                            title="Check comment against marking standards"
+                        >
+                            <span className="material-symbols-outlined text-sm">checklist</span>
+                            {isStandardsChecking ? 'Checking...' : 'Check Standards'}
+                        </button>
+                    )}
                 </div>
                 <div className="flex items-center gap-4">
                     <div className="flex items-center gap-3">
@@ -681,28 +878,90 @@ export default function CommentEditor({ assignment, subject, groups, isHoD = fal
                 </div>
             )}
 
-            <div className="flex-1 p-8 relative">
-                <div className="relative h-full flex flex-col">
-                    <label className="text-xs font-bold text-primary uppercase mb-2 block">Generated Comment</label>
-                    <textarea
-                        className="flex-1 w-full p-6 text-lg leading-relaxed text-[#111418] dark:text-gray-100 bg-background-light/50 dark:bg-gray-950/50 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none outline-none font-display transition-all"
-                        placeholder="Start typing student comments here..."
-                        value={preview}
-                        onChange={handleTextChange}
-                        onBlur={handleTextBlur}
-                    ></textarea>
+            {!spagMatches && (
+                <div className={`flex-1 p-8 relative ${standardsResult ? 'sm:pr-[440px]' : ''}`}>
+                    <div className="relative h-full flex flex-col">
+                        <label className="text-xs font-bold text-primary uppercase mb-2 block">Generated Comment</label>
+                        <textarea
+                            className="flex-1 w-full p-6 text-lg leading-relaxed text-[#111418] dark:text-gray-100 bg-background-light/50 dark:bg-gray-950/50 rounded-xl border border-transparent focus:border-primary focus:ring-2 focus:ring-primary/20 resize-none outline-none font-display transition-all"
+                            placeholder="Start typing student comments here..."
+                            value={preview}
+                            onChange={handleTextChange}
+                            onBlur={handleTextBlur}
+                        ></textarea>
 
+                    </div>
                 </div>
-            </div>
+            )}
 
-            {/* AI Suggestion Panel */}
-            {aiSuggestion && (
-                <AiSuggestionPanel
-                    suggestion={aiSuggestion}
-                    onApplyChange={handleApplyAiChange}
-                    onApplyAll={handleApplyAllAi}
-                    onDismiss={handleAiDismiss}
+            {/* SPAG Panel — red underline + click popup (shifts left when sidebar is open) */}
+            {spagMatches !== null && (
+                <div className={showSpagSidebar ? 'sm:pr-[440px]' : ''}>
+                    <SpagPanel
+                        originalText={spagOriginalText}
+                        matches={spagMatches}
+                        resolutions={spagResolutions}
+                        onResolve={handleSpagResolve}
+                        onAcceptAll={handleSpagAcceptAll}
+                        onRejectAll={handleSpagRejectAll}
+                        onAllResolved={handleSpagAllResolved}
+                        onRerun={handleSpagRerun}
+                        onDismiss={handleSpagDismiss}
+                    />
+                    {!showSpagSidebar && (
+                        <div className="mx-8 mb-2 flex justify-end">
+                            <button
+                                onClick={() => setShowSpagSidebar(true)}
+                                className="flex items-center gap-1 px-3 py-1.5 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800 rounded transition-colors"
+                                title="Show error list sidebar"
+                            >
+                                <span className="material-symbols-outlined text-sm">menu_open</span>
+                                Show error list
+                            </button>
+                        </div>
+                    )}
+                </div>
+            )}
+
+            {/* SPAG Sidebar — list of all errors */}
+            {spagMatches !== null && showSpagSidebar && (
+                <SpagSidebar
+                    matches={spagMatches}
+                    resolutions={spagResolutions}
+                    onJumpTo={handleSpagJumpTo}
+                    onAcceptAll={handleSpagAcceptAll}
+                    onRejectAll={handleSpagRejectAll}
+                    onRerun={handleSpagRerun}
+                    onDismiss={handleSpagSidebarDismiss}
                 />
+            )}
+
+            {/* Standards Panel — rule pass/fail */}
+            {standardsResult && (
+                <StandardsPanel
+                    result={standardsResult}
+                    onAllResolved={handleStandardsAllPassed}
+                    onRerun={handleStandardsRerun}
+                    onDismiss={handleStandardsDismiss}
+                />
+            )}
+
+            {/* All Clear banner */}
+            {aiAllClear && !spagMatches && !standardsResult && (
+                <div className="mx-8 mb-4 bg-white dark:bg-gray-900 border border-green-200 dark:border-green-800 rounded-lg overflow-hidden">
+                    <div className="bg-green-50 dark:bg-green-900/20 px-4 py-3 flex items-center gap-2">
+                        <span className="material-symbols-outlined text-green-600 dark:text-green-400 text-base">check_circle</span>
+                        <strong className="text-green-700 dark:text-green-400 text-sm">No issues found</strong>
+                        <span className="ml-auto text-xs text-gray-500 dark:text-gray-400 italic">Nothing to change</span>
+                        <button
+                            onClick={handleAllClearDismiss}
+                            className="ml-2 text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                            title="Dismiss"
+                        >
+                            <span className="material-symbols-outlined text-sm">close</span>
+                        </button>
+                    </div>
+                </div>
             )}
 
             {/* HoD Review Panel */}

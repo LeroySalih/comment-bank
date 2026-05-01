@@ -168,6 +168,7 @@ export default async function StudentPage({ params }: { params: Promise<{ studen
     checkNote: row.checkNote,
     checkedAt: row.checkedAt,
     checkedById: row.checkedById,
+    aiStage: row.aiStage ?? null,
     Pupil: pupil,
     PupilCode: pupilCodeRows,
     CommonPupilCode: commonPupilCodeRows,
