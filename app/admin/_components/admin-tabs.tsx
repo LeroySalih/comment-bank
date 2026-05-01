@@ -24,34 +24,41 @@ interface AdminTabsProps {
 export function AdminTabs({ users, roles, subjects, deadlines, classes = [], commonGroups = [], commentFormatTemplate = '' }: AdminTabsProps) {
   const [activeTab, setActiveTab] = useState<'users' | 'pupils' | 'subjects' | 'classes' | 'deadlines' | 'linked-data' | 'ccg' | 'format' | 'activity'>('users')
 
-  const tabs = [
+  const leftTabs = [
     { key: 'users' as const, label: 'Users' },
-    { key: 'pupils' as const, label: 'Pupils' },
     { key: 'classes' as const, label: 'Classes' },
-    { key: 'ccg' as const, label: 'CCG' },
-    { key: 'subjects' as const, label: 'Subjects' },
-    { key: 'format' as const, label: 'Format' },
+    { key: 'pupils' as const, label: 'Pupils' },
+    { key: 'ccg' as const, label: 'Common Comments' },
+    { key: 'subjects' as const, label: 'Subject Comments' },
+    { key: 'format' as const, label: 'Template' },
+  ]
+
+  const rightTabs = [
     { key: 'linked-data' as const, label: 'Linked Data' },
     { key: 'deadlines' as const, label: 'Deadlines' },
     { key: 'activity' as const, label: 'Activity Log' },
   ]
 
+  const renderTab = (tab: { key: typeof activeTab, label: string }) => (
+    <button
+      key={tab.key}
+      className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${
+        activeTab === tab.key
+          ? "border-b-2 border-blue-500 text-blue-600"
+          : "text-gray-500 hover:text-gray-700"
+      }`}
+      onClick={() => setActiveTab(tab.key)}
+    >
+      {tab.label}
+    </button>
+  )
+
   return (
     <div className="space-y-6">
       <div className="flex border-b overflow-x-auto">
-        {tabs.map(tab => (
-          <button
-            key={tab.key}
-            className={`px-4 py-2 font-medium text-sm transition-colors whitespace-nowrap ${
-              activeTab === tab.key
-                ? "border-b-2 border-blue-500 text-blue-600"
-                : "text-gray-500 hover:text-gray-700"
-            }`}
-            onClick={() => setActiveTab(tab.key)}
-          >
-            {tab.label}
-          </button>
-        ))}
+        {leftTabs.map(renderTab)}
+        <div className="flex-1" />
+        {rightTabs.map(renderTab)}
       </div>
 
       <div className="mt-6">

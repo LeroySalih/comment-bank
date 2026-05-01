@@ -47,11 +47,11 @@ if ! docker inspect -f '{{.State.Running}}' "$CONTAINER" 2>/dev/null | grep -q t
 fi
 
 echo "==> Dropping and recreating $DB_NAME..."
-if ! docker exec "$CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $DB_NAME;"; then
+if ! docker exec "$CONTAINER" psql -U "$DB_USER" -d template1 -v ON_ERROR_STOP=1 -c "DROP DATABASE IF EXISTS $DB_NAME;"; then
   echo "FAILED: could not drop $DB_NAME"
   exit 1
 fi
-if ! docker exec "$CONTAINER" psql -U "$DB_USER" -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DB_NAME;"; then
+if ! docker exec "$CONTAINER" psql -U "$DB_USER" -d template1 -v ON_ERROR_STOP=1 -c "CREATE DATABASE $DB_NAME;"; then
   echo "FAILED: could not create $DB_NAME"
   exit 1
 fi

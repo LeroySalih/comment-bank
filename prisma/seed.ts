@@ -16,7 +16,6 @@ async function main() {
     await client.query(`DELETE FROM "Assignment"`);
     await client.query(`DELETE FROM "Pupil"`);
     await client.query(`DELETE FROM "_ClassToUser"`);
-    await client.query(`DELETE FROM "_PupilToClass"`);
     await client.query(`DELETE FROM "Class"`);
     await client.query(`DELETE FROM "CommentOption"`);
     await client.query(`DELETE FROM "CommentGroup"`);
