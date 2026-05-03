@@ -28,7 +28,12 @@ export async function callSpagWebhook(
     throw new Error(`SPAG service returned ${response.status}`);
   }
 
-  const raw: unknown = await response.json();
+  let raw: unknown;
+  try {
+    raw = await response.json();
+  } catch {
+    throw new Error(`SPAG service returned non-JSON body (status ${response.status})`);
+  }
   const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
   const data = unwrapped as Record<string, unknown>;
 
@@ -75,10 +80,17 @@ export async function callStandardsWebhook(
     throw new Error(`Standards service returned ${response.status}`);
   }
 
-  const raw: unknown = await response.json();
+  let raw: unknown;
+  try {
+    raw = await response.json();
+  } catch {
+    throw new Error(`Standards service returned non-JSON body (status ${response.status})`);
+  }
   const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
   const data = ((unwrapped as Record<string, unknown>)?.output ?? unwrapped) as Record<string, unknown>;
 
+  // Simplified variant of the original toEntry() — intentionally drops instances/wordCount,
+  // as the audit only needs pass/fail per rule.
   const toBool = (v: unknown): boolean => {
     if (typeof v === 'boolean') return v;
     if (typeof v === 'string') return v.toLowerCase() === 'true' || v.toLowerCase() === 'passed';

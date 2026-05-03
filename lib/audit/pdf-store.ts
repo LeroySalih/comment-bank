@@ -13,8 +13,9 @@ export function storePdf(buffer: Buffer): string {
   const token = randomUUID();
   store.set(token, { buffer, expiresAt: Date.now() + TTL_MS });
   // Lazy cleanup: remove expired entries on each store
+  const now = Date.now();
   for (const [key, entry] of store) {
-    if (entry.expiresAt < Date.now()) store.delete(key);
+    if (entry.expiresAt < now) store.delete(key);
   }
   return token;
 }
@@ -23,7 +24,10 @@ export function storePdf(buffer: Buffer): string {
 export function consumePdf(token: string): Buffer | null {
   const entry = store.get(token);
   if (!entry) return null;
+  if (entry.expiresAt < Date.now()) {
+    store.delete(token);
+    return null;
+  }
   store.delete(token);
-  if (entry.expiresAt < Date.now()) return null;
   return entry.buffer;
 }
