@@ -9,6 +9,7 @@ import { addIgnoredWord } from '@/lib/server-actions/ignored-words'
 import { substituteVariables } from '@/lib/audit/substitute-variables'
 import { VariablePreview } from '@/components/VariablePreview'
 import { countWords } from '@/lib/utils'
+import SpagPanel, { type SpagResolution } from '@/components/SpagPanel'
 import type { SpagMatch, StandardsResult, StandardsRuleKey } from '@/lib/types/ai-check'
 
 interface CommentOption {
@@ -56,10 +57,11 @@ export function EditCommentForm({
 
   // SPAG state
   const [spagMatches, setSpagMatches] = useState<SpagMatch[] | null>(null)
+  const [spagResolutions, setSpagResolutions] = useState<Map<number, SpagResolution>>(new Map())
+  // The substituted text at the time the SPAG check ran — used as SpagPanel's source of truth
+  const [spagOriginalText, setSpagOriginalText] = useState('')
   const [isSpagChecking, setIsSpagChecking] = useState(false)
   const [spagError, setSpagError] = useState<string | null>(null)
-  // Track words ignored this session so they vanish from the list immediately
-  const [locallyIgnored, setLocallyIgnored] = useState<Set<string>>(new Set())
 
   // Standards state
   const [standardsResult, setStandardsResult] = useState<StandardsResult | null>(null)
@@ -77,10 +79,10 @@ export function EditCommentForm({
     spagRequestId.current++
     standardsRequestId.current++
     setSpagMatches(null)
+    setSpagResolutions(new Map())
     setStandardsResult(null)
     setSpagError(null)
     setStandardsError(null)
-    setLocallyIgnored(new Set())
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -111,12 +113,14 @@ export function EditCommentForm({
     const id = ++spagRequestId.current
     setIsSpagChecking(true)
     setSpagMatches(null)
+    setSpagResolutions(new Map())
     setSpagError(null)
-    setLocallyIgnored(new Set())
 
     // Substitute fixed test values so template variables like <Name> do not
-    // trigger false SPAG positives.
+    // trigger false SPAG positives. Store the substituted text so SpagPanel
+    // offsets remain valid even if the user edits the textarea afterwards.
     const substituted = substituteVariables(text, subjectTitle)
+    setSpagOriginalText(substituted)
     const result = await requestSpagCheck(substituted)
 
     if (spagRequestId.current !== id) return // response is stale, discard it
@@ -127,6 +131,81 @@ export function EditCommentForm({
     } else {
       setSpagError(result.error)
     }
+  }
+
+  // Apply all resolutions (in reverse offset order) to produce updated text
+  function applyResolutions(
+    original: string,
+    resolutions: Map<number, SpagResolution>
+  ): string {
+    const entries = [...resolutions.values()].sort((a, b) => b.match.offset - a.match.offset)
+    let result = original
+    for (const r of entries) {
+      const start = r.match.offset
+      const end = start + r.match.length
+      const replacement =
+        r.action === 'accepted' || r.action === 'edited'
+          ? r.replacement
+          : r.action === 'deleted'
+          ? ''
+          : r.match.word // ignored — keep word unchanged
+      result = result.slice(0, start) + replacement + result.slice(end)
+    }
+    return result
+  }
+
+  function handleSpagResolve(resolution: SpagResolution) {
+    if (resolution.action === 'ignored') {
+      addIgnoredWord(resolution.match.word).catch(console.error)
+    }
+    const next = new Map(spagResolutions)
+    next.set(resolution.match.offset, resolution)
+    setSpagResolutions(next)
+
+    // For text-changing actions, update the textarea so the teacher sees the fix
+    if (resolution.action !== 'ignored') {
+      setText(applyResolutions(spagOriginalText, next))
+    }
+  }
+
+  function handleSpagAcceptAll() {
+    if (!spagMatches) return
+    const next = new Map(spagResolutions)
+    for (const m of spagMatches) {
+      if (next.has(m.offset)) continue
+      const replacement = m.replacements[0]
+      if (!replacement) continue // no suggestion — skip
+      next.set(m.offset, { match: m, action: 'accepted', replacement })
+    }
+    setSpagResolutions(next)
+    setText(applyResolutions(spagOriginalText, next))
+  }
+
+  function handleSpagRejectAll() {
+    if (!spagMatches) return
+    const next = new Map(spagResolutions)
+    for (const m of spagMatches) {
+      if (next.has(m.offset)) continue
+      addIgnoredWord(m.word).catch(console.error)
+      next.set(m.offset, { match: m, action: 'ignored' })
+    }
+    setSpagResolutions(next)
+  }
+
+  function handleSpagAllResolved() {
+    setSpagMatches(null)
+    setSpagResolutions(new Map())
+  }
+
+  function handleSpagDismiss() {
+    setSpagMatches(null)
+    setSpagResolutions(new Map())
+  }
+
+  function handleSpagRerun() {
+    setSpagMatches(null)
+    setSpagResolutions(new Map())
+    handleSpagCheck()
   }
 
   async function handleStandardsCheck() {
@@ -148,21 +227,6 @@ export function EditCommentForm({
       setStandardsError(result.error)
     }
   }
-
-  async function handleIgnoreWord(word: string) {
-    const result = await addIgnoredWord(word)
-    if (!result.success) {
-      // Word was not persisted — do not remove it from the visible list
-      return
-    }
-    // Persisted successfully — propagates to audit and pupil-report SPAG checks
-    setLocallyIgnored(prev => new Set(prev).add(word.toLowerCase()))
-  }
-
-  // Filter out matches the teacher has already ignored this session
-  const visibleMatches = (spagMatches ?? []).filter(
-    m => !locallyIgnored.has(m.word.toLowerCase())
-  )
 
   return (
     <div
@@ -239,48 +303,17 @@ export function EditCommentForm({
         )}
 
         {spagMatches !== null && !spagError && (
-          <div className="rounded-lg border border-amber-200 dark:border-amber-800 bg-white dark:bg-gray-900 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
-              <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-sm">
-                spellcheck
-              </span>
-              <span className="text-xs font-semibold text-amber-700 dark:text-amber-400">
-                {visibleMatches.length === 0
-                  ? 'SPAG — No issues found ✓'
-                  : `SPAG — ${visibleMatches.length} issue${visibleMatches.length > 1 ? 's' : ''} found`}
-              </span>
-            </div>
-            {visibleMatches.length > 0 && (
-              <ul className="divide-y divide-amber-100 dark:divide-amber-900/20">
-                {visibleMatches.map(match => (
-                  <li key={`${match.offset}-${match.word}`} className="px-3 py-2 flex items-start gap-2">
-                    <div className="flex-1 min-w-0">
-                      <span className="font-medium text-xs text-gray-800 dark:text-gray-200">
-                        &ldquo;{match.word}&rdquo;
-                      </span>
-                      <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">
-                        — {match.message}
-                      </span>
-                      {match.replacements.length > 0 && (
-                        <p className="text-[10px] text-gray-400 dark:text-gray-500 mt-0.5">
-                          Suggestion{match.replacements.length > 1 ? 's' : ''}:{' '}
-                          {match.replacements.slice(0, 3).join(', ')}
-                        </p>
-                      )}
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => handleIgnoreWord(match.word)}
-                      className="flex-shrink-0 text-[10px] px-1.5 py-0.5 text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-50 dark:hover:bg-gray-800 transition-colors"
-                      title="Ignore this word in all future SPAG checks (audit and pupil reports)"
-                    >
-                      Ignore
-                    </button>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </div>
+          <SpagPanel
+            originalText={spagOriginalText}
+            matches={spagMatches}
+            resolutions={spagResolutions}
+            onResolve={handleSpagResolve}
+            onAcceptAll={handleSpagAcceptAll}
+            onRejectAll={handleSpagRejectAll}
+            onAllResolved={handleSpagAllResolved}
+            onRerun={handleSpagRerun}
+            onDismiss={handleSpagDismiss}
+          />
         )}
 
         {/* Standards results */}
