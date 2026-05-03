@@ -18,7 +18,7 @@ function pickOption(options: Option[], tier: 'high' | 'medium' | 'low'): Option 
   const sorted = sortedOptions(options);
   if (tier === 'high') return sorted[0];
   if (tier === 'low') return sorted[sorted.length - 1];
-  return sorted[Math.floor((sorted.length - 1) / 2)];
+  return sorted[Math.round((sorted.length - 1) / 2)];
 }
 
 function assembleText(
@@ -45,6 +45,10 @@ export function buildSampleReports(
   // Filter out linked groups; groups must have at least one option
   const activeGroups = subjectGroups.filter(g => !g.isLinked && g.options.length > 0);
 
+  if (activeGroups.length === 0) {
+    return { reports: [], untestedItems: [] };
+  }
+
   // Fixed common selections: first option by displayOrder from each common group
   const commonSelections: Record<string, Option> = {};
   for (const cg of commonGroups) {
@@ -58,8 +62,8 @@ export function buildSampleReports(
   // Track which (groupId, code) combos have been seen
   const seenCodes = new Set<string>(); // `${groupId}:${code}`
 
-  function addReport(subjectSelections: Record<string, Option>): boolean {
-    if (reports.length >= maxReports) return false;
+  function addReport(subjectSelections: Record<string, Option>): void {
+    if (reports.length >= maxReports) return;
     const index = reports.length;
     const selectionsForReport: SampledReport['selections'] = {};
     for (const [groupId, opt] of Object.entries(subjectSelections)) {
@@ -82,7 +86,6 @@ export function buildSampleReports(
     }
     const assembledText = assembleText(subjectSelections, commonSelections, subjectTitle);
     reports.push({ reportIndex: index, selections: selectionsForReport, assembledText });
-    return true;
   }
 
   // ── Strategy 1: All High ────────────────────────────────────────────────
