@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { getPupils, updatePupil, processPupilUpload, createPupil } from "@/lib/server-actions/admin"
+import { getPupils, updatePupil, processPupilUpload, createPupil, deletePupil } from "@/lib/server-actions/admin"
 
 interface Pupil {
   admissionNumber: string
@@ -22,6 +22,7 @@ export function PupilManagement() {
   const [addForm, setAddForm] = useState({ admissionNumber: '', firstName: '', lastName: '', gender: 'M', form: '' })
   const [addError, setAddError] = useState<string | null>(null)
   const [addSaving, setAddSaving] = useState(false)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
 
   const fetchPupils = async (q: string) => {
     setLoading(true)
@@ -88,6 +89,18 @@ export function PupilManagement() {
     } else {
       setAddError('error' in result ? (result.error ?? 'Failed to create pupil') : 'Failed to create pupil')
     }
+  }
+
+  const handleDeletePupil = async (pupil: Pupil) => {
+    if (!confirm(`Permanently delete ${pupil.firstName} ${pupil.lastName} (${pupil.admissionNumber})? This will also remove them from all classes.`)) return
+    setDeletingId(pupil.admissionNumber)
+    const result = await deletePupil(pupil.admissionNumber)
+    if (result.success) {
+      setPupils(prev => prev.filter(p => p.admissionNumber !== pupil.admissionNumber))
+    } else {
+      alert('error' in result ? (result.error ?? 'Failed to delete pupil') : 'Failed to delete pupil')
+    }
+    setDeletingId(null)
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -282,12 +295,24 @@ export function PupilManagement() {
                       </span>
                     </td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                      <button
-                        onClick={() => handleToggleActive(pupil)}
-                        className={`${pupil.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
-                      >
-                        Set {pupil.isActive ? 'Inactive' : 'Active'}
-                      </button>
+                      <div className="flex items-center gap-3">
+                        <button
+                          type="button"
+                          onClick={() => handleToggleActive(pupil)}
+                          className={`${pupil.isActive ? 'text-red-600 hover:text-red-900' : 'text-green-600 hover:text-green-900'}`}
+                        >
+                          Set {pupil.isActive ? 'Inactive' : 'Active'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePupil(pupil)}
+                          disabled={deletingId === pupil.admissionNumber}
+                          className="text-gray-400 hover:text-red-600 disabled:opacity-50 transition-colors"
+                          title="Delete pupil permanently"
+                        >
+                          {deletingId === pupil.admissionNumber ? '…' : '🗑'}
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
