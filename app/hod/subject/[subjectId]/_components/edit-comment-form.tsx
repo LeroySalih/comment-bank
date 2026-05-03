@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { updateComment } from '@/lib/server-actions/hod'
@@ -9,7 +9,7 @@ import { addIgnoredWord } from '@/lib/server-actions/ignored-words'
 import { substituteVariables } from '@/lib/audit/substitute-variables'
 import { VariablePreview } from '@/components/VariablePreview'
 import { countWords } from '@/lib/utils'
-import SpagPanel, { type SpagResolution } from '@/components/SpagPanel'
+import type { SpagResolution } from '@/components/SpagPanel'
 import type { SpagMatch, StandardsResult, StandardsRuleKey } from '@/lib/types/ai-check'
 
 interface CommentOption {
@@ -43,6 +43,10 @@ const STANDARDS_RULE_KEYS: StandardsRuleKey[] = [
   'Formatting',
 ]
 
+type Segment =
+  | { type: 'unchanged'; text: string }
+  | { type: 'match'; match: SpagMatch }
+
 export function EditCommentForm({
   comment,
   subjectId,
@@ -58,10 +62,15 @@ export function EditCommentForm({
   // SPAG state
   const [spagMatches, setSpagMatches] = useState<SpagMatch[] | null>(null)
   const [spagResolutions, setSpagResolutions] = useState<Map<number, SpagResolution>>(new Map())
-  // The substituted text at the time the SPAG check ran — used as SpagPanel's source of truth
   const [spagOriginalText, setSpagOriginalText] = useState('')
   const [isSpagChecking, setIsSpagChecking] = useState(false)
   const [spagError, setSpagError] = useState<string | null>(null)
+
+  // SPAG inline popup state
+  const [activeSpagOffset, setActiveSpagOffset] = useState<number | null>(null)
+  const [popupPlacement, setPopupPlacement] = useState<'above' | 'below'>('below')
+  const [editingOffset, setEditingOffset] = useState<number | null>(null)
+  const [editValue, setEditValue] = useState('')
 
   // Standards state
   const [standardsResult, setStandardsResult] = useState<StandardsResult | null>(null)
@@ -70,10 +79,56 @@ export function EditCommentForm({
 
   const spagRequestId = useRef(0)
   const standardsRequestId = useRef(0)
+  const spagContainerRef = useRef<HTMLDivElement | null>(null)
+  const spagPopupRef = useRef<HTMLDivElement | null>(null)
+  const spagEditInputRef = useRef<HTMLInputElement | null>(null)
 
   const router = useRouter()
 
-  // Clear AI results when the comment text changes so stale results are not shown
+  // Click outside closes the SPAG popup
+  useEffect(() => {
+    if (activeSpagOffset === null) return
+    const handler = (e: MouseEvent) => {
+      if (spagPopupRef.current && !spagPopupRef.current.contains(e.target as Node)) {
+        const underline = spagContainerRef.current?.querySelector(
+          `[data-spag-offset="${activeSpagOffset}"]`
+        )
+        if (underline && underline.contains(e.target as Node)) return
+        setActiveSpagOffset(null)
+        setEditingOffset(null)
+        setEditValue('')
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [activeSpagOffset])
+
+  // Focus edit input when edit mode opens
+  useEffect(() => {
+    if (editingOffset !== null && spagEditInputRef.current) {
+      spagEditInputRef.current.focus()
+      spagEditInputRef.current.select()
+    }
+  }, [editingOffset])
+
+  // Segments: split spagOriginalText into unchanged / match slices
+  const segments = useMemo<Segment[]>(() => {
+    if (!spagMatches) return []
+    const sorted = [...spagMatches].sort((a, b) => a.offset - b.offset)
+    const out: Segment[] = []
+    let cursor = 0
+    for (const m of sorted) {
+      if (m.offset > cursor) out.push({ type: 'unchanged', text: spagOriginalText.slice(cursor, m.offset) })
+      out.push({ type: 'match', match: m })
+      cursor = m.offset + m.length
+    }
+    if (cursor < spagOriginalText.length) out.push({ type: 'unchanged', text: spagOriginalText.slice(cursor) })
+    return out
+  }, [spagMatches, spagOriginalText])
+
+  const unresolvedCount = spagMatches ? spagMatches.length - spagResolutions.size : 0
+
+  // Clear AI results when the comment text changes
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
     spagRequestId.current++
@@ -108,6 +163,8 @@ export function EditCommentForm({
     }
   }
 
+  // ── SPAG check ──────────────────────────────────────────────────────────────
+
   async function handleSpagCheck() {
     if (!text.trim()) return
     const id = ++spagRequestId.current
@@ -115,15 +172,13 @@ export function EditCommentForm({
     setSpagMatches(null)
     setSpagResolutions(new Map())
     setSpagError(null)
+    setActiveSpagOffset(null)
 
-    // Substitute fixed test values so template variables like <Name> do not
-    // trigger false SPAG positives. Store the substituted text so SpagPanel
-    // offsets remain valid even if the user edits the textarea afterwards.
     const substituted = substituteVariables(text, subjectTitle)
     setSpagOriginalText(substituted)
     const result = await requestSpagCheck(substituted)
 
-    if (spagRequestId.current !== id) return // response is stale, discard it
+    if (spagRequestId.current !== id) return
     setIsSpagChecking(false)
 
     if (result.success) {
@@ -133,48 +188,42 @@ export function EditCommentForm({
     }
   }
 
-  // Apply all resolutions (in reverse offset order) to produce updated text
-  function applyResolutions(
-    original: string,
-    resolutions: Map<number, SpagResolution>
-  ): string {
+  // Apply resolutions (reverse order so earlier offsets stay valid)
+  function applyResolutions(original: string, resolutions: Map<number, SpagResolution>): string {
     const entries = [...resolutions.values()].sort((a, b) => b.match.offset - a.match.offset)
     let result = original
     for (const r of entries) {
       const start = r.match.offset
       const end = start + r.match.length
       const replacement =
-        r.action === 'accepted' || r.action === 'edited'
-          ? r.replacement
-          : r.action === 'deleted'
-          ? ''
-          : r.match.word // ignored — keep word unchanged
+        r.action === 'accepted' || r.action === 'edited' ? r.replacement
+        : r.action === 'deleted' ? ''
+        : r.match.word
       result = result.slice(0, start) + replacement + result.slice(end)
     }
     return result
   }
 
-  function handleSpagResolve(resolution: SpagResolution) {
+  function resolveSpag(resolution: SpagResolution, existingResolutions: Map<number, SpagResolution>) {
     if (resolution.action === 'ignored') {
       addIgnoredWord(resolution.match.word).catch(console.error)
     }
-    const next = new Map(spagResolutions)
+    const next = new Map(existingResolutions)
     next.set(resolution.match.offset, resolution)
     setSpagResolutions(next)
-
-    // For text-changing actions, update the textarea so the teacher sees the fix
     if (resolution.action !== 'ignored') {
       setText(applyResolutions(spagOriginalText, next))
     }
+    return next
   }
 
   function handleSpagAcceptAll() {
     if (!spagMatches) return
-    const next = new Map(spagResolutions)
+    let next = new Map(spagResolutions)
     for (const m of spagMatches) {
       if (next.has(m.offset)) continue
       const replacement = m.replacements[0]
-      if (!replacement) continue // no suggestion — skip
+      if (!replacement) continue
       next.set(m.offset, { match: m, action: 'accepted', replacement })
     }
     setSpagResolutions(next)
@@ -192,21 +241,70 @@ export function EditCommentForm({
     setSpagResolutions(next)
   }
 
-  function handleSpagAllResolved() {
+  function clearSpag() {
     setSpagMatches(null)
     setSpagResolutions(new Map())
-  }
-
-  function handleSpagDismiss() {
-    setSpagMatches(null)
-    setSpagResolutions(new Map())
+    setActiveSpagOffset(null)
   }
 
   function handleSpagRerun() {
-    setSpagMatches(null)
-    setSpagResolutions(new Map())
+    clearSpag()
     handleSpagCheck()
   }
+
+  // ── SPAG popup handlers ─────────────────────────────────────────────────────
+
+  function closePopup() {
+    setActiveSpagOffset(null)
+    setEditingOffset(null)
+    setEditValue('')
+  }
+
+  function handleOpenPopup(e: React.MouseEvent<HTMLSpanElement>, match: SpagMatch) {
+    const rect = e.currentTarget.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    setPopupPlacement(spaceBelow < 240 && rect.top > spaceBelow ? 'above' : 'below')
+    setActiveSpagOffset(match.offset)
+    setEditingOffset(null)
+    setEditValue('')
+  }
+
+  function handleAccept(match: SpagMatch, replacement: string) {
+    resolveSpag({ match, action: 'accepted', replacement }, spagResolutions)
+    closePopup()
+  }
+
+  function handleEditStart(match: SpagMatch) {
+    setEditingOffset(match.offset)
+    setEditValue(match.replacements[0] ?? match.word)
+  }
+
+  function handleEditSubmit(match: SpagMatch) {
+    resolveSpag({ match, action: 'edited', replacement: editValue }, spagResolutions)
+    closePopup()
+  }
+
+  function handleDelete(match: SpagMatch) {
+    resolveSpag({ match, action: 'deleted' }, spagResolutions)
+    closePopup()
+  }
+
+  function handleIgnore(match: SpagMatch) {
+    resolveSpag({ match, action: 'ignored' }, spagResolutions)
+    closePopup()
+  }
+
+  function renderResolved(resolution: SpagResolution, key: string) {
+    if (resolution.action === 'accepted' || resolution.action === 'edited') {
+      return <span key={key} className="text-green-700 dark:text-green-400">{resolution.replacement}</span>
+    }
+    if (resolution.action === 'deleted') {
+      return <span key={key} className="text-gray-400 dark:text-gray-500 italic">[deleted]</span>
+    }
+    return <span key={key} className="text-gray-600 dark:text-gray-300">{resolution.match.word}</span>
+  }
+
+  // ── Standards check ─────────────────────────────────────────────────────────
 
   async function handleStandardsCheck() {
     if (!text.trim()) return
@@ -218,7 +316,7 @@ export function EditCommentForm({
     const substituted = substituteVariables(text, subjectTitle)
     const result = await requestStandardsCheck(substituted)
 
-    if (standardsRequestId.current !== id) return // response is stale, discard it
+    if (standardsRequestId.current !== id) return
     setIsStandardsChecking(false)
 
     if (result.success) {
@@ -262,17 +360,153 @@ export function EditCommentForm({
               </label>
               <span className="text-[10px] text-gray-400 font-medium">{countWords(text)} words</span>
             </div>
-            <textarea
-              value={text}
-              onChange={handleTextChange}
-              required
-              rows={2}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
-            />
+
+            {/* Textarea OR inline SPAG annotated view — same box */}
+            {spagMatches !== null && !spagError ? (
+              <div className="space-y-1">
+                <div
+                  ref={spagContainerRef}
+                  className="block w-full rounded-md border border-amber-300 dark:border-amber-600 bg-white dark:bg-gray-700 shadow-sm p-2 text-sm leading-relaxed whitespace-pre-wrap min-h-[4.5rem]"
+                >
+                  {segments.map((seg, i) => {
+                    if (seg.type === 'unchanged') return <span key={i}>{seg.text}</span>
+                    const { match } = seg
+                    const resolution = spagResolutions.get(match.offset)
+                    if (resolution) return renderResolved(resolution, String(i))
+                    const isActive = activeSpagOffset === match.offset
+                    return (
+                      <span key={i} className="relative inline-block">
+                        <span
+                          data-spag-offset={match.offset}
+                          onClick={e => handleOpenPopup(e, match)}
+                          className="cursor-pointer text-red-700 dark:text-red-400"
+                          style={{
+                            textDecorationLine: 'underline',
+                            textDecorationStyle: 'wavy',
+                            textDecorationColor: '#ef4444',
+                            textDecorationThickness: '1.5px',
+                            textUnderlineOffset: '3px',
+                          }}
+                          title={match.message}
+                        >
+                          {match.word}
+                        </span>
+                        {isActive && (
+                          <div
+                            ref={spagPopupRef}
+                            className={`absolute z-50 left-0 ${popupPlacement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1'} min-w-[14rem] max-w-[20rem] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 text-sm font-sans whitespace-normal`}
+                          >
+                            <div className="flex items-start gap-2 px-1 pb-2 border-b border-gray-100 dark:border-gray-800">
+                              <span className="material-symbols-outlined text-amber-500 text-base">spellcheck</span>
+                              <div className="flex-1 min-w-0">
+                                <p className="font-mono font-semibold text-red-600 dark:text-red-400 text-sm truncate">{match.word}</p>
+                                <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{match.message}</p>
+                              </div>
+                              <button type="button" onClick={closePopup} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <span className="material-symbols-outlined text-sm">close</span>
+                              </button>
+                            </div>
+
+                            {editingOffset === match.offset ? (
+                              <div className="pt-2 px-1 flex items-center gap-1">
+                                <input
+                                  ref={spagEditInputRef}
+                                  type="text"
+                                  value={editValue}
+                                  onChange={e => setEditValue(e.target.value)}
+                                  onKeyDown={e => {
+                                    if (e.key === 'Enter') { e.preventDefault(); handleEditSubmit(match) }
+                                    else if (e.key === 'Escape') { e.preventDefault(); closePopup() }
+                                  }}
+                                  className="flex-1 px-2 py-1 border border-blue-400 rounded text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-300"
+                                />
+                                <button
+                                  type="button"
+                                  onClick={() => handleEditSubmit(match)}
+                                  className="px-2 py-1 bg-green-600 hover:bg-green-700 text-white rounded text-xs font-semibold"
+                                >
+                                  Apply
+                                </button>
+                              </div>
+                            ) : (
+                              <>
+                                {match.replacements.length > 0 ? (
+                                  <div className="pt-2 px-1">
+                                    <p className="text-[10px] uppercase font-semibold text-gray-400 mb-1">Suggestions</p>
+                                    <div className="flex flex-wrap gap-1">
+                                      {match.replacements.slice(0, 6).map(r => (
+                                        <button
+                                          key={r}
+                                          type="button"
+                                          onClick={() => handleAccept(match, r)}
+                                          className="px-2 py-1 bg-green-50 dark:bg-green-900/30 text-green-700 dark:text-green-400 border border-green-200 dark:border-green-700 rounded text-xs font-mono hover:bg-green-100 dark:hover:bg-green-900/50 transition-colors"
+                                        >
+                                          {r}
+                                        </button>
+                                      ))}
+                                    </div>
+                                  </div>
+                                ) : (
+                                  <p className="pt-2 px-1 text-xs text-gray-400 italic">No suggestions available</p>
+                                )}
+                                <div className="pt-2 px-1 mt-2 border-t border-gray-100 dark:border-gray-800 flex items-center gap-1">
+                                  <button type="button" onClick={() => handleEditStart(match)} className="flex items-center gap-1 px-2 py-1 text-xs text-blue-600 dark:text-blue-400 hover:bg-blue-50 dark:hover:bg-blue-900/20 rounded">
+                                    <span className="material-symbols-outlined text-sm">edit</span>Edit
+                                  </button>
+                                  <button type="button" onClick={() => handleDelete(match)} className="flex items-center gap-1 px-2 py-1 text-xs text-orange-600 dark:text-orange-400 hover:bg-orange-50 dark:hover:bg-orange-900/20 rounded">
+                                    <span className="material-symbols-outlined text-sm">delete</span>Delete
+                                  </button>
+                                  <button type="button" onClick={() => handleIgnore(match)} className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded ml-auto">
+                                    <span className="material-symbols-outlined text-sm">visibility_off</span>Ignore
+                                  </button>
+                                </div>
+                              </>
+                            )}
+                          </div>
+                        )}
+                      </span>
+                    )
+                  })}
+                </div>
+
+                {/* Compact SPAG action bar */}
+                <div className="flex items-center gap-2">
+                  <span className="text-[11px] text-amber-600 dark:text-amber-400">
+                    {unresolvedCount > 0
+                      ? `${unresolvedCount} issue${unresolvedCount > 1 ? 's' : ''} — click underlined word`
+                      : 'All issues resolved ✓'}
+                  </span>
+                  {unresolvedCount > 0 && (
+                    <>
+                      <button type="button" onClick={handleSpagAcceptAll} className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium bg-green-600 hover:bg-green-700 text-white rounded transition-colors">
+                        <span className="material-symbols-outlined text-xs">done_all</span>Accept all
+                      </button>
+                      <button type="button" onClick={handleSpagRejectAll} className="flex items-center gap-1 px-2 py-0.5 text-[11px] font-medium border border-gray-300 dark:border-gray-600 text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
+                        <span className="material-symbols-outlined text-xs">visibility_off</span>Ignore all
+                      </button>
+                    </>
+                  )}
+                  <button type="button" onClick={handleSpagRerun} className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 rounded ml-auto transition-colors">
+                    <span className="material-symbols-outlined text-xs">refresh</span>Re-run
+                  </button>
+                  <button type="button" onClick={clearSpag} className="flex items-center gap-1 px-2 py-0.5 text-[11px] text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded transition-colors">
+                    <span className="material-symbols-outlined text-xs">close</span>Dismiss
+                  </button>
+                </div>
+              </div>
+            ) : (
+              <textarea
+                value={text}
+                onChange={handleTextChange}
+                required
+                rows={2}
+                className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
+              />
+            )}
           </div>
         </div>
 
-        {/* Male/Female preview — passes subjectTitle so <Subject> renders correctly */}
+        {/* Male/Female preview */}
         <VariablePreview text={text} subjectName={subjectTitle} />
 
         {/* AI check buttons */}
@@ -297,42 +531,29 @@ export function EditCommentForm({
           </button>
         </div>
 
-        {/* SPAG results */}
         {spagError && (
           <p className="text-xs text-red-600 dark:text-red-400">SPAG check failed: {spagError}</p>
         )}
 
-        {spagMatches !== null && !spagError && (
-          <SpagPanel
-            originalText={spagOriginalText}
-            matches={spagMatches}
-            resolutions={spagResolutions}
-            onResolve={handleSpagResolve}
-            onAcceptAll={handleSpagAcceptAll}
-            onRejectAll={handleSpagRejectAll}
-            onAllResolved={handleSpagAllResolved}
-            onRerun={handleSpagRerun}
-            onDismiss={handleSpagDismiss}
-          />
-        )}
-
         {/* Standards results */}
         {standardsError && (
-          <p className="text-xs text-red-600 dark:text-red-400">
-            Standards check failed: {standardsError}
-          </p>
+          <p className="text-xs text-red-600 dark:text-red-400">Standards check failed: {standardsError}</p>
         )}
 
         {standardsResult && !standardsError && (
           <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 overflow-hidden">
             <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
-              <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-sm">
-                checklist
-              </span>
+              <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-sm">checklist</span>
               <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">
-                Standards —{' '}
-                {standardsResult.Status.result ? 'Passed ✓' : 'Issues found'}
+                Standards — {standardsResult.Status.result ? 'Passed ✓' : 'Issues found'}
               </span>
+              <button
+                type="button"
+                onClick={() => setStandardsResult(null)}
+                className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+              >
+                <span className="material-symbols-outlined text-sm">close</span>
+              </button>
             </div>
             <ul className="divide-y divide-blue-100 dark:divide-blue-900/20">
               {STANDARDS_RULE_KEYS.map(key => {
@@ -340,22 +561,14 @@ export function EditCommentForm({
                 return (
                   <li
                     key={key}
-                    className={`px-3 py-1.5 flex items-center gap-2 ${
-                      !entry.result ? 'bg-red-50/50 dark:bg-red-900/10' : ''
-                    }`}
+                    className={`px-3 py-1.5 flex items-center gap-2 ${!entry.result ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}
                   >
-                    <span
-                      className={`material-symbols-outlined text-sm ${
-                        entry.result ? 'text-green-500' : 'text-red-500'
-                      }`}
-                    >
+                    <span className={`material-symbols-outlined text-sm ${entry.result ? 'text-green-500' : 'text-red-500'}`}>
                       {entry.result ? 'check_circle' : 'cancel'}
                     </span>
                     <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">{key}</span>
                     {typeof entry.wordCount === 'number' && (
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">
-                        {entry.wordCount} words
-                      </span>
+                      <span className="text-[10px] text-gray-400 dark:text-gray-500">{entry.wordCount} words</span>
                     )}
                   </li>
                 )
