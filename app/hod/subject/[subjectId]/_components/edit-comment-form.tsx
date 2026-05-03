@@ -4,13 +4,13 @@ import { useState, useRef, useMemo, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { updateComment } from '@/lib/server-actions/hod'
-import { requestSpagCheck, requestStandardsCheck } from '@/lib/server-actions/ai-check'
+import { requestSpagCheck } from '@/lib/server-actions/ai-check'
 import { addIgnoredWord } from '@/lib/server-actions/ignored-words'
 import { substituteVariables } from '@/lib/audit/substitute-variables'
 import { VariablePreview } from '@/components/VariablePreview'
 import { countWords } from '@/lib/utils'
 import type { SpagResolution } from '@/components/SpagPanel'
-import type { SpagMatch, StandardsResult, StandardsRuleKey } from '@/lib/types/ai-check'
+import type { SpagMatch } from '@/lib/types/ai-check'
 
 interface CommentOption {
   id: string
@@ -26,22 +26,6 @@ interface EditCommentFormProps {
   subjectTitle: string
   onClose: () => void
 }
-
-const STANDARDS_RULE_KEYS: StandardsRuleKey[] = [
-  'UKSpelling',
-  'CourseOverviewIncluded',
-  'AcademicPerformanceIncluded',
-  'TargetWordCountMet',
-  'TerminologyCorrect',
-  'JargonFree',
-  'DataSpecific',
-  'ToneBalanced',
-  'SocialSkillsIncluded',
-  'CollaborationIncluded',
-  'BehaviourIncluded',
-  'ParentalSupportIncluded',
-  'Formatting',
-]
 
 type Segment =
   | { type: 'unchanged'; text: string }
@@ -72,13 +56,7 @@ export function EditCommentForm({
   const [editingOffset, setEditingOffset] = useState<number | null>(null)
   const [editValue, setEditValue] = useState('')
 
-  // Standards state
-  const [standardsResult, setStandardsResult] = useState<StandardsResult | null>(null)
-  const [isStandardsChecking, setIsStandardsChecking] = useState(false)
-  const [standardsError, setStandardsError] = useState<string | null>(null)
-
   const spagRequestId = useRef(0)
-  const standardsRequestId = useRef(0)
   const spagContainerRef = useRef<HTMLDivElement | null>(null)
   const spagPopupRef = useRef<HTMLDivElement | null>(null)
   const spagEditInputRef = useRef<HTMLInputElement | null>(null)
@@ -128,16 +106,13 @@ export function EditCommentForm({
 
   const unresolvedCount = spagMatches ? spagMatches.length - spagResolutions.size : 0
 
-  // Clear AI results when the comment text changes
+  // Clear SPAG results when the comment text changes
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
     spagRequestId.current++
-    standardsRequestId.current++
     setSpagMatches(null)
     setSpagResolutions(new Map())
-    setStandardsResult(null)
     setSpagError(null)
-    setStandardsError(null)
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -302,28 +277,6 @@ export function EditCommentForm({
       return <span key={key} className="text-gray-400 dark:text-gray-500 italic">[deleted]</span>
     }
     return <span key={key} className="text-gray-600 dark:text-gray-300">{resolution.match.word}</span>
-  }
-
-  // ── Standards check ─────────────────────────────────────────────────────────
-
-  async function handleStandardsCheck() {
-    if (!text.trim()) return
-    const id = ++standardsRequestId.current
-    setIsStandardsChecking(true)
-    setStandardsResult(null)
-    setStandardsError(null)
-
-    const substituted = substituteVariables(text, subjectTitle)
-    const result = await requestStandardsCheck(substituted)
-
-    if (standardsRequestId.current !== id) return
-    setIsStandardsChecking(false)
-
-    if (result.success) {
-      setStandardsResult(result.result)
-    } else {
-      setStandardsError(result.error)
-    }
   }
 
   return (
@@ -520,61 +473,10 @@ export function EditCommentForm({
             <span className="material-symbols-outlined text-sm">spellcheck</span>
             {isSpagChecking ? 'Checking…' : 'Check SPAG'}
           </button>
-          <button
-            type="button"
-            onClick={handleStandardsCheck}
-            disabled={isStandardsChecking || !text.trim()}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-blue-700 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/20 hover:bg-blue-100 dark:hover:bg-blue-900/40 border border-blue-200 dark:border-blue-800 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">checklist</span>
-            {isStandardsChecking ? 'Checking…' : 'Check Standards'}
-          </button>
         </div>
 
         {spagError && (
           <p className="text-xs text-red-600 dark:text-red-400">SPAG check failed: {spagError}</p>
-        )}
-
-        {/* Standards results */}
-        {standardsError && (
-          <p className="text-xs text-red-600 dark:text-red-400">Standards check failed: {standardsError}</p>
-        )}
-
-        {standardsResult && !standardsError && (
-          <div className="rounded-lg border border-blue-200 dark:border-blue-800 bg-white dark:bg-gray-900 overflow-hidden">
-            <div className="flex items-center gap-2 px-3 py-2 bg-blue-50 dark:bg-blue-900/20 border-b border-blue-200 dark:border-blue-800">
-              <span className="material-symbols-outlined text-blue-600 dark:text-blue-400 text-sm">checklist</span>
-              <span className="text-xs font-semibold text-blue-700 dark:text-blue-400">
-                Standards — {standardsResult.Status.result ? 'Passed ✓' : 'Issues found'}
-              </span>
-              <button
-                type="button"
-                onClick={() => setStandardsResult(null)}
-                className="ml-auto text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-              >
-                <span className="material-symbols-outlined text-sm">close</span>
-              </button>
-            </div>
-            <ul className="divide-y divide-blue-100 dark:divide-blue-900/20">
-              {STANDARDS_RULE_KEYS.map(key => {
-                const entry = standardsResult[key]
-                return (
-                  <li
-                    key={key}
-                    className={`px-3 py-1.5 flex items-center gap-2 ${!entry.result ? 'bg-red-50/50 dark:bg-red-900/10' : ''}`}
-                  >
-                    <span className={`material-symbols-outlined text-sm ${entry.result ? 'text-green-500' : 'text-red-500'}`}>
-                      {entry.result ? 'check_circle' : 'cancel'}
-                    </span>
-                    <span className="text-xs text-gray-700 dark:text-gray-300 flex-1">{key}</span>
-                    {typeof entry.wordCount === 'number' && (
-                      <span className="text-[10px] text-gray-400 dark:text-gray-500">{entry.wordCount} words</span>
-                    )}
-                  </li>
-                )
-              })}
-            </ul>
-          </div>
         )}
 
         {/* Save / Cancel */}
