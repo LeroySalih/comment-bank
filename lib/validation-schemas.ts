@@ -38,6 +38,7 @@ export const CreatePupilSchema = z.object({
   firstName: z.string().min(1, 'First name is required').max(100),
   lastName: z.string().min(1, 'Last name is required').max(100),
   gender: z.enum(['M', 'F'], { message: 'Gender must be M or F' }),
+  form: z.string().max(20).optional().nullable(),
   isActive: z.boolean().optional().default(true)
 })
 
