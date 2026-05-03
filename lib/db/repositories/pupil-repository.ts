@@ -65,16 +65,18 @@ export class PupilRepository {
     firstName: string
     lastName: string
     gender: string
+    form?: string | null
     isActive?: boolean
   }): Promise<DbPupil> {
     const { rows } = await pool.query<DbPupil>(
-      `INSERT INTO "Pupil" ("admissionNumber", "firstName", "lastName", "gender", "isActive")
-       VALUES ($1, $2, $3, $4, $5) RETURNING *`,
+      `INSERT INTO "Pupil" ("admissionNumber", "firstName", "lastName", "gender", "form", "isActive")
+       VALUES ($1, $2, $3, $4, $5, $6) RETURNING *`,
       [
         data.admissionNumber,
         encrypt(data.firstName),
         encrypt(data.lastName),
         data.gender,
+        data.form ?? null,
         data.isActive ?? true
       ]
     )
