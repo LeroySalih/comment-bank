@@ -53,7 +53,7 @@ export function PupilManagement() {
   const handleToggleActive = async (pupil: Pupil) => {
     const newStatus = !pupil.isActive
     // Optimistic update
-    setPupils(pupils.map(p => 
+    setPupils(prev => prev.map(p =>
       p.admissionNumber === pupil.admissionNumber ? { ...p, isActive: newStatus } : p
     ))
 
@@ -61,7 +61,7 @@ export function PupilManagement() {
     if (!result.success) {
       alert("Failed to update pupil status")
       // Revert
-      setPupils(pupils.map(p => 
+      setPupils(prev => prev.map(p =>
         p.admissionNumber === pupil.admissionNumber ? { ...p, isActive: pupil.isActive } : p
       ))
     }
@@ -107,6 +107,7 @@ export function PupilManagement() {
     const result = await deletePupil(pupil.admissionNumber)
     if (result.success) {
       setPupils(prev => prev.filter(p => p.admissionNumber !== pupil.admissionNumber))
+      setAssigningPupilId(null)
     } else {
       alert('error' in result ? (result.error ?? 'Failed to delete pupil') : 'Failed to delete pupil')
     }

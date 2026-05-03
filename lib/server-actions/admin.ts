@@ -15,6 +15,7 @@ import {
   UpdateUserActiveStatusSchema,
   UpdatePupilSchema,
   CreatePupilSchema,
+  DeletePupilSchema,
   CreateSubjectSchema,
   UpdateSubjectSchema,
   DeleteSubjectSchema,
@@ -250,26 +251,26 @@ export const createPupil = withRole('admin', async (data: {
  */
 export const deletePupil = withRole('admin', async (admissionNumber: string) => {
   try {
-    if (!admissionNumber) {
-      return { success: false as const, error: 'Admission number is required', code: 'VALIDATION_ERROR' }
-    }
+    const validation = validateFormData(DeletePupilSchema, { admissionNumber })
+    if (!validation.success) return validation
+    const { admissionNumber: validAdmissionNumber } = validation.data
 
-    const existing = await pupilRepository.findByAdmissionNumber(admissionNumber)
+    const existing = await pupilRepository.findByAdmissionNumber(validAdmissionNumber)
     if (!existing) {
       return { success: false as const, error: 'Pupil not found', code: 'NOT_FOUND' }
     }
 
-    await pool.query<never>(`DELETE FROM "Pupil" WHERE "admissionNumber" = $1`, [admissionNumber])
+    await pool.query<never>(`DELETE FROM "Pupil" WHERE "admissionNumber" = $1`, [validAdmissionNumber])
 
     await logDataChange(
       'delete_pupil',
       'pupil',
-      admissionNumber,
+      validAdmissionNumber,
       { firstName: existing.firstName, lastName: existing.lastName },
       null
     )
 
-    logger.info('Pupil deleted', { admissionNumber })
+    logger.info('Pupil deleted', { admissionNumber: validAdmissionNumber })
     revalidatePath('/admin')
 
     return { success: true as const }
@@ -284,6 +285,10 @@ export const deletePupil = withRole('admin', async (admissionNumber: string) => 
  */
 export const getClassesForPupilAssignment = withRole('admin', async (admissionNumber: string) => {
   try {
+    if (!admissionNumber) {
+      return { success: false as const, error: 'Admission number is required', code: 'VALIDATION_ERROR' }
+    }
+
     // All classes with subject title
     const { rows: allClasses } = await pool.query<{
       id: string

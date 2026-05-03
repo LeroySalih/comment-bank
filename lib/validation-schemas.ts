@@ -42,6 +42,9 @@ export const CreatePupilSchema = z.object({
   isActive: z.boolean().optional().default(true)
 })
 
+export const DeletePupilSchema = z.object({
+  admissionNumber: z.string().min(1, 'Admission number is required')
+})
 
 // Subject Management Schemas
 export const CreateSubjectSchema = z.object({
