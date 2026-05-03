@@ -125,7 +125,9 @@ function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; s
   )
 }
 
-function EditCommentForm({ comment, subjectId, groupId, onClose, subjectTitle: _subjectTitle }: { comment: CommentOption; subjectId: string; groupId: string; onClose: () => void; subjectTitle?: string }) {
+// subjectTitle is threaded here as a placeholder — it will be used in the next
+// task when EditCommentForm is extracted to its own file with SPAG/standards checking.
+function EditCommentForm({ comment, subjectId, groupId, onClose, subjectTitle: _subjectTitle }: { comment: CommentOption; subjectId: string; groupId: string; onClose: () => void; subjectTitle: string }) {
   const [code, setCode] = useState(comment.code)
   const [text, setText] = useState(comment.text)
   const [error, setError] = useState<string | null>(null)
