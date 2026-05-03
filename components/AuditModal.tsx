@@ -49,6 +49,7 @@ export default function AuditModal({
   isOpen,
   onClose,
 }: AuditModalProps) {
+  const [mounted, setMounted] = useState(false);
   const [phase, setPhase] = useState<Phase>({ name: 'idle' });
   // retryKey increments on Retry to force the stream useEffect to re-run
   const [retryKey, setRetryKey] = useState(0);
@@ -81,6 +82,9 @@ export default function AuditModal({
     spagFailedCodesRef.current = new Set();
     untestedCountRef.current = 0;
   }, []);
+
+  // ── Suppress portal until client has mounted (prevents hydration mismatch) ──
+  useEffect(() => { setMounted(true); }, []);
 
   // ── Open stream when isOpen becomes true (or on retry) ───────────────────
 
@@ -278,7 +282,7 @@ export default function AuditModal({
 
   // ── Render ────────────────────────────────────────────────────────────────
 
-  if (typeof document === 'undefined') return null;
+  if (!mounted) return null;
 
   const headingId = `audit-modal-heading-${subjectId}`;
 
