@@ -296,11 +296,11 @@ export function PupilManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
                 </tr>
               ) : pupils.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
+                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
                 </tr>
               ) : (
                 pupils.map((pupil) => (
@@ -361,7 +361,7 @@ export function PupilManagement() {
                   </tr>
                   {assigningPupilId === pupil.admissionNumber && (
                     <tr className="bg-blue-50">
-                      <td colSpan={8} className="px-6 py-3">
+                      <td colSpan={7} className="px-6 py-3">
                         <div className="text-xs font-semibold text-blue-700 mb-2">Assign to a class</div>
                         {assignLoading ? (
                           <p className="text-xs text-gray-400">Loading classes…</p>
