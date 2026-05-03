@@ -65,11 +65,15 @@ const STANDARDS_RULE_KEYS: StandardsRuleKey[] = [
 ];
 
 /**
- * Calls the Standards webhook and returns pass/fail with failed rule names.
+ * Calls the Standards webhook and returns pass/fail with failed rule names and per-rule instances.
  */
 export async function callStandardsWebhook(
   text: string
-): Promise<{ passed: boolean; failures: StandardsRuleKey[] }> {
+): Promise<{
+  passed: boolean;
+  failures: StandardsRuleKey[];
+  failureDetails: Partial<Record<StandardsRuleKey, { instances: string[] }>>;
+}> {
   const response = await fetch(config.STANDARDS_WEBHOOK_URL, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
@@ -89,8 +93,6 @@ export async function callStandardsWebhook(
   const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
   const data = ((unwrapped as Record<string, unknown>)?.output ?? unwrapped) as Record<string, unknown>;
 
-  // Simplified variant of the original toEntry() — intentionally drops instances/wordCount,
-  // as the audit only needs pass/fail per rule.
   const toBool = (v: unknown): boolean => {
     if (typeof v === 'boolean') return v;
     if (typeof v === 'string') return v.toLowerCase() === 'true' || v.toLowerCase() === 'passed';
@@ -98,9 +100,22 @@ export async function callStandardsWebhook(
     return false;
   };
 
-  const failures: StandardsRuleKey[] = STANDARDS_RULE_KEYS.filter(
-    key => !toBool(data?.[key])
-  );
+  const failures: StandardsRuleKey[] = [];
+  const failureDetails: Partial<Record<StandardsRuleKey, { instances: string[] }>> = {};
 
-  return { passed: failures.length === 0, failures };
+  for (const key of STANDARDS_RULE_KEYS) {
+    const entry = data?.[key];
+    if (!toBool(entry)) {
+      failures.push(key);
+      // Capture instances from the raw rule entry if available
+      if (entry && typeof entry === 'object') {
+        const raw = entry as Record<string, unknown>;
+        if (Array.isArray(raw.instances) && raw.instances.length > 0) {
+          failureDetails[key] = { instances: raw.instances as string[] };
+        }
+      }
+    }
+  }
+
+  return { passed: failures.length === 0, failures, failureDetails };
 }

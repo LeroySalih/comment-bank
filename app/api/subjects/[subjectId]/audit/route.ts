@@ -168,7 +168,7 @@ export async function GET(
         let passedReports = 0;
 
         for (const report of reports) {
-          const { passed, failures } = await callStandardsWebhook(report.assembledText);
+          const { passed, failures, failureDetails } = await callStandardsWebhook(report.assembledText);
           if (passed) passedReports++;
 
           const codes: Record<string, string> = {};
@@ -177,7 +177,14 @@ export async function GET(
           }
 
           if (!passed) {
-            standardsFailures.push({ reportIndex: report.reportIndex, codes, passed, failures });
+            standardsFailures.push({
+              reportIndex: report.reportIndex,
+              codes,
+              passed,
+              failures,
+              assembledText: report.assembledText,
+              failureDetails,
+            });
           }
 
           send({

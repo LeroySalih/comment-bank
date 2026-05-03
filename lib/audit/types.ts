@@ -91,6 +91,8 @@ export type StandardsAuditEntry = {
   codes: Record<string, string>;
   passed: boolean;
   failures: StandardsRuleKey[];
+  assembledText: string;
+  failureDetails: Partial<Record<StandardsRuleKey, { instances: string[] }>>;
 };
 
 /** Full data passed to the PDF renderer */
