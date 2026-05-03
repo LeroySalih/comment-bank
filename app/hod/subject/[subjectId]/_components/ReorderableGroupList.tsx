@@ -9,6 +9,7 @@ import { GripVertical, Plus, X, ChevronDown, ChevronRight, Pencil, Trash2 } from
 import { useRouter } from "next/navigation"
 import { VariablePreview } from "@/components/VariablePreview"
 import { countWords } from "@/lib/utils"
+import { GroupSpagPanel } from "@/components/GroupSpagPanel"
 
 interface CommentOption {
   id: string
@@ -273,6 +274,7 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups, subj
   const [groups, setGroups] = useState(initialGroups)
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
+  const [spagActiveGroups, setSpagActiveGroups] = useState<Set<string>>(new Set())
 
   const ccgGroupNameSet = useMemo(
       () => new Set((ccgGroups ?? []).map(cg => cg.name)),
@@ -363,6 +365,17 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups, subj
                       />
                       <button
                         onClick={() => {
+                          if (!expandedGroups.has(group.id)) toggleGroup(group.id)
+                          setSpagActiveGroups(prev => new Set(prev).add(group.id))
+                        }}
+                        className="text-xs font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 flex items-center gap-1 ml-2"
+                        title="SPAG check all items in this group"
+                      >
+                        <span className="material-symbols-outlined text-sm">spellcheck</span>
+                        Check SPAG
+                      </button>
+                      <button
+                        onClick={() => {
                           if (!expandedGroups.has(group.id)) {
                             toggleGroup(group.id)
                           }
@@ -381,6 +394,17 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups, subj
                     {/* Expanded Content */}
                     {expandedGroups.has(group.id) && (
                       <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+                        {spagActiveGroups.has(group.id) && (
+                          <GroupSpagPanel
+                            options={group.CommentOption}
+                            subjectTitle={subjectTitle}
+                            onClose={() => setSpagActiveGroups(prev => {
+                              const next = new Set(prev)
+                              next.delete(group.id)
+                              return next
+                            })}
+                          />
+                        )}
                         {addingToGroup === group.id && (
                           <InlineCommentForm
                             groupId={group.id}

@@ -17,6 +17,7 @@ import { useRouter } from "next/navigation"
 import { EditCommentWithSpag } from "@/components/EditCommentWithSpag"
 import { VariablePreview } from "@/components/VariablePreview"
 import { countWords } from "@/lib/utils"
+import { GroupSpagPanel } from "@/components/GroupSpagPanel"
 
 interface CommentOption {
   id: string
@@ -381,6 +382,7 @@ export function CcgManagement({ initialGroups }: Props) {
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
   const [deletingGroup, setDeletingGroup] = useState<string | null>(null)
+  const [spagActiveGroups, setSpagActiveGroups] = useState<Set<string>>(new Set())
   const router = useRouter()
 
   useEffect(() => {
@@ -496,6 +498,17 @@ export function CcgManagement({ initialGroups }: Props) {
                             <button
                               onClick={() => {
                                 if (!expandedGroups.has(group.id)) toggleGroup(group.id)
+                                setSpagActiveGroups(prev => new Set(prev).add(group.id))
+                              }}
+                              className="text-xs font-medium text-amber-600 hover:text-amber-800 dark:text-amber-400 dark:hover:text-amber-300 flex items-center gap-1 ml-2"
+                              title="SPAG check all items in this group"
+                            >
+                              <span className="material-symbols-outlined text-sm">spellcheck</span>
+                              Check SPAG
+                            </button>
+                            <button
+                              onClick={() => {
+                                if (!expandedGroups.has(group.id)) toggleGroup(group.id)
                                 setAddingToGroup(addingToGroup === group.id ? null : group.id)
                               }}
                               className="text-xs font-medium text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300 flex items-center gap-1 ml-2"
@@ -510,6 +523,16 @@ export function CcgManagement({ initialGroups }: Props) {
 
                           {expandedGroups.has(group.id) && (
                             <div className="p-4 border-t border-gray-100 dark:border-gray-700">
+                              {spagActiveGroups.has(group.id) && (
+                                <GroupSpagPanel
+                                  options={group.CommonCommentOption}
+                                  onClose={() => setSpagActiveGroups(prev => {
+                                    const next = new Set(prev)
+                                    next.delete(group.id)
+                                    return next
+                                  })}
+                                />
+                              )}
                               {addingToGroup === group.id && (
                                 <InlineOptionForm groupId={group.id} onClose={() => setAddingToGroup(null)} />
                               )}
