@@ -11,7 +11,6 @@ import { buildSampleReports } from '@/lib/audit/build-reports';
 import { substituteVariables } from '@/lib/audit/substitute-variables';
 import { callSpagWebhook, callStandardsWebhook } from '@/lib/audit/webhook-calls';
 import { renderAuditPdf } from '@/lib/audit/generate-pdf';
-import { storePdf } from '@/lib/audit/pdf-store';
 
 export async function GET(
   _request: NextRequest,
@@ -206,9 +205,8 @@ export async function GET(
         };
 
         const pdfBuffer = await renderAuditPdf(pdfData);
-        const token = storePdf(pdfBuffer);
 
-        send({ type: 'complete', pdfUrl: `/api/subjects/${subjectId}/audit/pdf?token=${token}` });
+        send({ type: 'complete', pdfBase64: pdfBuffer.toString('base64') });
       } catch (err) {
         send({ type: 'error', message: err instanceof Error ? err.message : String(err) });
       } finally {

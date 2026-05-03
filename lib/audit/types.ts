@@ -40,7 +40,7 @@ export type AuditUntestedEvent = {
 
 export type AuditCompleteEvent = {
   type: 'complete';
-  pdfUrl: string;
+  pdfBase64: string;
 };
 
 export type AuditErrorEvent = {

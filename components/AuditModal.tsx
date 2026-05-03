@@ -28,7 +28,7 @@ type Phase =
       spagFailures: number;
       spagFailedComments: number;
       untestedCount: number;
-      pdfUrl: string;
+      pdfBase64: string;
     }
   | { name: 'error'; message: string };
 
@@ -178,7 +178,7 @@ export default function AuditModal({
             spagFailures: spagFailRef.current,
             spagFailedComments: spagFailedCodesRef.current.size,
             untestedCount: untestedCountRef.current,
-            pdfUrl: event.pdfUrl,
+            pdfBase64: event.pdfBase64,
           });
           break;
 
@@ -255,12 +255,16 @@ export default function AuditModal({
     onClose();
   };
 
-  const handleDownload = async () => {
+  const handleDownload = () => {
     if (phase.name !== 'complete') return;
     try {
-      const res = await fetch(phase.pdfUrl);
-      if (!res.ok) throw new Error(`Download failed: ${res.status}`);
-      const blob = await res.blob();
+      // Decode the base64 PDF that arrived in the SSE complete event — no second
+      // HTTP request needed, so this works regardless of which server process
+      // handled the original stream.
+      const binary = atob(phase.pdfBase64);
+      const bytes = new Uint8Array(binary.length);
+      for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+      const blob = new Blob([bytes], { type: 'application/pdf' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;
@@ -270,7 +274,6 @@ export default function AuditModal({
       document.body.removeChild(a);
       URL.revokeObjectURL(url);
     } catch (err) {
-      // Surface download error without losing the complete state
       console.error('PDF download failed:', err);
     }
   };
