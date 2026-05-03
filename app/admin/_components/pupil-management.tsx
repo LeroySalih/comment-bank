@@ -1,7 +1,7 @@
 "use client"
 
-import { useState, useEffect, useRef } from "react"
-import { getPupils, updatePupil, processPupilUpload, createPupil, deletePupil } from "@/lib/server-actions/admin"
+import React, { useState, useEffect, useRef } from "react"
+import { getPupils, updatePupil, processPupilUpload, createPupil, deletePupil, getClassesForPupilAssignment, addPupilsToClass } from "@/lib/server-actions/admin"
 
 interface Pupil {
   admissionNumber: string
@@ -23,6 +23,16 @@ export function PupilManagement() {
   const [addError, setAddError] = useState<string | null>(null)
   const [addSaving, setAddSaving] = useState(false)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [assigningPupilId, setAssigningPupilId] = useState<string | null>(null)
+  const [assignClasses, setAssignClasses] = useState<Array<{
+    id: string
+    name: string
+    year: string | null
+    subjectTitle: string
+    isAssigned: boolean
+  }>>([])
+  const [assignLoading, setAssignLoading] = useState(false)
+  const [assigningClassId, setAssigningClassId] = useState<string | null>(null)
 
   const fetchPupils = async (q: string) => {
     setLoading(true)
@@ -101,6 +111,31 @@ export function PupilManagement() {
       alert('error' in result ? (result.error ?? 'Failed to delete pupil') : 'Failed to delete pupil')
     }
     setDeletingId(null)
+  }
+
+  const openAssignPanel = async (admissionNumber: string) => {
+    if (assigningPupilId === admissionNumber) {
+      setAssigningPupilId(null)
+      return
+    }
+    setAssigningPupilId(admissionNumber)
+    setAssignLoading(true)
+    const result = await getClassesForPupilAssignment(admissionNumber)
+    if (result.success && 'classes' in result) {
+      setAssignClasses(result.classes)
+    }
+    setAssignLoading(false)
+  }
+
+  const handleAssignToClass = async (admissionNumber: string, classId: string) => {
+    setAssigningClassId(classId)
+    const result = await addPupilsToClass(classId, [admissionNumber])
+    if (result.success) {
+      setAssignClasses(prev => prev.map(c => c.id === classId ? { ...c, isAssigned: true } : c))
+    } else {
+      alert('error' in result ? (result.error ?? 'Failed to assign to class') : 'Failed to assign')
+    }
+    setAssigningClassId(null)
   }
 
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -261,15 +296,16 @@ export function PupilManagement() {
             <tbody className="bg-white divide-y divide-gray-200">
               {loading ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
                 </tr>
               ) : pupils.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
+                  <td colSpan={8} className="px-6 py-4 text-center text-sm text-gray-500">No pupils found</td>
                 </tr>
               ) : (
                 pupils.map((pupil) => (
-                  <tr key={pupil.admissionNumber} className={pupil.isActive ? "" : "bg-gray-50"}>
+                  <React.Fragment key={pupil.admissionNumber}>
+                  <tr className={pupil.isActive ? "" : "bg-gray-50"}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{pupil.admissionNumber}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
                       <input
@@ -312,9 +348,55 @@ export function PupilManagement() {
                         >
                           {deletingId === pupil.admissionNumber ? '…' : '🗑'}
                         </button>
+                        <button
+                          type="button"
+                          onClick={() => openAssignPanel(pupil.admissionNumber)}
+                          className={`text-sm font-medium transition-colors ${assigningPupilId === pupil.admissionNumber ? 'text-blue-700' : 'text-blue-500 hover:text-blue-800'}`}
+                          title="Assign to a class"
+                        >
+                          + Class
+                        </button>
                       </div>
                     </td>
                   </tr>
+                  {assigningPupilId === pupil.admissionNumber && (
+                    <tr className="bg-blue-50">
+                      <td colSpan={8} className="px-6 py-3">
+                        <div className="text-xs font-semibold text-blue-700 mb-2">Assign to a class</div>
+                        {assignLoading ? (
+                          <p className="text-xs text-gray-400">Loading classes…</p>
+                        ) : (
+                          <div className="flex flex-wrap gap-2">
+                            {assignClasses.filter(c => !c.isAssigned).length === 0 ? (
+                              <p className="text-xs text-gray-500">This pupil is already assigned to all classes.</p>
+                            ) : (
+                              assignClasses.filter(c => !c.isAssigned).map(c => (
+                                <button
+                                  key={c.id}
+                                  type="button"
+                                  onClick={() => handleAssignToClass(pupil.admissionNumber, c.id)}
+                                  disabled={assigningClassId === c.id}
+                                  className="flex items-center gap-1 px-2 py-1 bg-white border border-blue-200 rounded text-xs hover:bg-blue-100 disabled:opacity-50 transition-colors"
+                                >
+                                  <span className="font-semibold text-blue-700">{c.name}</span>
+                                  <span className="text-gray-500">— {c.subjectTitle}{c.year ? ` (Y${c.year})` : ''}</span>
+                                  {assigningClassId === c.id ? <span className="text-blue-400 ml-1">…</span> : <span className="text-blue-400 ml-1">+</span>}
+                                </button>
+                              ))
+                            )}
+                            {assignClasses.filter(c => c.isAssigned).length > 0 && (
+                              <div className="w-full mt-1">
+                                <span className="text-xs text-gray-400">
+                                  Already in: {assignClasses.filter(c => c.isAssigned).map(c => c.name).join(', ')}
+                                </span>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </td>
+                    </tr>
+                  )}
+                  </React.Fragment>
                 ))
               )}
             </tbody>
