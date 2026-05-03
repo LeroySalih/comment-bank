@@ -2,8 +2,9 @@
 
 import { useState, useEffect, useMemo } from "react"
 import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd"
-import { reorderCommentGroups, createComment, updateComment, deleteComment, reorderComments } from "@/lib/server-actions/hod"
+import { reorderCommentGroups, createComment, deleteComment, reorderComments } from "@/lib/server-actions/hod"
 import { EditGroupForm } from "./edit-group-form"
+import { EditCommentForm } from './edit-comment-form'
 import { GripVertical, Plus, X, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { VariablePreview } from "@/components/VariablePreview"
@@ -125,93 +126,6 @@ function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; s
   )
 }
 
-// subjectTitle is threaded here as a placeholder — it will be used in the next
-// task when EditCommentForm is extracted to its own file with SPAG/standards checking.
-function EditCommentForm({ comment, subjectId, groupId, onClose, subjectTitle: _subjectTitle }: { comment: CommentOption; subjectId: string; groupId: string; onClose: () => void; subjectTitle: string }) {
-  const [code, setCode] = useState(comment.code)
-  const [text, setText] = useState(comment.text)
-  const [error, setError] = useState<string | null>(null)
-  const [saving, setSaving] = useState(false)
-  const router = useRouter()
-
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    setError(null)
-    setSaving(true)
-
-    const formData = new FormData()
-    formData.append("code", code)
-    formData.append("text", text)
-
-    const result = await updateComment(comment.id, subjectId, groupId, formData)
-    setSaving(false)
-
-    if (!result.success) {
-      setError(('error' in result ? result.error : "Failed to update comment") || "Failed to update comment")
-    } else {
-      onClose()
-      router.refresh()
-    }
-  }
-
-  return (
-    <div className="p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg border border-blue-200 dark:border-blue-800" onClick={(e) => e.stopPropagation()}>
-      <div className="flex justify-between items-center mb-3">
-        <h4 className="text-sm font-medium text-gray-900 dark:text-white">Edit Comment</h4>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-          <X size={16} />
-        </button>
-      </div>
-      <form onSubmit={handleSubmit} className="space-y-3">
-        <div className="flex gap-3">
-          <div className="w-24">
-            <label className="block text-xs font-medium text-gray-500 dark:text-gray-400 mb-1">Code</label>
-            <input
-              type="text"
-              value={code}
-              onChange={(e) => setCode(e.target.value)}
-              required
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
-            />
-          </div>
-          <div className="flex-1">
-            <div className="flex justify-between items-end mb-1">
-              <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Comment Text</label>
-              <span className="text-[10px] text-gray-400 font-medium">{countWords(text)} words</span>
-            </div>
-            <textarea
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              required
-              rows={2}
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
-            />
-          </div>
-        </div>
-
-        <VariablePreview text={text} />
-
-        <div className="flex gap-2 justify-end">
-          <button
-            type="button"
-            onClick={onClose}
-            className="bg-gray-200 dark:bg-gray-600 text-gray-800 dark:text-gray-200 px-3 py-1.5 rounded-md text-sm hover:bg-gray-300 dark:hover:bg-gray-500"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {saving ? "Saving..." : "Save Changes"}
-          </button>
-        </div>
-        {error && <p className="text-red-600 text-xs">{error}</p>}
-      </form>
-    </div>
-  )
-}
 
 function CommentItem({ comment, subjectId, groupId, index, onReorder, subjectTitle }: {
   comment: CommentOption
