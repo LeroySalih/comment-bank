@@ -25,6 +25,19 @@ export async function GET(
     return new Response('Unauthorized', { status: 401 });
   }
 
+  // Verify the user is an admin or the HoD of this specific subject
+  if (!session.user.roles?.includes('admin')) {
+    const { rows: accessRows } = await pool.query(
+      `SELECT 1 FROM "Subject" s
+       JOIN "_SubjectToUser" su ON su."A" = s.id
+       WHERE s.id = $1 AND su."B" = $2`,
+      [subjectId, session.user.id]
+    );
+    if (accessRows.length === 0) {
+      return new Response('Forbidden', { status: 403 });
+    }
+  }
+
   // ── Fetch subject ─────────────────────────────────────────────────────────
   const { rows: subjectRows } = await pool.query<DbSubject>(
     `SELECT * FROM "Subject" WHERE id = $1`,

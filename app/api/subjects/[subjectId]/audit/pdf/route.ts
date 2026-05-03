@@ -3,6 +3,7 @@ export const runtime = 'nodejs';
 import { NextRequest } from 'next/server';
 import { getServerSession } from 'next-auth';
 import { authOptions } from '@/app/api/auth/[...nextauth]/route';
+import { pool } from '@/lib/db';
 import { consumePdf } from '@/lib/audit/pdf-store';
 
 export async function GET(
@@ -14,6 +15,19 @@ export async function GET(
   const session = await getServerSession(authOptions);
   if (!session?.user?.id) {
     return new Response('Unauthorized', { status: 401 });
+  }
+
+  // Verify the user is an admin or the HoD of this specific subject
+  if (!session.user.roles?.includes('admin')) {
+    const { rows: accessRows } = await pool.query(
+      `SELECT 1 FROM "Subject" s
+       JOIN "_SubjectToUser" su ON su."A" = s.id
+       WHERE s.id = $1 AND su."B" = $2`,
+      [subjectId, session.user.id]
+    );
+    if (accessRows.length === 0) {
+      return new Response('Forbidden', { status: 403 });
+    }
   }
 
   const token = request.nextUrl.searchParams.get('token');

@@ -23,15 +23,21 @@ function pickOption(options: Option[], tier: 'high' | 'medium' | 'low'): Option 
 
 function assembleText(
   subjectSelections: Record<string, Option>,
+  activeGroups: Group[],
   commonSelections: Record<string, Option>,
+  commonGroups: Group[],
   subjectTitle: string
 ): string {
   const parts: string[] = [];
-  for (const opt of Object.values(subjectSelections)) {
-    parts.push(substituteVariables(opt.text, subjectTitle));
+  // Iterate groups in their configured displayOrder so the assembled text
+  // matches what a real report would look like (important for standards check).
+  for (const g of activeGroups) {
+    const opt = subjectSelections[g.id];
+    if (opt) parts.push(substituteVariables(opt.text, subjectTitle));
   }
-  for (const opt of Object.values(commonSelections)) {
-    parts.push(substituteVariables(opt.text, subjectTitle));
+  for (const g of commonGroups) {
+    const opt = commonSelections[g.id];
+    if (opt) parts.push(substituteVariables(opt.text, subjectTitle));
   }
   return parts.join(' ');
 }
@@ -84,7 +90,7 @@ export function buildSampleReports(
         groupTitle: cg.title,
       };
     }
-    const assembledText = assembleText(subjectSelections, commonSelections, subjectTitle);
+    const assembledText = assembleText(subjectSelections, activeGroups, commonSelections, commonGroups, subjectTitle);
     reports.push({ reportIndex: index, selections: selectionsForReport, assembledText });
   }
 
