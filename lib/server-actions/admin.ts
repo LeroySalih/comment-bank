@@ -14,6 +14,7 @@ import {
   UpdateUserRolesSchema,
   UpdateUserActiveStatusSchema,
   UpdatePupilSchema,
+  CreatePupilSchema,
   CreateSubjectSchema,
   UpdateSubjectSchema,
   DeleteSubjectSchema,
@@ -192,6 +193,123 @@ export const getPupils = withRole('admin', async (query: string = '') => {
     return { success: true, pupils }
   } catch (error) {
     logger.error('Failed to get pupils', { error, query })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Create a single pupil manually (Admin only)
+ */
+export const createPupil = withRole('admin', async (data: {
+  admissionNumber: string
+  firstName: string
+  lastName: string
+  gender: string
+  form?: string | null
+  isActive?: boolean
+}) => {
+  try {
+    const validation = validateFormData(CreatePupilSchema, data)
+    if (!validation.success) return validation
+
+    const validated = validation.data
+
+    // Check for duplicate admission number
+    const existing = await pupilRepository.findByAdmissionNumber(validated.admissionNumber)
+    if (existing) {
+      return {
+        success: false as const,
+        error: `A pupil with admission number ${validated.admissionNumber} already exists`,
+        code: 'DUPLICATE'
+      }
+    }
+
+    const pupil = await pupilRepository.create(validated)
+
+    await logDataChange(
+      'create_pupil',
+      'pupil',
+      validated.admissionNumber,
+      null,
+      { firstName: validated.firstName, lastName: validated.lastName, gender: validated.gender, form: validated.form ?? null }
+    )
+
+    logger.info('Pupil created manually', { admissionNumber: validated.admissionNumber })
+    revalidatePath('/admin')
+
+    return { success: true as const, pupil }
+  } catch (error) {
+    logger.error('Failed to create pupil', { error, data })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Delete a pupil permanently (Admin only)
+ * Cascades to all Assignments via DB foreign key constraint.
+ */
+export const deletePupil = withRole('admin', async (admissionNumber: string) => {
+  try {
+    if (!admissionNumber) {
+      return { success: false as const, error: 'Admission number is required', code: 'VALIDATION_ERROR' }
+    }
+
+    const existing = await pupilRepository.findByAdmissionNumber(admissionNumber)
+    if (!existing) {
+      return { success: false as const, error: 'Pupil not found', code: 'NOT_FOUND' }
+    }
+
+    await pool.query(`DELETE FROM "Pupil" WHERE "admissionNumber" = $1`, [admissionNumber])
+
+    await logDataChange(
+      'delete_pupil',
+      'pupil',
+      admissionNumber,
+      { firstName: existing.firstName, lastName: existing.lastName },
+      null
+    )
+
+    logger.info('Pupil deleted', { admissionNumber })
+    revalidatePath('/admin')
+
+    return { success: true as const }
+  } catch (error) {
+    logger.error('Failed to delete pupil', { error, admissionNumber })
+    return handleServerActionError(error)
+  }
+})
+
+/**
+ * Get all classes with a flag indicating whether the pupil is already assigned (Admin only)
+ */
+export const getClassesForPupilAssignment = withRole('admin', async (admissionNumber: string) => {
+  try {
+    // All classes with subject title
+    const { rows: allClasses } = await pool.query<{
+      id: string
+      name: string
+      year: string | null
+      subjectTitle: string
+    }>(
+      `SELECT c.id, c.name, c.year, s.title AS "subjectTitle"
+       FROM "Class" c
+       JOIN "Subject" s ON s.id = c."subjectId"
+       ORDER BY s.title ASC, c.name ASC`
+    )
+
+    // Class IDs the pupil is already assigned to
+    const { rows: assigned } = await pool.query<{ classId: string }>(
+      `SELECT "classId" FROM "Assignment" WHERE "pupilId" = $1`,
+      [admissionNumber]
+    )
+    const assignedIds = new Set(assigned.map(r => r.classId))
+
+    return {
+      success: true as const,
+      classes: allClasses.map(c => ({ ...c, isAssigned: assignedIds.has(c.id) }))
+    }
+  } catch (error) {
+    logger.error('Failed to get classes for pupil assignment', { error, admissionNumber })
     return handleServerActionError(error)
   }
 })
