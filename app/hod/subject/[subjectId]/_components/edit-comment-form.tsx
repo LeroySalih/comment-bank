@@ -43,6 +43,9 @@ export function EditCommentForm({
   const [saveError, setSaveError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
+  // Two-stage save flow: 'clean' → no changes; 'dirty' → must check SPAG; 'spag_ok' → ready to save
+  const [editStage, setEditStage] = useState<'clean' | 'dirty' | 'spag_ok'>('clean')
+
   // SPAG state
   const [spagMatches, setSpagMatches] = useState<SpagMatch[] | null>(null)
   const [spagResolutions, setSpagResolutions] = useState<Map<number, SpagResolution>>(new Map())
@@ -106,13 +109,14 @@ export function EditCommentForm({
 
   const unresolvedCount = spagMatches ? spagMatches.length - spagResolutions.size : 0
 
-  // Clear SPAG results when the comment text changes
+  // Clear SPAG results when the comment text changes; require re-check before saving
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
     spagRequestId.current++
     setSpagMatches(null)
     setSpagResolutions(new Map())
     setSpagError(null)
+    setEditStage('dirty')
   }
 
   async function handleSubmit(e: React.FormEvent) {
@@ -157,7 +161,10 @@ export function EditCommentForm({
     setIsSpagChecking(false)
 
     if (result.success) {
-      setSpagMatches(result.result?.matches ?? [])
+      const matches = result.result?.matches ?? []
+      setSpagMatches(matches)
+      // No issues at all → immediately ready to save
+      if (matches.length === 0) setEditStage('spag_ok')
     } else {
       setSpagError(result.error)
     }
@@ -189,12 +196,13 @@ export function EditCommentForm({
     if (resolution.action !== 'ignored') {
       setText(applyResolutions(spagOriginalText, next))
     }
+    if (spagMatches && next.size === spagMatches.length) setEditStage('spag_ok')
     return next
   }
 
   function handleSpagAcceptAll() {
     if (!spagMatches) return
-    let next = new Map(spagResolutions)
+    const next = new Map(spagResolutions)
     for (const m of spagMatches) {
       if (next.has(m.offset)) continue
       const replacement = m.replacements[0]
@@ -203,6 +211,7 @@ export function EditCommentForm({
     }
     setSpagResolutions(next)
     setText(applyResolutions(spagOriginalText, next))
+    if (next.size === spagMatches.length) setEditStage('spag_ok')
   }
 
   function handleSpagRejectAll() {
@@ -214,6 +223,7 @@ export function EditCommentForm({
       next.set(m.offset, { match: m, action: 'ignored' })
     }
     setSpagResolutions(next)
+    if (next.size === spagMatches.length) setEditStage('spag_ok')
   }
 
   function clearSpag() {
@@ -462,24 +472,11 @@ export function EditCommentForm({
         {/* Male/Female preview */}
         <VariablePreview text={text} subjectName={subjectTitle} />
 
-        {/* AI check buttons */}
-        <div className="flex gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={handleSpagCheck}
-            disabled={isSpagChecking || !text.trim()}
-            className="flex items-center gap-1 px-2.5 py-1 text-xs font-medium text-amber-700 dark:text-amber-400 bg-amber-50 dark:bg-amber-900/20 hover:bg-amber-100 dark:hover:bg-amber-900/40 border border-amber-200 dark:border-amber-800 rounded disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-          >
-            <span className="material-symbols-outlined text-sm">spellcheck</span>
-            {isSpagChecking ? 'Checking…' : 'Check SPAG'}
-          </button>
-        </div>
-
         {spagError && (
           <p className="text-xs text-red-600 dark:text-red-400">SPAG check failed: {spagError}</p>
         )}
 
-        {/* Save / Cancel */}
+        {/* Save / Cancel — primary button changes with edit stage */}
         <div className="flex gap-2 justify-end pt-1">
           <button
             type="button"
@@ -488,13 +485,28 @@ export function EditCommentForm({
           >
             Cancel
           </button>
-          <button
-            type="submit"
-            disabled={saving}
-            className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700 disabled:opacity-50"
-          >
-            {saving ? 'Saving…' : 'Save Changes'}
-          </button>
+
+          {editStage === 'dirty' && spagMatches === null ? (
+            /* Must check SPAG before saving */
+            <button
+              type="button"
+              onClick={handleSpagCheck}
+              disabled={isSpagChecking || !text.trim()}
+              className="flex items-center gap-1.5 bg-amber-500 hover:bg-amber-600 disabled:opacity-50 disabled:cursor-not-allowed text-white px-3 py-1.5 rounded-md text-sm font-medium transition-colors"
+            >
+              <span className="material-symbols-outlined text-sm">spellcheck</span>
+              {isSpagChecking ? 'Checking…' : 'Check SPAG'}
+            </button>
+          ) : (
+            /* SPAG passed or issues all resolved → allow save */
+            <button
+              type="submit"
+              disabled={saving || (editStage === 'dirty' && unresolvedCount > 0)}
+              className="bg-indigo-600 text-white px-3 py-1.5 rounded-md text-sm hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed"
+            >
+              {saving ? 'Saving…' : 'Save Changes'}
+            </button>
+          )}
         </div>
 
         {saveError && <p className="text-red-600 dark:text-red-400 text-xs">{saveError}</p>}
