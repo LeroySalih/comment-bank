@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import { requestSpagCheck } from '@/lib/server-actions/ai-check'
 import { addIgnoredWord } from '@/lib/server-actions/ignored-words'
 import { substituteVariables } from '@/lib/audit/substitute-variables'
@@ -16,7 +16,7 @@ type ItemResult =
   | { status: 'pending' }
   | { status: 'checking' }
   | { status: 'pass' }
-  | { status: 'issues'; matches: SpagMatch[]; ignoredWords: Set<string> }
+  | { status: 'issues'; matches: SpagMatch[]; ignoredWords: Set<string>; spagText: string }
   | { status: 'error'; message: string }
 
 interface GroupSpagPanelProps {
@@ -25,11 +25,161 @@ interface GroupSpagPanelProps {
   onClose: () => void
 }
 
+// ── Inline annotation renderer (read-only) ────────────────────────────────────
+
+type Segment =
+  | { type: 'unchanged'; text: string }
+  | { type: 'match'; match: SpagMatch }
+
+function SpagAnnotatedText({
+  spagText,
+  matches,
+  ignoredWords,
+  onIgnore,
+}: {
+  spagText: string
+  matches: SpagMatch[]
+  ignoredWords: Set<string>
+  onIgnore: (word: string) => void
+}) {
+  const [activeOffset, setActiveOffset] = useState<number | null>(null)
+  const [popupPlacement, setPopupPlacement] = useState<'above' | 'below'>('below')
+  const containerRef = useRef<HTMLDivElement>(null)
+  const popupRef = useRef<HTMLDivElement>(null)
+
+  // Close popup on outside click
+  useEffect(() => {
+    if (activeOffset === null) return
+    const handler = (e: MouseEvent) => {
+      if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
+        const underline = containerRef.current?.querySelector(`[data-spag-offset="${activeOffset}"]`)
+        if (underline && underline.contains(e.target as Node)) return
+        setActiveOffset(null)
+      }
+    }
+    document.addEventListener('mousedown', handler)
+    return () => document.removeEventListener('mousedown', handler)
+  }, [activeOffset])
+
+  const visibleMatches = useMemo(
+    () => matches.filter(m => !ignoredWords.has(m.word.toLowerCase())),
+    [matches, ignoredWords]
+  )
+
+  const segments = useMemo<Segment[]>(() => {
+    const sorted = [...visibleMatches].sort((a, b) => a.offset - b.offset)
+    const out: Segment[] = []
+    let cursor = 0
+    for (const m of sorted) {
+      if (m.offset > cursor) out.push({ type: 'unchanged', text: spagText.slice(cursor, m.offset) })
+      out.push({ type: 'match', match: m })
+      cursor = m.offset + m.length
+    }
+    if (cursor < spagText.length) out.push({ type: 'unchanged', text: spagText.slice(cursor) })
+    return out
+  }, [visibleMatches, spagText])
+
+  return (
+    <div
+      ref={containerRef}
+      className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed"
+    >
+      {segments.map((seg, i) => {
+        if (seg.type === 'unchanged') return <span key={i}>{seg.text}</span>
+        const { match } = seg
+        const isActive = activeOffset === match.offset
+        return (
+          <span key={i} className="relative inline-block">
+            <span
+              data-spag-offset={match.offset}
+              onClick={e => {
+                const rect = e.currentTarget.getBoundingClientRect()
+                setPopupPlacement(
+                  window.innerHeight - rect.bottom < 200 && rect.top > 200 ? 'above' : 'below'
+                )
+                setActiveOffset(prev => prev === match.offset ? null : match.offset)
+              }}
+              className="cursor-pointer text-red-700 dark:text-red-400"
+              style={{
+                textDecorationLine: 'underline',
+                textDecorationStyle: 'wavy',
+                textDecorationColor: '#ef4444',
+                textDecorationThickness: '1.5px',
+                textUnderlineOffset: '3px',
+              }}
+              title={match.message}
+            >
+              {match.word}
+            </span>
+
+            {isActive && (
+              <div
+                ref={popupRef}
+                className={`absolute z-50 left-0 ${popupPlacement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1'} min-w-[14rem] max-w-[20rem] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 text-sm font-sans whitespace-normal`}
+              >
+                {/* Header */}
+                <div className="flex items-start gap-2 px-1 pb-2 border-b border-gray-100 dark:border-gray-800">
+                  <span className="material-symbols-outlined text-amber-500 text-base">spellcheck</span>
+                  <div className="flex-1 min-w-0">
+                    <p className="font-mono font-semibold text-red-600 dark:text-red-400 text-sm truncate">
+                      &ldquo;{match.word}&rdquo;
+                    </p>
+                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{match.message}</p>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setActiveOffset(null)}
+                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+                  >
+                    <span className="material-symbols-outlined text-sm">close</span>
+                  </button>
+                </div>
+
+                {/* Suggestions (read-only) */}
+                {match.replacements.length > 0 ? (
+                  <div className="pt-2 px-1">
+                    <p className="text-[10px] uppercase font-semibold text-gray-400 mb-1">Suggestions</p>
+                    <div className="flex flex-wrap gap-1">
+                      {match.replacements.slice(0, 6).map(r => (
+                        <span
+                          key={r}
+                          className="px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-xs font-mono text-gray-600 dark:text-gray-300"
+                        >
+                          {r}
+                        </span>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <p className="pt-2 px-1 text-xs text-gray-400 italic">No suggestions available</p>
+                )}
+
+                {/* Actions */}
+                <div className="pt-2 px-1 mt-2 border-t border-gray-100 dark:border-gray-800 flex">
+                  <button
+                    type="button"
+                    onClick={() => { onIgnore(match.word); setActiveOffset(null) }}
+                    className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded ml-auto"
+                    title="Ignore this word in all future SPAG checks"
+                  >
+                    <span className="material-symbols-outlined text-sm">visibility_off</span>Ignore
+                  </button>
+                </div>
+              </div>
+            )}
+          </span>
+        )
+      })}
+    </div>
+  )
+}
+
+// ── Main panel ────────────────────────────────────────────────────────────────
+
 export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPanelProps) {
   const [results, setResults] = useState<Map<string, ItemResult>>(
     () => new Map(options.map(o => [o.id, { status: 'pending' }]))
   )
-  const [expandedItems, setExpandedItems] = useState<Set<string>>(new Set())
   const [isRunning, setIsRunning] = useState(false)
 
   // Start checking automatically when the panel mounts
@@ -37,7 +187,6 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
 
   async function runChecks() {
     setIsRunning(true)
-    setExpandedItems(new Set())
     setResults(new Map(options.map(o => [o.id, { status: 'pending' }])))
 
     for (const option of options) {
@@ -51,11 +200,8 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
         setResults(prev => new Map(prev).set(option.id,
           matches.length === 0
             ? { status: 'pass' }
-            : { status: 'issues', matches, ignoredWords: new Set() }
+            : { status: 'issues', matches, ignoredWords: new Set(), spagText: substituted }
         ))
-        if (matches.length > 0) {
-          setExpandedItems(prev => new Set(prev).add(option.id))
-        }
       } else {
         setResults(prev => new Map(prev).set(option.id,
           { status: 'error', message: result.error || 'Check failed' }
@@ -74,14 +220,6 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
       if (entry?.status !== 'issues') return prev
       const next = new Map(prev)
       next.set(optionId, { ...entry, ignoredWords: new Set(entry.ignoredWords).add(word.toLowerCase()) })
-      return next
-    })
-  }
-
-  function toggleItem(id: string) {
-    setExpandedItems(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
       return next
     })
   }
@@ -109,13 +247,17 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
           {!isRunning && (
             <button
               type="button"
-              onClick={runChecks}
+              onClick={() => runChecks()}
               className="flex items-center gap-1 text-xs text-amber-600 dark:text-amber-400 hover:text-amber-700 dark:hover:text-amber-300 transition-colors"
             >
               <span className="material-symbols-outlined text-sm">refresh</span>Re-run
             </button>
           )}
-          <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+          >
             <span className="material-symbols-outlined text-sm">close</span>
           </button>
         </div>
@@ -125,89 +267,63 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
       <ul className="divide-y divide-gray-100 dark:divide-gray-800">
         {options.map(option => {
           const result = results.get(option.id) ?? { status: 'pending' as const }
-          const isExpanded = expandedItems.has(option.id)
-          const visibleMatches = result.status === 'issues'
-            ? result.matches.filter(m => !result.ignoredWords.has(m.word.toLowerCase()))
-            : []
+          const visibleMatchCount = result.status === 'issues'
+            ? result.matches.filter(m => !result.ignoredWords.has(m.word.toLowerCase())).length
+            : 0
 
           return (
-            <li key={option.id}>
-              <div
-                className={`flex items-center gap-2 px-3 py-2 ${result.status === 'issues' ? 'cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-800/50' : ''}`}
-                onClick={() => result.status === 'issues' && toggleItem(option.id)}
-              >
+            <li key={option.id} className="px-3 py-2.5">
+              {/* Row header: code + status badge */}
+              <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 w-8 shrink-0">
                   {option.code}
                 </span>
-                <span className="text-xs text-gray-700 dark:text-gray-300 flex-1 truncate">
-                  {option.text.length > 70 ? option.text.slice(0, 70) + '…' : option.text}
-                </span>
 
                 {result.status === 'pending' && (
-                  <span className="text-[10px] text-gray-400 shrink-0">Pending</span>
+                  <span className="text-[10px] text-gray-400">Pending</span>
                 )}
                 {result.status === 'checking' && (
-                  <span className="text-[10px] text-amber-500 dark:text-amber-400 animate-pulse shrink-0">Checking…</span>
+                  <span className="text-[10px] text-amber-500 dark:text-amber-400 animate-pulse">Checking…</span>
                 )}
                 {result.status === 'pass' && (
-                  <span className="material-symbols-outlined text-green-500 text-base shrink-0">check_circle</span>
+                  <span className="material-symbols-outlined text-green-500 text-base leading-none">check_circle</span>
                 )}
                 {result.status === 'error' && (
-                  <span className="material-symbols-outlined text-red-500 text-base shrink-0" title={result.message}>error</span>
+                  <span
+                    className="material-symbols-outlined text-red-500 text-base leading-none"
+                    title={result.message}
+                  >
+                    error
+                  </span>
                 )}
                 {result.status === 'issues' && (
-                  <>
-                    <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded shrink-0 ${
-                      visibleMatches.length > 0
-                        ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
-                        : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
-                    }`}>
-                      {visibleMatches.length > 0
-                        ? `${visibleMatches.length} issue${visibleMatches.length > 1 ? 's' : ''}`
-                        : 'Resolved ✓'}
-                    </span>
-                    <span className="material-symbols-outlined text-gray-400 text-sm shrink-0">
-                      {isExpanded ? 'expand_less' : 'expand_more'}
-                    </span>
-                  </>
+                  <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded ${
+                    visibleMatchCount > 0
+                      ? 'bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400'
+                      : 'bg-green-100 dark:bg-green-900/30 text-green-600 dark:text-green-400'
+                  }`}>
+                    {visibleMatchCount > 0
+                      ? `${visibleMatchCount} issue${visibleMatchCount > 1 ? 's' : ''}`
+                      : 'Resolved ✓'}
+                  </span>
                 )}
               </div>
 
-              {/* Expanded issue details */}
-              {result.status === 'issues' && isExpanded && (
-                <ul className="border-t border-amber-100 dark:border-amber-900/30 bg-amber-50/40 dark:bg-amber-900/10 divide-y divide-amber-100 dark:divide-amber-900/20">
-                  {result.matches.map((match, j) => {
-                    const ignored = result.ignoredWords.has(match.word.toLowerCase())
-                    return (
-                      <li key={j} className={`flex items-start gap-2 px-4 py-1.5 ${ignored ? 'opacity-40' : ''}`}>
-                        <div className="flex-1 min-w-0">
-                          <span className="font-mono text-xs font-semibold text-red-600 dark:text-red-400">
-                            &ldquo;{match.word}&rdquo;
-                          </span>
-                          <span className="text-xs text-gray-500 dark:text-gray-400 ml-1">— {match.message}</span>
-                          {match.replacements.length > 0 && (
-                            <span className="text-[10px] text-gray-400 dark:text-gray-500 ml-1">
-                              → {match.replacements.slice(0, 3).join(', ')}
-                            </span>
-                          )}
-                        </div>
-                        {ignored ? (
-                          <span className="text-[10px] text-gray-400 italic shrink-0">Ignored</span>
-                        ) : (
-                          <button
-                            type="button"
-                            onClick={e => { e.stopPropagation(); handleIgnoreWord(option.id, match.word) }}
-                            className="shrink-0 text-[10px] px-1.5 py-0.5 text-gray-500 dark:text-gray-400 border border-gray-200 dark:border-gray-600 rounded hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-                            title="Ignore this word in all future SPAG checks"
-                          >
-                            Ignore
-                          </button>
-                        )}
-                      </li>
-                    )
-                  })}
-                </ul>
-              )}
+              {/* Text body — annotated if issues, plain otherwise */}
+              <div className="pl-10">
+                {result.status === 'issues' ? (
+                  <SpagAnnotatedText
+                    spagText={result.spagText}
+                    matches={result.matches}
+                    ignoredWords={result.ignoredWords}
+                    onIgnore={word => handleIgnoreWord(option.id, word)}
+                  />
+                ) : (
+                  <p className="text-xs text-gray-600 dark:text-gray-400">
+                    {option.text.length > 120 ? option.text.slice(0, 120) + '…' : option.text}
+                  </p>
+                )}
+              </div>
             </li>
           )
         })}
