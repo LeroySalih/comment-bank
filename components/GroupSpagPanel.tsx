@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { createPortal } from 'react-dom'
 import { requestSpagCheck } from '@/lib/server-actions/ai-check'
 import { addIgnoredWord } from '@/lib/server-actions/ignored-words'
 import { substituteVariables } from '@/lib/audit/substitute-variables'
@@ -31,6 +32,13 @@ type Segment =
   | { type: 'unchanged'; text: string }
   | { type: 'match'; match: SpagMatch }
 
+interface PopupState {
+  match: SpagMatch
+  top?: number
+  bottom?: number
+  left: number
+}
+
 function SpagAnnotatedText({
   spagText,
   matches,
@@ -42,24 +50,23 @@ function SpagAnnotatedText({
   ignoredWords: Set<string>
   onIgnore: (word: string) => void
 }) {
-  const [activeOffset, setActiveOffset] = useState<number | null>(null)
-  const [popupPlacement, setPopupPlacement] = useState<'above' | 'below'>('below')
-  const containerRef = useRef<HTMLDivElement>(null)
+  const [popup, setPopup] = useState<PopupState | null>(null)
+  const [mounted, setMounted] = useState(false)
   const popupRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => { setMounted(true) }, [])
 
   // Close popup on outside click
   useEffect(() => {
-    if (activeOffset === null) return
+    if (!popup) return
     const handler = (e: MouseEvent) => {
       if (popupRef.current && !popupRef.current.contains(e.target as Node)) {
-        const underline = containerRef.current?.querySelector(`[data-spag-offset="${activeOffset}"]`)
-        if (underline && underline.contains(e.target as Node)) return
-        setActiveOffset(null)
+        setPopup(null)
       }
     }
     document.addEventListener('mousedown', handler)
     return () => document.removeEventListener('mousedown', handler)
-  }, [activeOffset])
+  }, [popup])
 
   const visibleMatches = useMemo(
     () => matches.filter(m => !ignoredWords.has(m.word.toLowerCase())),
@@ -79,27 +86,102 @@ function SpagAnnotatedText({
     return out
   }, [visibleMatches, spagText])
 
-  return (
+  function handleWordClick(e: React.MouseEvent<HTMLSpanElement>, match: SpagMatch) {
+    e.stopPropagation()
+    // Toggle off if same word
+    if (popup?.match.offset === match.offset) {
+      setPopup(null)
+      return
+    }
+    const rect = e.currentTarget.getBoundingClientRect()
+    const spaceBelow = window.innerHeight - rect.bottom
+    const newPopup: PopupState = { match, left: Math.min(rect.left, window.innerWidth - 320) }
+    if (spaceBelow >= 180 || spaceBelow > rect.top) {
+      newPopup.top = rect.bottom + 4
+    } else {
+      newPopup.bottom = window.innerHeight - rect.top + 4
+    }
+    setPopup(newPopup)
+  }
+
+  // Portal popup — renders at document.body level, bypasses all overflow:hidden
+  const portalContent = mounted && popup ? createPortal(
     <div
-      ref={containerRef}
-      className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed"
+      ref={popupRef}
+      style={{
+        position: 'fixed',
+        top: popup.top,
+        bottom: popup.bottom,
+        left: popup.left,
+        zIndex: 9999,
+      }}
+      className="min-w-[14rem] max-w-[20rem] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-xl p-2 text-sm font-sans whitespace-normal"
     >
-      {segments.map((seg, i) => {
-        if (seg.type === 'unchanged') return <span key={i}>{seg.text}</span>
-        const { match } = seg
-        const isActive = activeOffset === match.offset
-        return (
-          <span key={i} className="relative inline-block">
+      {/* Header */}
+      <div className="flex items-start gap-2 px-1 pb-2 border-b border-gray-100 dark:border-gray-800">
+        <span className="material-symbols-outlined text-amber-500 text-base">spellcheck</span>
+        <div className="flex-1 min-w-0">
+          <p className="font-mono font-semibold text-red-600 dark:text-red-400 text-sm truncate">
+            &ldquo;{popup.match.word}&rdquo;
+          </p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{popup.match.message}</p>
+        </div>
+        <button
+          type="button"
+          onClick={() => setPopup(null)}
+          className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
+        >
+          <span className="material-symbols-outlined text-sm">close</span>
+        </button>
+      </div>
+
+      {/* Suggestions (read-only display) */}
+      {popup.match.replacements.length > 0 ? (
+        <div className="pt-2 px-1">
+          <p className="text-[10px] uppercase font-semibold text-gray-400 mb-1">Suggestions</p>
+          <div className="flex flex-wrap gap-1">
+            {popup.match.replacements.slice(0, 6).map(r => (
+              <span
+                key={r}
+                className="px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-xs font-mono text-gray-700 dark:text-gray-300"
+              >
+                {r}
+              </span>
+            ))}
+          </div>
+        </div>
+      ) : (
+        <p className="pt-2 px-1 text-xs text-gray-400 italic">No suggestions available</p>
+      )}
+
+      {/* Ignore action */}
+      <div className="pt-2 px-1 mt-2 border-t border-gray-100 dark:border-gray-800 flex">
+        <button
+          type="button"
+          onClick={() => { onIgnore(popup.match.word); setPopup(null) }}
+          className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded ml-auto"
+          title="Ignore this word in all future SPAG checks"
+        >
+          <span className="material-symbols-outlined text-sm">visibility_off</span>Ignore
+        </button>
+      </div>
+    </div>,
+    document.body
+  ) : null
+
+  return (
+    <>
+      <div className="text-xs text-gray-700 dark:text-gray-300 leading-relaxed">
+        {segments.map((seg, i) => {
+          if (seg.type === 'unchanged') return <span key={i}>{seg.text}</span>
+          const { match } = seg
+          const isActive = popup?.match.offset === match.offset
+          return (
             <span
+              key={i}
               data-spag-offset={match.offset}
-              onClick={e => {
-                const rect = e.currentTarget.getBoundingClientRect()
-                setPopupPlacement(
-                  window.innerHeight - rect.bottom < 200 && rect.top > 200 ? 'above' : 'below'
-                )
-                setActiveOffset(prev => prev === match.offset ? null : match.offset)
-              }}
-              className="cursor-pointer text-red-700 dark:text-red-400"
+              onClick={e => handleWordClick(e, match)}
+              className={`cursor-pointer ${isActive ? 'text-red-800 dark:text-red-300' : 'text-red-700 dark:text-red-400'}`}
               style={{
                 textDecorationLine: 'underline',
                 textDecorationStyle: 'wavy',
@@ -111,66 +193,11 @@ function SpagAnnotatedText({
             >
               {match.word}
             </span>
-
-            {isActive && (
-              <div
-                ref={popupRef}
-                className={`absolute z-50 left-0 ${popupPlacement === 'below' ? 'top-full mt-1' : 'bottom-full mb-1'} min-w-[14rem] max-w-[20rem] bg-white dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg p-2 text-sm font-sans whitespace-normal`}
-              >
-                {/* Header */}
-                <div className="flex items-start gap-2 px-1 pb-2 border-b border-gray-100 dark:border-gray-800">
-                  <span className="material-symbols-outlined text-amber-500 text-base">spellcheck</span>
-                  <div className="flex-1 min-w-0">
-                    <p className="font-mono font-semibold text-red-600 dark:text-red-400 text-sm truncate">
-                      &ldquo;{match.word}&rdquo;
-                    </p>
-                    <p className="text-xs text-gray-500 dark:text-gray-400 leading-snug">{match.message}</p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => setActiveOffset(null)}
-                    className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200"
-                  >
-                    <span className="material-symbols-outlined text-sm">close</span>
-                  </button>
-                </div>
-
-                {/* Suggestions (read-only) */}
-                {match.replacements.length > 0 ? (
-                  <div className="pt-2 px-1">
-                    <p className="text-[10px] uppercase font-semibold text-gray-400 mb-1">Suggestions</p>
-                    <div className="flex flex-wrap gap-1">
-                      {match.replacements.slice(0, 6).map(r => (
-                        <span
-                          key={r}
-                          className="px-2 py-1 bg-gray-50 dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded text-xs font-mono text-gray-600 dark:text-gray-300"
-                        >
-                          {r}
-                        </span>
-                      ))}
-                    </div>
-                  </div>
-                ) : (
-                  <p className="pt-2 px-1 text-xs text-gray-400 italic">No suggestions available</p>
-                )}
-
-                {/* Actions */}
-                <div className="pt-2 px-1 mt-2 border-t border-gray-100 dark:border-gray-800 flex">
-                  <button
-                    type="button"
-                    onClick={() => { onIgnore(match.word); setActiveOffset(null) }}
-                    className="flex items-center gap-1 px-2 py-1 text-xs text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-800 rounded ml-auto"
-                    title="Ignore this word in all future SPAG checks"
-                  >
-                    <span className="material-symbols-outlined text-sm">visibility_off</span>Ignore
-                  </button>
-                </div>
-              </div>
-            )}
-          </span>
-        )
-      })}
-    </div>
+          )
+        })}
+      </div>
+      {portalContent}
+    </>
   )
 }
 
@@ -232,9 +259,9 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
   , 0)
 
   return (
-    <div className="mb-4 border border-amber-200 dark:border-amber-800 rounded-lg overflow-hidden bg-white dark:bg-gray-900">
+    <div className="mb-4 border border-amber-200 dark:border-amber-800 rounded-lg bg-white dark:bg-gray-900">
       {/* Header */}
-      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800">
+      <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 dark:bg-amber-900/20 border-b border-amber-200 dark:border-amber-800 rounded-t-lg">
         <span className="material-symbols-outlined text-amber-600 dark:text-amber-400 text-base">spellcheck</span>
         <span className="text-sm font-semibold text-amber-700 dark:text-amber-400">
           {isRunning
@@ -273,7 +300,7 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
 
           return (
             <li key={option.id} className="px-3 py-2.5">
-              {/* Row header: code + status badge */}
+              {/* Code + status badge */}
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-mono font-bold text-gray-500 dark:text-gray-400 w-8 shrink-0">
                   {option.code}
@@ -289,10 +316,7 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
                   <span className="material-symbols-outlined text-green-500 text-base leading-none">check_circle</span>
                 )}
                 {result.status === 'error' && (
-                  <span
-                    className="material-symbols-outlined text-red-500 text-base leading-none"
-                    title={result.message}
-                  >
+                  <span className="material-symbols-outlined text-red-500 text-base leading-none" title={result.message}>
                     error
                   </span>
                 )}
@@ -309,7 +333,7 @@ export function GroupSpagPanel({ options, subjectTitle, onClose }: GroupSpagPane
                 )}
               </div>
 
-              {/* Text body — annotated if issues, plain otherwise */}
+              {/* Text — annotated inline if issues, plain otherwise */}
               <div className="pl-10">
                 {result.status === 'issues' ? (
                   <SpagAnnotatedText
