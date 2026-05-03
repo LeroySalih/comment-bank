@@ -1,7 +1,7 @@
 "use client"
 
 import { useState, useEffect, useRef } from "react"
-import { getPupils, updatePupil, processPupilUpload } from "@/lib/server-actions/admin"
+import { getPupils, updatePupil, processPupilUpload, createPupil } from "@/lib/server-actions/admin"
 
 interface Pupil {
   admissionNumber: string
@@ -18,6 +18,10 @@ export function PupilManagement() {
   const [loading, setLoading] = useState(false)
   const [uploading, setUploading] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const [showAddForm, setShowAddForm] = useState(false)
+  const [addForm, setAddForm] = useState({ admissionNumber: '', firstName: '', lastName: '', gender: 'M', form: '' })
+  const [addError, setAddError] = useState<string | null>(null)
+  const [addSaving, setAddSaving] = useState(false)
 
   const fetchPupils = async (q: string) => {
     setLoading(true)
@@ -65,6 +69,27 @@ export function PupilManagement() {
     }
   }
 
+  const handleAddPupil = async (e: React.FormEvent) => {
+    e.preventDefault()
+    setAddError(null)
+    setAddSaving(true)
+    const result = await createPupil({
+      admissionNumber: addForm.admissionNumber.trim(),
+      firstName: addForm.firstName.trim(),
+      lastName: addForm.lastName.trim(),
+      gender: addForm.gender as 'M' | 'F',
+      form: addForm.form.trim() || null
+    })
+    setAddSaving(false)
+    if (result.success) {
+      setAddForm({ admissionNumber: '', firstName: '', lastName: '', gender: 'M', form: '' })
+      setShowAddForm(false)
+      fetchPupils(query)
+    } else {
+      setAddError('error' in result ? (result.error ?? 'Failed to create pupil') : 'Failed to create pupil')
+    }
+  }
+
   const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file) return
@@ -104,6 +129,13 @@ export function PupilManagement() {
               className="hidden"
             />
             <button
+              type="button"
+              onClick={() => { setShowAddForm(v => !v); setAddError(null) }}
+              className="bg-green-600 hover:bg-green-700 text-white px-4 py-2 rounded-md font-medium"
+            >
+              {showAddForm ? 'Cancel' : '+ Add Pupil'}
+            </button>
+            <button
               onClick={() => fileInputRef.current?.click()}
               disabled={uploading}
               className="bg-blue-600 hover:bg-blue-700 text-white px-4 py-2 rounded-md font-medium disabled:opacity-50"
@@ -112,6 +144,83 @@ export function PupilManagement() {
             </button>
           </div>
         </div>
+
+        {showAddForm && (
+          <form onSubmit={handleAddPupil} className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg space-y-3">
+            <h3 className="text-sm font-semibold text-green-800">Add New Pupil</h3>
+            <div className="flex flex-wrap gap-3">
+              <div className="w-36">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Admission No *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.admissionNumber}
+                  onChange={e => setAddForm(f => ({ ...f, admissionNumber: e.target.value }))}
+                  placeholder="e.g. 12345"
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="w-36">
+                <label className="block text-xs font-medium text-gray-600 mb-1">First Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.firstName}
+                  onChange={e => setAddForm(f => ({ ...f, firstName: e.target.value }))}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="w-36">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Last Name *</label>
+                <input
+                  type="text"
+                  required
+                  value={addForm.lastName}
+                  onChange={e => setAddForm(f => ({ ...f, lastName: e.target.value }))}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+              <div className="w-28">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Gender *</label>
+                <select
+                  value={addForm.gender}
+                  onChange={e => setAddForm(f => ({ ...f, gender: e.target.value }))}
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                >
+                  <option value="M">M</option>
+                  <option value="F">F</option>
+                </select>
+              </div>
+              <div className="w-28">
+                <label className="block text-xs font-medium text-gray-600 mb-1">Form</label>
+                <input
+                  type="text"
+                  value={addForm.form}
+                  onChange={e => setAddForm(f => ({ ...f, form: e.target.value }))}
+                  placeholder="e.g. 9A"
+                  className="w-full border rounded px-2 py-1.5 text-sm"
+                />
+              </div>
+            </div>
+            {addError && <p className="text-red-600 text-xs">{addError}</p>}
+            <div className="flex gap-2">
+              <button
+                type="submit"
+                disabled={addSaving}
+                className="bg-green-600 hover:bg-green-700 text-white px-4 py-1.5 rounded text-sm font-medium disabled:opacity-50"
+              >
+                {addSaving ? 'Creating...' : 'Create Pupil'}
+              </button>
+              <button
+                type="button"
+                onClick={() => { setShowAddForm(false); setAddError(null) }}
+                className="bg-gray-200 hover:bg-gray-300 text-gray-700 px-4 py-1.5 rounded text-sm"
+              >
+                Cancel
+              </button>
+            </div>
+          </form>
+        )}
 
         <div className="mb-4">
           <input
