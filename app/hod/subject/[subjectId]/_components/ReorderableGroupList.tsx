@@ -32,6 +32,7 @@ interface Props {
   subjectId: string
   initialGroups: Group[]
   ccgGroups?: CcgGroup[]
+  subjectTitle?: string
 }
 
 function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; subjectId: string; onClose: () => void }) {
@@ -124,7 +125,7 @@ function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; s
   )
 }
 
-function EditCommentForm({ comment, subjectId, groupId, onClose }: { comment: CommentOption; subjectId: string; groupId: string; onClose: () => void }) {
+function EditCommentForm({ comment, subjectId, groupId, onClose, subjectTitle: _subjectTitle }: { comment: CommentOption; subjectId: string; groupId: string; onClose: () => void; subjectTitle?: string }) {
   const [code, setCode] = useState(comment.code)
   const [text, setText] = useState(comment.text)
   const [error, setError] = useState<string | null>(null)
@@ -210,12 +211,13 @@ function EditCommentForm({ comment, subjectId, groupId, onClose }: { comment: Co
   )
 }
 
-function CommentItem({ comment, subjectId, groupId, index, onReorder }: {
+function CommentItem({ comment, subjectId, groupId, index, onReorder, subjectTitle }: {
   comment: CommentOption
   subjectId: string
   groupId: string
   index: number
   onReorder: (comments: CommentOption[]) => void
+  subjectTitle: string
 }) {
   const [isEditing, setIsEditing] = useState(false)
   const [isDeleting, setIsDeleting] = useState(false)
@@ -242,7 +244,7 @@ function CommentItem({ comment, subjectId, groupId, index, onReorder }: {
             {...provided.draggableProps}
             className="mb-2"
           >
-            <EditCommentForm comment={comment} subjectId={subjectId} groupId={groupId} onClose={() => setIsEditing(false)} />
+            <EditCommentForm comment={comment} subjectId={subjectId} groupId={groupId} subjectTitle={subjectTitle} onClose={() => setIsEditing(false)} />
           </div>
         )}
       </Draggable>
@@ -295,7 +297,7 @@ function CommentItem({ comment, subjectId, groupId, index, onReorder }: {
   )
 }
 
-function CommentsList({ group, subjectId }: { group: Group; subjectId: string }) {
+function CommentsList({ group, subjectId, subjectTitle }: { group: Group; subjectId: string; subjectTitle: string }) {
   const [comments, setComments] = useState(group.CommentOption)
   const router = useRouter()
 
@@ -337,6 +339,7 @@ function CommentsList({ group, subjectId }: { group: Group; subjectId: string })
                 groupId={group.id}
                 index={index}
                 onReorder={setComments}
+                subjectTitle={subjectTitle}
               />
             ))}
             {provided.placeholder}
@@ -350,7 +353,7 @@ function CommentsList({ group, subjectId }: { group: Group; subjectId: string })
   )
 }
 
-export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups }: Props) {
+export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups, subjectTitle = '' }: Props) {
   const [groups, setGroups] = useState(initialGroups)
   const [addingToGroup, setAddingToGroup] = useState<string | null>(null)
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set())
@@ -470,7 +473,7 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups }: Pr
                           />
                         )}
                         <div className={addingToGroup === group.id ? "mt-4" : ""}>
-                          <CommentsList group={group} subjectId={subjectId} />
+                          <CommentsList group={group} subjectId={subjectId} subjectTitle={subjectTitle} />
                         </div>
                       </div>
                     )}

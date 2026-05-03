@@ -146,6 +146,7 @@ export default async function SubjectPage({ params }: Props) {
                     subjectId={subject.id}
                     initialGroups={subject.CommentGroup}
                     ccgGroups={ccgGroups}
+                    subjectTitle={subject.title ?? subject.code}
                   />
             </div>
         </section>
