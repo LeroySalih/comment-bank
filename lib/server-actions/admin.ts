@@ -259,7 +259,7 @@ export const deletePupil = withRole('admin', async (admissionNumber: string) => 
       return { success: false as const, error: 'Pupil not found', code: 'NOT_FOUND' }
     }
 
-    await pool.query(`DELETE FROM "Pupil" WHERE "admissionNumber" = $1`, [admissionNumber])
+    await pool.query<never>(`DELETE FROM "Pupil" WHERE "admissionNumber" = $1`, [admissionNumber])
 
     await logDataChange(
       'delete_pupil',
