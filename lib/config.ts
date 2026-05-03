@@ -41,6 +41,14 @@ export type Config = z.infer<typeof ConfigSchema>
  * Throws an error if validation fails
  */
 function validateConfig(): Config {
+  // During `next build`, Next.js sets NEXT_PHASE to 'phase-production-build' and
+  // imports every route to collect page data. Env vars (secrets, webhook URLs) are
+  // not available at build time — they're injected at runtime by the container
+  // orchestrator. Skip validation here; it will run again on the first real request.
+  if (process.env.NEXT_PHASE === 'phase-production-build') {
+    return {} as Config
+  }
+
   try {
     return ConfigSchema.parse(process.env)
   } catch (error) {
@@ -48,7 +56,7 @@ function validateConfig(): Config {
       const errorMessages = error.issues
         .map((err) => `  - ${err.path.join('.')}: ${err.message}`)
         .join('\n')
-      
+
       throw new Error(
         `Environment variable validation failed:\n${errorMessages}\n\n` +
         'Please check your .env file and ensure all required variables are set correctly.'
