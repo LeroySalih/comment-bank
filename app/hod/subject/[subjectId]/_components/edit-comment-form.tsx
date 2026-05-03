@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { X } from 'lucide-react'
 import { updateComment } from '@/lib/server-actions/hod'
@@ -66,11 +66,16 @@ export function EditCommentForm({
   const [isStandardsChecking, setIsStandardsChecking] = useState(false)
   const [standardsError, setStandardsError] = useState<string | null>(null)
 
+  const spagRequestId = useRef(0)
+  const standardsRequestId = useRef(0)
+
   const router = useRouter()
 
   // Clear AI results when the comment text changes so stale results are not shown
   const handleTextChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setText(e.target.value)
+    spagRequestId.current++
+    standardsRequestId.current++
     setSpagMatches(null)
     setStandardsResult(null)
     setSpagError(null)
@@ -103,6 +108,7 @@ export function EditCommentForm({
 
   async function handleSpagCheck() {
     if (!text.trim()) return
+    const id = ++spagRequestId.current
     setIsSpagChecking(true)
     setSpagMatches(null)
     setSpagError(null)
@@ -112,6 +118,8 @@ export function EditCommentForm({
     // trigger false SPAG positives.
     const substituted = substituteVariables(text, subjectTitle)
     const result = await requestSpagCheck(substituted)
+
+    if (spagRequestId.current !== id) return // response is stale, discard it
     setIsSpagChecking(false)
 
     if (result.success) {
@@ -123,12 +131,15 @@ export function EditCommentForm({
 
   async function handleStandardsCheck() {
     if (!text.trim()) return
+    const id = ++standardsRequestId.current
     setIsStandardsChecking(true)
     setStandardsResult(null)
     setStandardsError(null)
 
     const substituted = substituteVariables(text, subjectTitle)
     const result = await requestStandardsCheck(substituted)
+
+    if (standardsRequestId.current !== id) return // response is stale, discard it
     setIsStandardsChecking(false)
 
     if (result.success) {
@@ -139,9 +150,12 @@ export function EditCommentForm({
   }
 
   async function handleIgnoreWord(word: string) {
-    // Persists to IgnoredWord table — automatically propagates to the audit
-    // and pupil-report SPAG checks since they all read the same table.
-    await addIgnoredWord(word)
+    const result = await addIgnoredWord(word)
+    if (!result.success) {
+      // Word was not persisted — do not remove it from the visible list
+      return
+    }
+    // Persisted successfully — propagates to audit and pupil-report SPAG checks
     setLocallyIgnored(prev => new Set(prev).add(word.toLowerCase()))
   }
 
@@ -157,7 +171,7 @@ export function EditCommentForm({
     >
       <div className="flex justify-between items-center mb-3">
         <h4 className="text-sm font-medium text-gray-900 dark:text-white">Edit Comment</h4>
-        <button onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+        <button type="button" onClick={onClose} className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
           <X size={16} />
         </button>
       </div>
@@ -239,7 +253,7 @@ export function EditCommentForm({
             {visibleMatches.length > 0 && (
               <ul className="divide-y divide-amber-100 dark:divide-amber-900/20">
                 {visibleMatches.map(match => (
-                  <li key={match.offset} className="px-3 py-2 flex items-start gap-2">
+                  <li key={`${match.offset}-${match.word}`} className="px-3 py-2 flex items-start gap-2">
                     <div className="flex-1 min-w-0">
                       <span className="font-medium text-xs text-gray-800 dark:text-gray-200">
                         &ldquo;{match.word}&rdquo;
