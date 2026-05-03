@@ -28,7 +28,7 @@ export async function GET(
 
   const filename = `audit-${subjectId}-${Date.now()}.pdf`;
 
-  return new Response(buffer as any, {
+  return new Response(new Uint8Array(buffer), {
     headers: {
       'Content-Type': 'application/pdf',
       'Content-Disposition': `attachment; filename="${filename}"`,

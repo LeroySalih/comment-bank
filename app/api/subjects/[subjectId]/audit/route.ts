@@ -181,9 +181,6 @@ export async function GET(
         send({ type: 'untested', items: untestedItems });
 
         // ── Generate PDF ───────────────────────────────────────────────────
-        const groupTitles: Record<string, string> = {};
-        for (const g of subjectGroups) groupTitles[g.id] = g.title;
-
         const pdfData: AuditPdfData = {
           subjectTitle: subject.title ?? subject.code,
           subjectCode: subject.code,
@@ -193,7 +190,6 @@ export async function GET(
           spagEntries,
           standardsFailures,
           untestedItems,
-          groupTitles,
         };
 
         const pdfBuffer = await renderAuditPdf(pdfData);

@@ -13,6 +13,8 @@ import type { AuditPdfData } from './types';
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
+const STAT_VALUE_BASE = { fontSize: 20, fontFamily: 'Helvetica-Bold' } as const;
+
 const styles = StyleSheet.create({
   page: {
     fontFamily: 'Helvetica',
@@ -48,21 +50,9 @@ const styles = StyleSheet.create({
   statBlock: {
     flexDirection: 'column',
   },
-  statValue: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-    color: 'white',
-  },
-  statValueGreen: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-    color: '#86efac',
-  },
-  statValueRed: {
-    fontSize: 20,
-    fontFamily: 'Helvetica-Bold',
-    color: '#fca5a5',
-  },
+  statValue: { ...STAT_VALUE_BASE, color: 'white' },
+  statValueGreen: { ...STAT_VALUE_BASE, color: '#86efac' },
+  statValueRed: { ...STAT_VALUE_BASE, color: '#fca5a5' },
   statLabel: {
     fontSize: 8,
     color: '#9ab3c8',
@@ -288,7 +278,7 @@ function buildAuditDocument(data: AuditPdfData) {
         // Untested warning
         data.untestedItems.length > 0
           ? React.createElement(Text, { style: styles.untestedNote },
-            `⚠ ${data.untestedItems.length} comment code(s) were not included in any of the 50 sample reports: ` +
+            `⚠ ${data.untestedItems.length} comment code(s) were not included in any of the ${data.totalReports} sample reports: ` +
             data.untestedItems.map(u => `${u.code} (${u.groupName})`).join(', ')
           )
           : null

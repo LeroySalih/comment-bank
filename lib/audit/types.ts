@@ -103,6 +103,4 @@ export type AuditPdfData = {
   spagEntries: SpagAuditEntry[];
   standardsFailures: StandardsAuditEntry[];
   untestedItems: { code: string; groupName: string }[];
-  /** All subject groups (non-linked), for the comments section */
-  groupTitles: Record<string, string>;
 };
