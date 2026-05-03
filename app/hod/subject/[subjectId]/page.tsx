@@ -4,6 +4,7 @@ import Link from "next/link"
 import { GroupForm } from "./_components/group-form"
 import { ReorderableGroupList } from "./_components/ReorderableGroupList"
 import { SubjectCommentFormat } from "./_components/SubjectCommentFormat"
+import { AuditButton } from "./_components/audit-button"
 import { countWords } from "@/lib/utils"
 import { getReviewStats } from "@/lib/server-actions/comment-check"
 
@@ -109,6 +110,10 @@ export default async function SubjectPage({ params }: Props) {
                      Review Comments
                    </Link>
                  )}
+                 <AuditButton
+                   subjectId={subjectId}
+                   subjectTitle={subject.title ?? subject.code}
+                 />
                  <div className="h-10 w-px bg-gray-200 dark:bg-gray-700 hidden md:block"></div>
                  <div className="text-right hidden md:block">
                      <p className="text-sm text-[#617289] uppercase font-bold tracking-wider">Avg. Words</p>
