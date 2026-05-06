@@ -5,11 +5,12 @@ import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea
 import { reorderCommentGroups, createComment, deleteComment, reorderComments } from "@/lib/server-actions/hod"
 import { EditGroupForm } from "./edit-group-form"
 import { EditCommentForm } from './edit-comment-form'
-import { GripVertical, Plus, X, ChevronDown, ChevronRight, Pencil, Trash2 } from "lucide-react"
+import { GripVertical, Plus, X, ChevronDown, ChevronRight, Trash2 } from "lucide-react"
 import { useRouter } from "next/navigation"
 import { VariablePreview } from "@/components/VariablePreview"
 import { countWords } from "@/lib/utils"
 import { GroupSpagPanel } from "@/components/GroupSpagPanel"
+import { InlineSpagEditor } from "@/components/InlineSpagEditor"
 
 interface CommentOption {
   id: string
@@ -37,7 +38,7 @@ interface Props {
   subjectTitle?: string
 }
 
-function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; subjectId: string; onClose: () => void }) {
+function InlineCommentForm({ groupId, subjectId, subjectTitle, onClose }: { groupId: string; subjectId: string; subjectTitle?: string; onClose: () => void }) {
   const [code, setCode] = useState("")
   const [text, setText] = useState("")
   const [error, setError] = useState<string | null>(null)
@@ -92,13 +93,13 @@ function InlineCommentForm({ groupId, subjectId, onClose }: { groupId: string; s
               <label className="block text-xs font-medium text-gray-500 dark:text-gray-400">Comment Text</label>
               <span className="text-[10px] text-gray-400 font-medium">{countWords(text)} words</span>
             </div>
-            <textarea
+            <InlineSpagEditor
               value={text}
-              onChange={(e) => setText(e.target.value)}
-              required
+              onChange={setText}
+              subjectTitle={subjectTitle}
               rows={2}
               placeholder="e.g. <Name> has made excellent progress. <He> is a pleasure to teach."
-              className="block w-full rounded-md border-gray-300 dark:border-gray-600 dark:bg-gray-700 dark:text-white shadow-sm border p-2 text-sm"
+              spagOnly
             />
           </div>
         </div>
@@ -159,6 +160,7 @@ function CommentItem({ comment, subjectId, groupId, index, onReorder, subjectTit
           <div
             ref={provided.innerRef}
             {...provided.draggableProps}
+            {...provided.dragHandleProps}
             className="mb-2"
           >
             <EditCommentForm comment={comment} subjectId={subjectId} groupId={groupId} subjectTitle={subjectTitle} onClose={() => setIsEditing(false)} />
@@ -182,7 +184,10 @@ function CommentItem({ comment, subjectId, groupId, index, onReorder, subjectTit
           >
             <GripVertical size={14} />
           </div>
-          <div className="flex-1 min-w-0">
+          <div
+            className="flex-1 min-w-0 cursor-text"
+            onClick={() => setIsEditing(true)}
+          >
             <div className="flex items-center gap-2 mb-1">
               <span className="bg-indigo-100 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 text-xs font-bold px-1.5 py-0.5 rounded">
                 {comment.code}
@@ -192,13 +197,6 @@ function CommentItem({ comment, subjectId, groupId, index, onReorder, subjectTit
             <p className="text-sm text-gray-700 dark:text-gray-300 line-clamp-2">{comment.text}</p>
           </div>
           <div className="flex items-center gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
-            <button
-              onClick={() => setIsEditing(true)}
-              className="p-1 text-gray-400 hover:text-blue-600 transition-colors"
-              title="Edit"
-            >
-              <Pencil size={14} />
-            </button>
             <button
               onClick={handleDelete}
               disabled={isDeleting}
@@ -409,6 +407,7 @@ export function ReorderableGroupList({ subjectId, initialGroups, ccgGroups, subj
                           <InlineCommentForm
                             groupId={group.id}
                             subjectId={subjectId}
+                            subjectTitle={subjectTitle}
                             onClose={() => setAddingToGroup(null)}
                           />
                         )}

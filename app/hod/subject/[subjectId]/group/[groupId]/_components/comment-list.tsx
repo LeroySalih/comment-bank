@@ -17,9 +17,10 @@ interface Props {
   initialComments: CommentOption[]
   subjectId: string
   groupId: string
+  subjectTitle?: string
 }
 
-export function CommentList({ initialComments, subjectId, groupId }: Props) {
+export function CommentList({ initialComments, subjectId, groupId, subjectTitle }: Props) {
   const [comments, setComments] = useState(initialComments)
   const router = useRouter()
 
@@ -71,10 +72,11 @@ export function CommentList({ initialComments, subjectId, groupId }: Props) {
                      {...provided.draggableProps}
                      {...provided.dragHandleProps}
                    >
-                     <CommentItem 
-                        comment={comment} 
-                        subjectId={subjectId} 
-                        groupId={groupId} 
+                     <CommentItem
+                        comment={comment}
+                        subjectId={subjectId}
+                        groupId={groupId}
+                        subjectTitle={subjectTitle}
                       />
                    </div>
                 )}

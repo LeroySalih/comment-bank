@@ -114,7 +114,7 @@ const STANDARDS_RULE_KEYS = [
 
 export async function requestStandardsCheck(
   commentText: string
-): Promise<{ success: true; result: StandardsResult } | { success: false; error: string }> {
+): Promise<{ success: true; result: StandardsResult; raw: unknown } | { success: false; error: string }> {
   if (!commentText.trim()) {
     return { success: false, error: 'No comment text to check' };
   }
@@ -148,65 +148,58 @@ export async function requestStandardsCheck(
 
   try {
     const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
-    const data = (unwrapped as Record<string, unknown>)?.output ?? unwrapped;
-    const obj = data as Record<string, unknown>;
+    const obj = unwrapped as Record<string, unknown>;
 
-    const toBool = (v: unknown): boolean => {
-      if (typeof v === 'boolean') return v;
-      if (typeof v === 'string') return v.toLowerCase() === 'true' || v.toLowerCase() === 'passed';
-      return false;
+    const statusPassed = (v: unknown): boolean => {
+      if (!v || typeof v !== 'object') return false;
+      const o = v as Record<string, unknown>;
+      const s = (o.status ?? o.result ?? '');
+      return typeof s === 'boolean' ? s : String(s).toLowerCase() === 'passed';
     };
 
-    const toEntry = (v: unknown): StandardsRuleEntry => {
-      // Legacy: just a boolean / string
-      if (typeof v === 'boolean' || typeof v === 'string') {
-        return { result: toBool(v) };
-      }
-      // New: { result, instances?, wordCount? }
-      if (v && typeof v === 'object') {
-        const o = v as Record<string, unknown>;
-        const entry: StandardsRuleEntry = { result: toBool(o.result) };
-        if (Array.isArray(o.instances)) {
-          entry.instances = (o.instances as unknown[])
-            .filter((x): x is string => typeof x === 'string' && x.length > 0);
-        }
-        if (typeof o.wordCount === 'number') {
-          entry.wordCount = o.wordCount;
-        }
-        return entry;
-      }
-      return { result: false };
+    const instances = (v: unknown): string[] | undefined => {
+      if (!v || typeof v !== 'object') return undefined;
+      const arr = (v as Record<string, unknown>).instances;
+      if (!Array.isArray(arr)) return undefined;
+      const filtered = (arr as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0);
+      return filtered.length > 0 ? filtered : undefined;
     };
+
+    const structureCheck = (obj.structureCheck ?? {}) as Record<string, unknown>;
+    const structureFound = (key: string): boolean =>
+      String(structureCheck[key] ?? '').toLowerCase() === 'found';
+
+    const wordCountObj = obj.wordCount as Record<string, unknown> | undefined;
 
     const result: StandardsResult = {
-      Status: toEntry(obj?.Status),
-      UKSpelling: toEntry(obj?.UKSpelling),
-      CourseOverviewIncluded: toEntry(obj?.CourseOverviewIncluded),
-      AcademicPerformanceIncluded: toEntry(obj?.AcademicPerformanceIncluded),
-      TargetWordCountMet: toEntry(obj?.TargetWordCountMet),
-      TerminologyCorrect: toEntry(obj?.TerminologyCorrect),
-      JargonFree: toEntry(obj?.JargonFree),
-      DataSpecific: toEntry(obj?.DataSpecific),
-      ToneBalanced: toEntry(obj?.ToneBalanced),
-      SocialSkillsIncluded: toEntry(obj?.SocialSkillsIncluded),
-      CollaborationIncluded: toEntry(obj?.CollaborationIncluded),
-      BehaviourIncluded: toEntry(obj?.BehaviourIncluded),
-      ParentalSupportIncluded: toEntry(obj?.ParentalSupportIncluded),
-      Formatting: toEntry(obj?.Formatting),
+      // Not returned by service — omit from failing checks by defaulting to true
+      UKSpelling:   { result: true },
+      DataSpecific: { result: true },
+
+      TargetWordCountMet: {
+        result: statusPassed(obj.wordCount),
+        wordCount: typeof wordCountObj?.wordCount === 'number' ? wordCountObj.wordCount : undefined,
+      },
+
+      TerminologyCorrect: { result: statusPassed(obj.terminology) },
+      Formatting:         { result: statusPassed(obj.hasDoubleNewLines) },
+
+      JargonFree:    { result: statusPassed(obj.jargonCheck),  instances: instances(obj.jargonCheck) },
+      ToneBalanced:  { result: statusPassed(obj.negativity),   instances: instances(obj.negativity) },
+
+      CourseOverviewIncluded:      { result: structureFound('CourseOverview') },
+      AcademicPerformanceIncluded: { result: structureFound('AcademicPerformance') },
+      SocialSkillsIncluded:        { result: structureFound('SocialSkills') },
+      CollaborationIncluded:       { result: structureFound('Collaboration') },
+      BehaviourIncluded:           { result: structureFound('Behaviour') },
+      ParentalSupportIncluded:     { result: structureFound('ParentalSupport') },
+
+      Status: { result: false }, // derived below
     };
 
-    // Derive Status from individual rules if it wasn't supplied with a valid shape
-    const allRulesPassed = STANDARDS_RULE_KEYS.every(k => result[k].result === true);
-    const statusRaw = obj?.Status;
-    const statusProvided =
-      typeof statusRaw === 'boolean' ||
-      typeof statusRaw === 'string' ||
-      (statusRaw !== null && typeof statusRaw === 'object' && 'result' in (statusRaw as Record<string, unknown>));
-    if (!statusProvided) {
-      result.Status = { result: allRulesPassed };
-    }
+    result.Status = { result: STANDARDS_RULE_KEYS.every(k => result[k].result === true) };
 
-    return { success: true, result };
+    return { success: true, result, raw };
   } catch (err) {
     console.error('[standards-check] Parse exception:', err);
     return { success: false, error: `Failed to parse Standards response from ${config.STANDARDS_WEBHOOK_URL}` };
