@@ -102,6 +102,7 @@ export function InlineSpagEditor({
 
   // Standards state
   const [standardsResult, setStandardsResult] = useState<StandardsResult | null>(null)
+  const [standardsRaw, setStandardsRaw] = useState<unknown>(null)
   const [standardsChecking, setStandardsChecking] = useState(false)
   const stdReqRef = useRef(0)
 
@@ -156,7 +157,13 @@ export function InlineSpagEditor({
       const res = await requestStandardsCheck(value)
       if (myReq !== stdReqRef.current) return
       setStandardsChecking(false)
-      setStandardsResult(res.success ? res.result ?? null : null)
+      if (res.success) {
+        setStandardsResult(res.result ?? null)
+        setStandardsRaw(res.raw)
+      } else {
+        setStandardsResult(null)
+        setStandardsRaw(null)
+      }
     }, DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [value, spagOnly])
@@ -337,6 +344,16 @@ export function InlineSpagEditor({
             ))}
           </div>
         </div>
+      )}
+
+      {/* Debug: raw standards service response */}
+      {standardsRaw !== null && (
+        <details className="mt-2">
+          <summary className="text-[10px] text-gray-400 cursor-pointer select-none">Standards service response (raw)</summary>
+          <pre className="mt-1 text-[10px] bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded p-2 overflow-auto max-h-64 text-gray-600 dark:text-gray-400">
+            {JSON.stringify(standardsRaw, null, 2)}
+          </pre>
+        </details>
       )}
 
       {/* All clear */}
