@@ -81,6 +81,7 @@ export default async function GroupPage({ params }: Props) {
             initialComments={group.CommentOption.map((o: any) => ({ ...o, order: o.displayOrder }))}
             subjectId={subjectId}
             groupId={groupId}
+            subjectTitle={group.Subject.title || group.Subject.code}
           />
           {group.CommentOption.length === 0 && (
              <p className="text-gray-500 text-center py-10">No comments added to this group yet.</p>
