@@ -28,7 +28,8 @@ export function encrypt(text: string): string {
 /**
  * Check if a string is encrypted (has the expected format)
  */
-export function isEncrypted(text: string): boolean {
+export function isEncrypted(text: string | null | undefined): boolean {
+  if (!text) return false
   const parts = text.split(':')
   return parts.length === 3 && parts.every(part => part.length > 0)
 }
@@ -37,7 +38,8 @@ export function isEncrypted(text: string): boolean {
  * Decrypts a string using AES-256-GCM
  * Throws an error if decryption fails
  */
-export function decrypt(encryptedText: string): string {
+export function decrypt(encryptedText: string | null | undefined): string {
+  if (!encryptedText) return ''
   const key = process.env.PUPIL_ENCRYPTION_KEY
   if (!key || key.length !== 64) {
     throw new Error('PUPIL_ENCRYPTION_KEY must be a 64-character (32-byte) hex string')

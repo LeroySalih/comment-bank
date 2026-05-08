@@ -498,8 +498,8 @@ export class ClassRepository {
    * Automatically decrypts PII.
    */
   async getPupils(classId: string): Promise<PupilWithAssignmentId[]> {
-    const { rows } = await pool.query<DbPupil & { assignmentId: string }>(
-      `SELECT p.*, a.id as "assignmentId"
+    const { rows } = await pool.query<DbPupil & { assignmentId: string; finalComment: string | null }>(
+      `SELECT p.*, a.id as "assignmentId", a."finalComment"
        FROM "Assignment" a
        JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
        WHERE a."classId" = $1
