@@ -132,8 +132,8 @@ export async function GET(
       };
 
       try {
-        // Init
-        send({ type: 'init', totalComments: allComments.length, totalReports: reports.length });
+        // Init — DEBUG: only 1 standards report sent
+        send({ type: 'init', totalComments: allComments.length, totalReports: Math.min(reports.length, 1) });
 
         // ── Phase 1: SPAG ──────────────────────────────────────────────────
         const spagEntries: SpagAuditEntry[] = [];
@@ -164,10 +164,11 @@ export async function GET(
         send({ type: 'spag_done' });
 
         // ── Phase 2: Standards ─────────────────────────────────────────────
+        // DEBUG: limit to 1 report to observe the raw service response
         const standardsFailures: StandardsAuditEntry[] = [];
         let passedReports = 0;
 
-        for (const report of reports) {
+        for (const report of reports.slice(0, 1)) {
           const { passed, failures, failureDetails } = await callStandardsWebhook(report.assembledText);
           if (passed) passedReports++;
 
