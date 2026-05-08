@@ -151,6 +151,7 @@ export async function requestStandardsCheck(
     const obj = unwrapped as Record<string, unknown>;
 
     const statusPassed = (v: unknown): boolean => {
+      if (typeof v === 'string') return v.toLowerCase() === 'passed';
       if (!v || typeof v !== 'object') return false;
       const o = v as Record<string, unknown>;
       const s = (o.status ?? o.result ?? '');
@@ -165,11 +166,7 @@ export async function requestStandardsCheck(
       return filtered.length > 0 ? filtered : undefined;
     };
 
-    const structureCheck = (obj.structureCheck ?? {}) as Record<string, unknown>;
-    const structureFound = (key: string): boolean =>
-      String(structureCheck[key] ?? '').toLowerCase() === 'found';
-
-    const wordCountObj = obj.wordCount as Record<string, unknown> | undefined;
+    const wordCountObj = obj.word_count as Record<string, unknown> | undefined;
 
     const result: StandardsResult = {
       // Not returned by service — omit from failing checks by defaulting to true
@@ -177,22 +174,22 @@ export async function requestStandardsCheck(
       DataSpecific: { result: true },
 
       TargetWordCountMet: {
-        result: statusPassed(obj.wordCount),
+        result: statusPassed(obj.word_count),
         wordCount: typeof wordCountObj?.wordCount === 'number' ? wordCountObj.wordCount : undefined,
       },
 
       TerminologyCorrect: { result: statusPassed(obj.terminology) },
-      Formatting:         { result: statusPassed(obj.hasDoubleNewLines) },
+      Formatting:         { result: statusPassed(obj.HasDoubleNewlineslines) },
 
-      JargonFree:    { result: statusPassed(obj.jargonCheck),  instances: instances(obj.jargonCheck) },
-      ToneBalanced:  { result: statusPassed(obj.negativity),   instances: instances(obj.negativity) },
+      JargonFree:    { result: statusPassed(obj.jargon),     instances: instances(obj.jargon) },
+      ToneBalanced:  { result: statusPassed(obj.negativity), instances: instances(obj.negativity) },
 
-      CourseOverviewIncluded:      { result: structureFound('CourseOverview') },
-      AcademicPerformanceIncluded: { result: structureFound('AcademicPerformance') },
-      SocialSkillsIncluded:        { result: structureFound('SocialSkills') },
-      CollaborationIncluded:       { result: structureFound('Collaboration') },
-      BehaviourIncluded:           { result: structureFound('Behaviour') },
-      ParentalSupportIncluded:     { result: structureFound('ParentalSupport') },
+      CourseOverviewIncluded:      { result: statusPassed(obj.courseOverview) },
+      AcademicPerformanceIncluded: { result: statusPassed(obj.academicPerformance) },
+      SocialSkillsIncluded:        { result: statusPassed(obj.socialSkills) },
+      CollaborationIncluded:       { result: statusPassed(obj.collaboration) },
+      BehaviourIncluded:           { result: statusPassed(obj.behaviour) },
+      ParentalSupportIncluded:     { result: statusPassed(obj.parentalSupport) },
 
       Status: { result: false }, // derived below
     };
