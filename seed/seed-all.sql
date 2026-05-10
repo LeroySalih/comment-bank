@@ -597,6 +597,47 @@ INSERT INTO "User" (id, username, password, "isActive") VALUES ('e9913bf2396436b
 INSERT INTO "User" (id, username, password, "isActive") VALUES ('158d15e754e983031efe', 't.yafai', '$2b$10$pmrK1C4WWawcCLmRHCzrXeZv3PISyHOl8OZ0Nnqcd8CNCCQB84x5.', true) ON CONFLICT (username) DO NOTHING;
 INSERT INTO "User" (id, username, password, "isActive") VALUES ('fd1e58160c741b9cbf3a', 'y.dasouki', '$2b$10$pmrK1C4WWawcCLmRHCzrXeZv3PISyHOl8OZ0Nnqcd8CNCCQB84x5.', true) ON CONFLICT (username) DO NOTHING;
 
+-- ── Teacher roles ──────────────────────────────────────────
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '7df17fc3ee9767f27492') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '9b6a3472cedfe4f10826') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '1b98a78cee88b43a5024') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'f150e71801bd8410d574') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'f1a15047dcdc49b0d1bf') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'b09ff1ab1d0583aa955e') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '5f95f3434be5648b5d80') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'f3a9ac717be348cb8932') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '513de73970f569aa0344') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'a861497b23a650f9b440') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '7f501fe35061978683a9') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '6298d554d8e14067ff3e') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'e16f16d7233090cb7965') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'c89abddc6d32037da55d') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'dc3ba9a20e9d40aff0b4') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'd03263d74be35d68b7e7') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '20e179146eb6bd982565') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'e3c5fa508ad4fe4f19d6') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '5b9f00952b7726608a95') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'eb100bda8b0d3ecc0c62') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '7127cdaa6d5aac38b1ab') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '2e42bbb99dd33754220a') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '0f2cb4f68319568db9ac') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '6e6ca8c1794636815991') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '0aaeed216fcaa328c260') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '32ee1105401237bff687') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '72b3ecb6bb3ddf696ffc') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '3ab4e5dd7f5007d04f91') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '11a6a61bf1f0c25b9e92') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'ba907005863effc8887e') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '77fe10b9e66e0427adda') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'e5bd8960caeadda4ba86') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '4dcdd75becac3c5ac374') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '26cbf254ce12996ba47a') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'b4b61e4d64204228f13a') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'fd0e10eec0a7cb76bd4f') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'e9913bf2396436bfd948') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', '158d15e754e983031efe') ON CONFLICT DO NOTHING;
+INSERT INTO "_RoleToUser" ("A", "B") VALUES ('role_teacher_001', 'fd1e58160c741b9cbf3a') ON CONFLICT DO NOTHING;
+
 -- ── Classes ────────────────────────────────────────────────
 INSERT INTO "Class" (id, name, year, "subjectId") VALUES ('528f7d8434d6f3a6f7ad', '10Ar/Ar', '10', 'c8c86430aabc681813e8') ON CONFLICT (name) DO NOTHING;
 INSERT INTO "Class" (id, name, year, "subjectId") VALUES ('5315b384ce058e8ab8a6', '10Bi1/Bi', '10', 'c5603dd1210b371db7ae') ON CONFLICT (name) DO NOTHING;
