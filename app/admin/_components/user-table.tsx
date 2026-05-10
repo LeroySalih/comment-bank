@@ -17,6 +17,11 @@ type Role = {
 
 export function UserTable({ users, availableRoles }: { users: User[]; availableRoles: Role[] }) {
   const [loadingId, setLoadingId] = useState<string | null>(null)
+  const [filterUsername, setFilterUsername] = useState("")
+
+  const filteredUsers = users.filter(u =>
+    u.username.toLowerCase().includes(filterUsername.toLowerCase())
+  )
 
   const handleRoleChange = async (userId: string, roleName: string, isChecked: boolean) => {
     setLoadingId(userId)
@@ -43,6 +48,25 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
   }
 
   return (
+    <div>
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Filter by username…"
+          value={filterUsername}
+          onChange={e => setFilterUsername(e.target.value)}
+          className="flex-1 max-w-xs px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {filterUsername && (
+          <button
+            onClick={() => setFilterUsername("")}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800 border rounded-md"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-3">Showing {filteredUsers.length} of {users.length} users</p>
     <div className="overflow-x-auto">
       <table className="min-w-full divide-y divide-gray-200">
         <thead className="bg-gray-50">
@@ -54,7 +78,7 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
           </tr>
         </thead>
         <tbody className="bg-white divide-y divide-gray-200">
-          {users.map((user) => (
+          {filteredUsers.map((user) => (
             <tr key={user.id} className={!user.isActive ? "bg-gray-50" : ""}>
               <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">
                 {user.username}
@@ -95,6 +119,7 @@ export function UserTable({ users, availableRoles }: { users: User[]; availableR
           ))}
         </tbody>
       </table>
+    </div>
     </div>
   )
 }

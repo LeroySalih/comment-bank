@@ -144,6 +144,9 @@ export function ClassManagement({ subjects }: ClassManagementProps) {
   const [savingTeachers, setSavingTeachers] = useState<string | null>(null)
   const [openDropdown, setOpenDropdown] = useState<string | null>(null)
   const [dropdownPos, setDropdownPos] = useState({ top: 0, left: 0 })
+  const [filterName, setFilterName] = useState("")
+  const [filterSubject, setFilterSubject] = useState("")
+  const [filterTeacher, setFilterTeacher] = useState("")
 
   const fetchClasses = async () => {
     setLoading(true)
@@ -240,6 +243,17 @@ export function ClassManagement({ subjects }: ClassManagementProps) {
     }
   }
 
+  const filteredClasses = classes.filter(cls => {
+    const nameMatch = cls.name.toLowerCase().includes(filterName.toLowerCase())
+    const subjectMatch =
+      cls.Subject.code.toLowerCase().includes(filterSubject.toLowerCase()) ||
+      (cls.Subject.title ?? "").toLowerCase().includes(filterSubject.toLowerCase())
+    const teacherMatch = cls.User.some(t =>
+      t.username.toLowerCase().includes(filterTeacher.toLowerCase())
+    )
+    return nameMatch && subjectMatch && (filterTeacher === "" || teacherMatch)
+  })
+
   return (
     <div className="space-y-6">
       <div className="bg-white shadow rounded-lg p-6">
@@ -319,6 +333,42 @@ export function ClassManagement({ subjects }: ClassManagementProps) {
           </form>
         )}
 
+        {/* Filter bar */}
+        <div className="flex flex-wrap gap-3 mb-4">
+          <input
+            type="text"
+            placeholder="Filter by class name…"
+            value={filterName}
+            onChange={e => setFilterName(e.target.value)}
+            className="flex-1 min-w-[160px] px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="text"
+            placeholder="Filter by subject…"
+            value={filterSubject}
+            onChange={e => setFilterSubject(e.target.value)}
+            className="flex-1 min-w-[160px] px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          <input
+            type="text"
+            placeholder="Filter by teacher…"
+            value={filterTeacher}
+            onChange={e => setFilterTeacher(e.target.value)}
+            className="flex-1 min-w-[160px] px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+          />
+          {(filterName || filterSubject || filterTeacher) && (
+            <button
+              onClick={() => { setFilterName(""); setFilterSubject(""); setFilterTeacher("") }}
+              className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800 border rounded-md"
+            >
+              Clear
+            </button>
+          )}
+        </div>
+        <p className="text-xs text-gray-400 mb-3">
+          Showing {filteredClasses.length} of {classes.length} classes
+        </p>
+
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200">
             <thead className="bg-gray-50">
@@ -336,12 +386,14 @@ export function ClassManagement({ subjects }: ClassManagementProps) {
                 <tr>
                   <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">Loading...</td>
                 </tr>
-              ) : classes.length === 0 ? (
+              ) : filteredClasses.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">No classes found</td>
+                  <td colSpan={6} className="px-6 py-4 text-center text-sm text-gray-500">
+                    {classes.length === 0 ? "No classes found" : "No classes match the current filters"}
+                  </td>
                 </tr>
               ) : (
-                classes.map((cls) => (
+                filteredClasses.map((cls) => (
                   <tr key={cls.id}>
                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900">{cls.name}</td>
                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">{cls.year || "-"}</td>

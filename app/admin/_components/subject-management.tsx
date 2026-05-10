@@ -1,5 +1,6 @@
 "use client"
 
+import { useState } from "react"
 import { SubjectForm } from "./subjects/subject-form"
 import { EditSubjectForm } from "./subjects/edit-subject-form"
 import { SubjectUserAssignment } from "./subjects/subject-user-assignment"
@@ -11,11 +12,37 @@ interface SubjectManagementProps {
 }
 
 export function SubjectManagement({ subjects, users }: SubjectManagementProps) {
+  const [filter, setFilter] = useState("")
+
+  const filteredSubjects = subjects.filter(s =>
+    s.code.toLowerCase().includes(filter.toLowerCase()) ||
+    (s.title ?? "").toLowerCase().includes(filter.toLowerCase())
+  )
+
   return (
     <div>
       <div className="mb-8">
         <SubjectForm />
       </div>
+
+      <div className="flex gap-3 mb-4">
+        <input
+          type="text"
+          placeholder="Filter by code or title…"
+          value={filter}
+          onChange={e => setFilter(e.target.value)}
+          className="flex-1 max-w-xs px-3 py-2 border rounded-md text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+        />
+        {filter && (
+          <button
+            onClick={() => setFilter("")}
+            className="px-3 py-2 text-sm text-gray-500 hover:text-gray-800 border rounded-md"
+          >
+            Clear
+          </button>
+        )}
+      </div>
+      <p className="text-xs text-gray-400 mb-3">Showing {filteredSubjects.length} of {subjects.length} subjects</p>
 
       <div className="overflow-x-auto">
         <table className="w-full text-sm">
@@ -30,7 +57,7 @@ export function SubjectManagement({ subjects, users }: SubjectManagementProps) {
             </tr>
           </thead>
           <tbody>
-            {subjects.map((subject: any) => (
+            {filteredSubjects.map((subject: any) => (
               <tr key={subject.id} className="border-b border-gray-100 dark:border-gray-800 hover:bg-gray-50 dark:hover:bg-gray-800/50 transition-colors">
                 <td className="px-4 py-3">
                   <Link href={`/hod/subject/${subject.id}`} className="font-semibold text-indigo-600 dark:text-indigo-400 hover:underline">
@@ -64,9 +91,11 @@ export function SubjectManagement({ subjects, users }: SubjectManagementProps) {
           </tbody>
         </table>
 
-        {subjects.length === 0 && (
+        {filteredSubjects.length === 0 && (
           <div className="text-center py-10 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-200 dark:border-gray-700 mt-4">
-            <p className="text-gray-500">No subjects found. Create one to get started.</p>
+            <p className="text-gray-500">
+              {subjects.length === 0 ? "No subjects found. Create one to get started." : "No subjects match the current filter."}
+            </p>
           </div>
         )}
       </div>
