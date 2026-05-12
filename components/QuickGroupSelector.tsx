@@ -56,19 +56,9 @@ export default function QuickGroupSelector({
     setLoading(false);
   };
 
-  const order = ['H', 'M', 'L'];
-  const sortedOptions = [...options].sort((a,b) => {
-    const indexA = order.indexOf(a.code);
-    const indexB = order.indexOf(b.code);
-    if (indexA !== -1 && indexB !== -1) return indexA - indexB;
-    if (indexA !== -1) return -1;
-    if (indexB !== -1) return 1;
-    return a.code.localeCompare(b.code);
-  });
-
   return (
     <div className={`flex rounded-lg overflow-hidden border border-[#dbe0e6] dark:border-[#3a4454] w-fit bg-gray-50 dark:bg-[#101822] divide-x divide-[#dbe0e6] dark:divide-[#3a4454] ${disabled ? 'opacity-50' : ''}`}>
-      {sortedOptions.map((opt) => {
+      {options.map((opt) => {
         const isActive = val === opt.code;
 
         let tooltipContent = opt.text;
