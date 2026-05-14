@@ -81,16 +81,11 @@ export default function CopyCommentButton({ assignment, subject, groups, commonG
     return assignment.PupilCode?.some(c => c.groupId === g.id && c.code);
   });
 
-  // Check if all CCGs have a selected code
-  const ccgComplete = !commonGroups || commonGroups.length === 0 || commonGroups.every(g => {
-    if (g.isLinked && g.linkedField) {
-      const code = (assignment.linkedData as Record<string, string> | null)?.[g.linkedField];
-      return code && g.CommonCommentOption.some(o => o.code === code);
-    }
-    return commonPupilCodes?.some(c => c.commonGroupId === g.id && c.code);
-  });
+  // CCG groups are optional — only require at least one CCG selection when
+  // there are no subject-specific groups (otherwise the generated comment is empty)
+  const hasAnyCcgSelection = commonPupilCodes?.some(c => !!c.code) ?? false;
 
-  const isComplete = subjectComplete && ccgComplete;
+  const isComplete = groups.length > 0 ? subjectComplete : hasAnyCcgSelection;
 
   // Check if comment needs review or is rejected
   const isPendingReview = assignment.checkStatus === 'required_check' || assignment.checkStatus === 'checked_rejected';
