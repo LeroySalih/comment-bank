@@ -38,11 +38,6 @@ const RULES: Rule[] = [
     description: 'Ensure that the comment includes an overview of the units taken by the pupil this year.',
   },
   {
-    key: 'AcademicPerformanceIncluded',
-    label: 'Academic Performance Included',
-    description: 'Ensure that the comment includes the academic performance of the pupil.',
-  },
-  {
     key: 'TargetWordCountMet',
     label: 'Target Word Count Met',
     description: 'Ensure that the number of words of the comment is between 250 and 280.',

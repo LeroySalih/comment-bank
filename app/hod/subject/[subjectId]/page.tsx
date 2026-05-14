@@ -156,6 +156,7 @@ export default async function SubjectPage({ params }: Props) {
           subjectId={subject.id}
           initialFormat={subject.commentFormat}
           groups={subject.CommentGroup}
+          subjectTitle={subject.title ?? subject.code}
         />
       </div>
     </main>

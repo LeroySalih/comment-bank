@@ -99,7 +99,6 @@ export async function requestSpagCheck(
 const STANDARDS_RULE_KEYS = [
   'UKSpelling',
   'CourseOverviewIncluded',
-  'AcademicPerformanceIncluded',
   'TargetWordCountMet',
   'TerminologyCorrect',
   'JargonFree',
@@ -166,7 +165,7 @@ export async function requestStandardsCheck(
       return filtered.length > 0 ? filtered : undefined;
     };
 
-    const wordCountObj = obj.word_count as Record<string, unknown> | undefined;
+    const wordCountObj = obj.wordCount as Record<string, unknown> | undefined;
 
     const result: StandardsResult = {
       // Not returned by service — omit from failing checks by defaulting to true
@@ -174,18 +173,17 @@ export async function requestStandardsCheck(
       DataSpecific: { result: true },
 
       TargetWordCountMet: {
-        result: statusPassed(obj.word_count),
+        result: statusPassed(obj.wordCount),
         wordCount: typeof wordCountObj?.wordCount === 'number' ? wordCountObj.wordCount : undefined,
       },
 
       TerminologyCorrect: { result: statusPassed(obj.terminology) },
-      Formatting:         { result: statusPassed(obj.HasDoubleNewlineslines) },
+      Formatting:         { result: statusPassed(obj.hasDoubleNewlines) },
 
       JargonFree:    { result: statusPassed(obj.jargon),     instances: instances(obj.jargon) },
       ToneBalanced:  { result: statusPassed(obj.negativity), instances: instances(obj.negativity) },
 
       CourseOverviewIncluded:      { result: statusPassed(obj.courseOverview) },
-      AcademicPerformanceIncluded: { result: statusPassed(obj.academicPerformance) },
       SocialSkillsIncluded:        { result: statusPassed(obj.socialSkills) },
       CollaborationIncluded:       { result: statusPassed(obj.collaboration) },
       BehaviourIncluded:           { result: statusPassed(obj.behaviour) },

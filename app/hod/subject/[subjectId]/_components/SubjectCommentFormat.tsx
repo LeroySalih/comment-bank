@@ -1,10 +1,10 @@
 "use client"
 
-import { useState, useMemo } from "react"
+import { useState, useEffect } from "react"
 import { updateSubjectCommentFormat } from "@/lib/server-actions/hod"
 import { useRouter } from "next/navigation"
 
-const SAMPLE_DATA: Record<string, string> = {
+const SAMPLE_DATA_BASE: Record<string, string> = {
   '<Name>': 'James',
   '<He>': 'He',
   '<he>': 'he',
@@ -18,7 +18,6 @@ const SAMPLE_DATA: Record<string, string> = {
   '<Year>': '7',
   '<EoYLevel>': 'B2',
   '<TargetLevel>': 'A1',
-  '<Subject>': 'Computer Science',
 }
 
 function pickRandom<T>(arr: T[]): T | undefined {
@@ -44,9 +43,10 @@ interface Props {
   subjectId: string
   initialFormat: string | null
   groups: CommentGroup[]
+  subjectTitle: string
 }
 
-export function SubjectCommentFormat({ subjectId, initialFormat, groups }: Props) {
+export function SubjectCommentFormat({ subjectId, initialFormat, groups, subjectTitle }: Props) {
   const [format, setFormat] = useState(initialFormat || "")
   const [saving, setSaving] = useState(false)
   const [saved, setSaved] = useState(false)
@@ -73,14 +73,21 @@ export function SubjectCommentFormat({ subjectId, initialFormat, groups }: Props
 
   const groupNames = groups.map(g => g.name)
 
-  // Build preview: replace <GroupName> tags with random option text, then resolve variables
-  // eslint-disable-next-line react-hooks/exhaustive-deps
-  const previewSegments = useMemo(() => {
-    if (!format) return []
+  const [previewSegments, setPreviewSegments] = useState<{ text: string; unresolved: boolean }[]>([])
+
+  // Build preview client-side only — pickRandom uses Math.random() which causes
+  // SSR/client hydration mismatches if run during server render.
+  useEffect(() => {
+    if (!format) {
+      setPreviewSegments([])
+      return
+    }
+
+    const sampleData = { ...SAMPLE_DATA_BASE, '<Subject>': subjectTitle }
 
     const resolveVars = (text: string): string => {
       let r = text
-      for (const [tag, value] of Object.entries(SAMPLE_DATA)) {
+      for (const [tag, value] of Object.entries(sampleData)) {
         r = r.replaceAll(tag, value)
       }
       return r
@@ -114,8 +121,8 @@ export function SubjectCommentFormat({ subjectId, initialFormat, groups }: Props
       segments.push({ text: result.slice(lastIndex), unresolved: false })
     }
 
-    return segments
-  }, [format, groups, seed])
+    setPreviewSegments(segments)
+  }, [format, groups, seed, subjectTitle])
 
   return (
     <div className="bg-white dark:bg-gray-900 rounded-xl border border-[#f0f2f4] dark:border-gray-800 shadow-sm p-6">

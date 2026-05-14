@@ -57,15 +57,22 @@ export async function callSpagWebhook(
 
 // ── Standards ─────────────────────────────────────────────────────────────────
 
-const STANDARDS_RULE_KEYS: StandardsRuleKey[] = [
-  'UKSpelling', 'CourseOverviewIncluded', 'AcademicPerformanceIncluded',
-  'TargetWordCountMet', 'TerminologyCorrect', 'JargonFree', 'DataSpecific',
-  'ToneBalanced', 'SocialSkillsIncluded', 'CollaborationIncluded',
-  'BehaviourIncluded', 'ParentalSupportIncluded', 'Formatting',
-];
-
 /**
  * Calls the Standards webhook and returns pass/fail with failed rule names and per-rule instances.
+ *
+ * Service response key → StandardsRuleKey mapping:
+ *   word_count          → TargetWordCountMet    {status, wordCount}
+ *   terminology         → TerminologyCorrect    {status}
+ *   HasDoubleNewlineslines → Formatting         {status}
+ *   jargon              → JargonFree            {result, instances}
+ *   negativity          → ToneBalanced          {result, instances}
+ *   courseOverview      → CourseOverviewIncluded        plain string
+ *   socialSkills        → SocialSkillsIncluded          plain string
+ *   collaboration       → CollaborationIncluded         plain string
+ *   behaviour           → BehaviourIncluded             plain string
+ *   parentalSupport     → ParentalSupportIncluded       plain string
+ *
+ * UKSpelling and DataSpecific are not returned by the service and are excluded.
  */
 export async function callStandardsWebhook(
   text: string
@@ -84,35 +91,59 @@ export async function callStandardsWebhook(
     throw new Error(`Standards service returned ${response.status}`);
   }
 
+  const bodyText = await response.text();
+  console.log('[standards-webhook] Raw response body:', bodyText);
+
   let raw: unknown;
   try {
-    raw = await response.json();
+    raw = JSON.parse(bodyText);
   } catch {
-    throw new Error(`Standards service returned non-JSON body (status ${response.status})`);
+    console.error('[standards-webhook] Non-JSON response body:', bodyText);
+    throw new Error(`Standards service returned non-JSON body (status ${response.status}): ${bodyText.slice(0, 300)}`);
   }
-  const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
-  const data = ((unwrapped as Record<string, unknown>)?.output ?? unwrapped) as Record<string, unknown>;
 
-  const toBool = (v: unknown): boolean => {
-    if (typeof v === 'boolean') return v;
-    if (typeof v === 'string') return v.toLowerCase() === 'true' || v.toLowerCase() === 'passed';
-    if (v && typeof v === 'object') return toBool((v as Record<string, unknown>).result);
-    return false;
+  const unwrapped = Array.isArray(raw) ? (raw as unknown[])[0] : raw;
+  const d = (unwrapped ?? {}) as Record<string, unknown>;
+
+  // Resolves plain strings, {status:...} and {result:...} objects to boolean
+  const passed = (v: unknown): boolean => {
+    if (typeof v === 'string') return v.toLowerCase() === 'passed';
+    if (!v || typeof v !== 'object') return false;
+    const o = v as Record<string, unknown>;
+    const s = o.status ?? o.result ?? '';
+    return typeof s === 'boolean' ? s : String(s).toLowerCase() === 'passed';
   };
+
+  const getInstances = (v: unknown): string[] | undefined => {
+    if (!v || typeof v !== 'object') return undefined;
+    const arr = (v as Record<string, unknown>).instances;
+    if (!Array.isArray(arr)) return undefined;
+    const filtered = (arr as unknown[]).filter((x): x is string => typeof x === 'string' && x.length > 0);
+    return filtered.length > 0 ? filtered : undefined;
+  };
+
+  // Explicit mapping from service keys to rule results
+  const checks: [StandardsRuleKey, boolean, string[] | undefined][] = [
+    ['TargetWordCountMet',        passed(d.wordCount),            undefined],
+    ['TerminologyCorrect',        passed(d.terminology),          undefined],
+    ['Formatting',                passed(d.hasDoubleNewlines),    undefined],
+    ['JargonFree',                passed(d.jargon),               getInstances(d.jargon)],
+    ['ToneBalanced',              passed(d.negativity),           getInstances(d.negativity)],
+    ['CourseOverviewIncluded',    passed(d.courseOverview),       undefined],
+    ['SocialSkillsIncluded',      passed(d.socialSkills),         undefined],
+    ['CollaborationIncluded',     passed(d.collaboration),        undefined],
+    ['BehaviourIncluded',         passed(d.behaviour),            undefined],
+    ['ParentalSupportIncluded',   passed(d.parentalSupport),      undefined],
+  ];
 
   const failures: StandardsRuleKey[] = [];
   const failureDetails: Partial<Record<StandardsRuleKey, { instances: string[] }>> = {};
 
-  for (const key of STANDARDS_RULE_KEYS) {
-    const entry = data?.[key];
-    if (!toBool(entry)) {
+  for (const [key, ok, instances] of checks) {
+    if (!ok) {
       failures.push(key);
-      // Capture instances from the raw rule entry if available
-      if (entry && typeof entry === 'object') {
-        const raw = entry as Record<string, unknown>;
-        if (Array.isArray(raw.instances) && raw.instances.length > 0) {
-          failureDetails[key] = { instances: raw.instances as string[] };
-        }
+      if (instances && instances.length > 0) {
+        failureDetails[key] = { instances };
       }
     }
   }

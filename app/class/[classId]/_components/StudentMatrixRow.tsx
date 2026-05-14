@@ -72,6 +72,7 @@ interface StudentMatrixRowProps {
   classYear?: string | null;
   commonGroupsBefore?: CommonCommentGroup[];
   commonGroupsAfter?: CommonCommentGroup[];
+  allCommonGroups?: CommonCommentGroup[];
   formatTemplate?: string;
   subjectFormat?: string | null;
 }
@@ -97,7 +98,7 @@ function LinkedCodeBadge({ code, hasMatch }: { code: string | null; hasMatch: bo
   );
 }
 
-export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroupsBefore, commonGroupsAfter, formatTemplate, subjectFormat }: StudentMatrixRowProps) {
+export default function StudentMatrixRow({ assignment, groups, subject, classYear, commonGroupsBefore, commonGroupsAfter, allCommonGroups, formatTemplate, subjectFormat }: StudentMatrixRowProps) {
   const router = useRouter();
 
   // Track subject-specific selections locally
@@ -216,6 +217,24 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
           )}
         </div>
       </td>
+      <td className="sticky left-[460px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-blue-50 dark:group-hover:bg-[#1d2838] border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+        {assignment.eoyLevel ? (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-indigo-50 text-indigo-700 dark:bg-indigo-900/30 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+            {assignment.eoyLevel}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 italic">—</span>
+        )}
+      </td>
+      <td className="sticky left-[560px] z-20 px-6 py-4 whitespace-nowrap bg-white dark:bg-[#1a222c] group-hover:bg-blue-50 dark:group-hover:bg-[#1d2838] border-b border-gray-100 dark:border-gray-800 shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+        {assignment.targetLevel ? (
+          <span className="inline-flex items-center px-2.5 py-1 rounded-md text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+            {assignment.targetLevel}
+          </span>
+        ) : (
+          <span className="text-xs text-gray-400 italic">—</span>
+        )}
+      </td>
 
       {/* CCG columns before SCG */}
       {(commonGroupsBefore || []).map((g) => {
@@ -295,7 +314,7 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
             assignment={currentAssignment}
             subject={subject}
             groups={groups}
-            commonGroups={[...(commonGroupsBefore || []), ...(commonGroupsAfter || [])]}
+            commonGroups={allCommonGroups || [...(commonGroupsBefore || []), ...(commonGroupsAfter || [])]}
             commonPupilCodes={currentCommonPupilCodes}
             formatTemplate={formatTemplate}
             subjectFormat={subjectFormat}

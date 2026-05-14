@@ -456,6 +456,7 @@ export function CcgManagement({ initialGroups }: Props) {
                     <div
                       ref={provided.innerRef}
                       {...provided.draggableProps}
+                      {...provided.dragHandleProps}
                       className="bg-white dark:bg-gray-900 rounded-lg border border-[#f0f2f4] dark:border-gray-700 overflow-hidden"
                     >
                       {editingGroup === group.id ? (
@@ -465,7 +466,7 @@ export function CcgManagement({ initialGroups }: Props) {
                       ) : (
                         <>
                           <div className="flex items-center gap-2 p-3 bg-gray-50 dark:bg-gray-800/50">
-                            <div {...provided.dragHandleProps} className="text-[#617289] dark:text-gray-500 hover:text-primary cursor-grab active:cursor-grabbing">
+                            <div className="text-[#617289] dark:text-gray-500 hover:text-primary cursor-grab active:cursor-grabbing">
                               <GripVertical size={20} />
                             </div>
                             <button onClick={() => toggleGroup(group.id)} className="text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">

@@ -10,6 +10,22 @@ import {
   renderToBuffer,
 } from '@react-pdf/renderer';
 import type { AuditPdfData } from './types';
+import type { StandardsRuleKey } from '@/lib/types/ai-check';
+
+// ── All standards rules in display order ─────────────────────────────────────
+
+const ALL_RULES: { key: StandardsRuleKey; label: string }[] = [
+  { key: 'TargetWordCountMet',          label: 'Word Count' },
+  { key: 'Formatting',                  label: 'Formatting' },
+  { key: 'TerminologyCorrect',          label: 'Terminology' },
+  { key: 'JargonFree',                  label: 'Jargon Free' },
+  { key: 'ToneBalanced',                label: 'Tone Balanced' },
+  { key: 'CourseOverviewIncluded',      label: 'Course Overview' },
+  { key: 'SocialSkillsIncluded',        label: 'Social Skills' },
+  { key: 'CollaborationIncluded',       label: 'Collaboration' },
+  { key: 'BehaviourIncluded',           label: 'Behaviour' },
+  { key: 'ParentalSupportIncluded',     label: 'Parental Support' },
+];
 
 // ── Styles ────────────────────────────────────────────────────────────────────
 
@@ -50,9 +66,9 @@ const styles = StyleSheet.create({
   statBlock: {
     flexDirection: 'column',
   },
-  statValue: { ...STAT_VALUE_BASE, color: 'white' },
+  statValue:      { ...STAT_VALUE_BASE, color: 'white' },
   statValueGreen: { ...STAT_VALUE_BASE, color: '#86efac' },
-  statValueRed: { ...STAT_VALUE_BASE, color: '#fca5a5' },
+  statValueRed:   { ...STAT_VALUE_BASE, color: '#fca5a5' },
   statLabel: {
     fontSize: 8,
     color: '#9ab3c8',
@@ -78,7 +94,7 @@ const styles = StyleSheet.create({
     borderLeftColor: '#1e3a5f',
     paddingLeft: 8,
     marginBottom: 4,
-    marginTop: 8,
+    marginTop: 10,
   },
   commentRow: {
     flexDirection: 'row',
@@ -89,23 +105,24 @@ const styles = StyleSheet.create({
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: '#2563eb',
-    width: 28,
+    width: 36,
   },
   commentCodeFail: {
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
     color: '#dc2626',
-    width: 28,
+    width: 36,
   },
   commentText: {
     fontSize: 9,
     color: '#374151',
     flex: 1,
+    lineHeight: 1.5,
   },
   spagError: {
     fontSize: 8,
     color: '#dc2626',
-    paddingLeft: 40,
+    paddingLeft: 48,
     marginBottom: 2,
   },
   untestedNote: {
@@ -116,12 +133,18 @@ const styles = StyleSheet.create({
     padding: 8,
     marginTop: 8,
   },
+
   // ── Per-report page styles ──────────────────────────────────────────────────
   reportPageHeader: {
-    backgroundColor: '#1e3a5f',
     paddingVertical: 14,
     paddingHorizontal: 32,
-    marginBottom: 20,
+    marginBottom: 16,
+  },
+  reportPageHeaderPassed: {
+    backgroundColor: '#14532d',
+  },
+  reportPageHeaderFailed: {
+    backgroundColor: '#7f1d1d',
   },
   reportPageHeaderLabel: {
     fontSize: 8,
@@ -150,45 +173,69 @@ const styles = StyleSheet.create({
     marginBottom: 6,
   },
   reportText: {
-    fontSize: 10,
+    fontSize: 9,
     color: '#111827',
     lineHeight: 1.6,
     borderLeftWidth: 3,
     borderLeftColor: '#d1d5db',
     paddingLeft: 12,
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  failedRulesLabel: {
+  rulesLabel: {
     fontSize: 8,
     fontFamily: 'Helvetica-Bold',
-    color: '#991b1b',
+    color: '#374151',
     textTransform: 'uppercase',
     letterSpacing: 0.5,
-    marginBottom: 8,
+    marginBottom: 6,
   },
-  ruleItem: {
-    marginBottom: 10,
-    borderLeftWidth: 2,
-    borderLeftColor: '#fca5a5',
-    paddingLeft: 10,
+  rulesGrid: {
+    flexDirection: 'column',
+    gap: 4,
+  },
+  ruleRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    paddingVertical: 5,
+    paddingHorizontal: 8,
+    borderRadius: 4,
+  },
+  ruleRowPassed: {
+    backgroundColor: '#f0fdf4',
+  },
+  ruleRowFailed: {
+    backgroundColor: '#fef2f2',
+  },
+  ruleStatus: {
+    fontSize: 9,
+    fontFamily: 'Helvetica-Bold',
+    width: 18,
+  },
+  ruleStatusPassed: {
+    color: '#16a34a',
+  },
+  ruleStatusFailed: {
+    color: '#dc2626',
   },
   ruleName: {
     fontSize: 9,
     fontFamily: 'Helvetica-Bold',
-    color: '#dc2626',
-    marginBottom: 3,
+    width: 130,
   },
-  ruleInstance: {
+  ruleNamePassed: {
+    color: '#166534',
+  },
+  ruleNameFailed: {
+    color: '#991b1b',
+  },
+  ruleFeedback: {
     fontSize: 8,
     color: '#6b7280',
-    marginBottom: 1,
-    paddingLeft: 8,
+    flex: 1,
+    lineHeight: 1.4,
   },
-  ruleNoInstances: {
-    fontSize: 8,
-    color: '#9ca3af',
-    fontStyle: 'italic',
-    paddingLeft: 8,
+  ruleFeedbackFailed: {
+    color: '#b91c1c',
   },
 });
 
@@ -213,11 +260,10 @@ function buildAuditDocument(data: AuditPdfData) {
     day: 'numeric', month: 'long', year: 'numeric',
   });
 
-  // ── Page 1: Summary + Section 1 ────────────────────────────────────────────
+  // ── Page 1: Summary + Section 1 — All Comments ─────────────────────────────
   const mainPage = React.createElement(
     Page,
     { size: 'A4', style: styles.page },
-    // Header
     React.createElement(
       View,
       { style: styles.header },
@@ -232,30 +278,32 @@ function buildAuditDocument(data: AuditPdfData) {
         { style: styles.headerStats },
         React.createElement(View, { style: styles.statBlock },
           React.createElement(Text, { style: styles.statValue }, String(data.totalReports)),
-          React.createElement(Text, { style: styles.statLabel }, 'Reports')
+          React.createElement(Text, { style: styles.statLabel }, 'Sample Reports')
         ),
         React.createElement(View, { style: styles.statBlock },
-          React.createElement(Text, { style: styles.statValueGreen }, `${passRate}%`),
-          React.createElement(Text, { style: styles.statLabel }, 'Passed')
+          React.createElement(Text, {
+            style: data.passedReports === data.totalReports ? styles.statValueGreen : styles.statValueRed,
+          }, `${passRate}%`),
+          React.createElement(Text, { style: styles.statLabel }, 'Standards Passed')
         ),
         React.createElement(View, { style: styles.statBlock },
-          React.createElement(Text, { style: styles.statValueRed }, String(spagFailures.length)),
+          React.createElement(Text, {
+            style: spagFailures.length === 0 ? styles.statValueGreen : styles.statValueRed,
+          }, String(spagFailures.length)),
           React.createElement(Text, { style: styles.statLabel }, 'SPAG Failures')
         ),
         React.createElement(View, { style: styles.statBlock },
           React.createElement(Text, {
             style: data.untestedItems.length > 0 ? styles.statValueRed : styles.statValueGreen,
           }, String(data.untestedItems.length)),
-          React.createElement(Text, { style: styles.statLabel }, 'Untested')
+          React.createElement(Text, { style: styles.statLabel }, 'Untested Codes')
         )
       )
     ),
-    // Body
     React.createElement(
       View,
       { style: styles.body },
-      // Section 1 — Comments Audited
-      React.createElement(Text, { style: styles.sectionLabel }, 'Section 1 — Comments Audited'),
+      React.createElement(Text, { style: styles.sectionLabel }, 'Section 1 — All Comments'),
       ...[...groupedEntries.entries()].map(([groupName, entries]) =>
         React.createElement(
           View,
@@ -275,86 +323,86 @@ function buildAuditDocument(data: AuditPdfData) {
               ),
               ...entry.errors.map((err, i) =>
                 React.createElement(Text, { key: i, style: styles.spagError },
-                  `  ⚠ "${err.word}": ${err.message}`
+                  `⚠ "${err.word}": ${err.message}`
                 )
               )
             )
           )
         )
       ),
-
-      // Note about Section 2
-      data.standardsFailures.length > 0
-        ? React.createElement(Text, {
-            style: { ...styles.sectionLabel, marginTop: 24, color: '#dc2626' },
-          },
-            `Section 2 — ${data.standardsFailures.length} Failed Standards Report${data.standardsFailures.length > 1 ? 's' : ''} (see following pages)`
-          )
-        : React.createElement(Text, { style: { ...styles.sectionLabel, color: '#16a34a', marginTop: 24 } },
-            '✓ All standards reports passed'
-          ),
-
-      // Untested warning
       data.untestedItems.length > 0
         ? React.createElement(Text, { style: styles.untestedNote },
-            `⚠ ${data.untestedItems.length} comment code(s) were not included in any of the ${data.totalReports} sample reports: ` +
+            `⚠ ${data.untestedItems.length} code(s) not included in any sample report: ` +
             data.untestedItems.map(u => `${u.code} (${u.groupName})`).join(', ')
           )
         : null
     )
   );
 
-  // ── One page per failed standards report ────────────────────────────────────
-  const reportPages = data.standardsFailures.map(failure =>
-    React.createElement(
+  // ── One page per sample report — Section 2 ─────────────────────────────────
+  const reportPages = data.standardsReports.map(report => {
+    const headerStyle = {
+      ...styles.reportPageHeader,
+      ...(report.passed ? styles.reportPageHeaderPassed : styles.reportPageHeaderFailed),
+    };
+
+    return React.createElement(
       Page,
-      { key: failure.reportIndex, size: 'A4', style: styles.page },
-      // Mini header
+      { key: report.reportIndex, size: 'A4', style: styles.page },
+      // Header
       React.createElement(
         View,
-        { style: styles.reportPageHeader },
+        { style: headerStyle },
         React.createElement(Text, { style: styles.reportPageHeaderLabel },
-          `Section 2 — Failed Standards Report`
+          `Section 2 — Sample Report ${report.reportIndex + 1} of ${data.totalReports} · ${report.label}`
         ),
         React.createElement(Text, { style: styles.reportPageHeaderTitle },
-          `Report #${failure.reportIndex + 1}`
+          report.passed ? `✓ ${report.label} — All Standards Passed` : `✗ ${report.label} — Standards Failures`
         ),
         React.createElement(Text, { style: styles.reportPageHeaderCodes },
-          `Comment codes: ${Object.values(failure.codes).join(', ')}`
+          `Codes: ${Object.entries(report.codes).map(([title, code]) => `${title}: ${code}`).join('  |  ')}`
         )
       ),
-      // Report body
+      // Body
       React.createElement(
         View,
         { style: styles.reportBody },
-        // Full assembled text
-        React.createElement(Text, { style: styles.reportTextLabel }, 'Assembled Report'),
-        React.createElement(Text, { style: styles.reportText }, failure.assembledText),
-        // Failed rules
-        React.createElement(Text, { style: styles.failedRulesLabel },
-          `Failed Rules (${failure.failures.length})`
-        ),
-        ...failure.failures.map(rule => {
-          const detail = failure.failureDetails[rule];
-          const instances = detail?.instances ?? [];
-          return React.createElement(
-            View,
-            { key: rule, style: styles.ruleItem },
-            React.createElement(Text, { style: styles.ruleName }, `✗ ${rule}`),
-            instances.length > 0
-              ? instances.map((inst, i) =>
-                  React.createElement(Text, { key: i, style: styles.ruleInstance },
-                    `• ${inst}`
-                  )
-                )
-              : React.createElement(Text, { style: styles.ruleNoInstances },
-                  'No additional detail available'
-                )
-          );
-        })
+        // Assembled text
+        React.createElement(Text, { style: styles.reportTextLabel }, 'Assembled Comment'),
+        React.createElement(Text, { style: styles.reportText }, report.assembledText),
+        // Standards rules — all of them
+        React.createElement(Text, { style: styles.rulesLabel }, 'Standards Audit Results'),
+        React.createElement(
+          View,
+          { style: styles.rulesGrid },
+          ...ALL_RULES.map(({ key, label }) => {
+            const failed = report.failures.includes(key);
+            const detail = report.failureDetails[key];
+            const instances = detail?.instances ?? [];
+            const feedbackText = failed
+              ? instances.length > 0
+                ? instances.join(' · ')
+                : 'Did not meet this standard'
+              : 'Passed';
+
+            return React.createElement(
+              View,
+              { key, style: { ...styles.ruleRow, ...(failed ? styles.ruleRowFailed : styles.ruleRowPassed) } },
+              React.createElement(Text, {
+                style: { ...styles.ruleStatus, ...(failed ? styles.ruleStatusFailed : styles.ruleStatusPassed) },
+              }, failed ? '✗' : '✓'),
+              React.createElement(Text, {
+                style: { ...styles.ruleName, ...(failed ? styles.ruleNameFailed : styles.ruleNamePassed) },
+              }, label),
+              React.createElement(Text, {
+                style: { ...styles.ruleFeedback, ...(failed ? styles.ruleFeedbackFailed : {}) },
+              }, feedbackText)
+            );
+          })
+        )
       )
-    )
-  );
+    );
+  });
 
   return React.createElement(
     Document,

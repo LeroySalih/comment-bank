@@ -42,7 +42,6 @@ export type SpagResult = {
 export type StandardsRuleKey =
   | 'UKSpelling'
   | 'CourseOverviewIncluded'
-  | 'AcademicPerformanceIncluded'
   | 'TargetWordCountMet'
   | 'TerminologyCorrect'
   | 'JargonFree'

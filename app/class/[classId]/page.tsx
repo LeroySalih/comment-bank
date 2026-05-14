@@ -256,6 +256,12 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                 <th scope="col" className="sticky top-0 left-[320px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[140px] min-w-[140px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
                                     Status
                                 </th>
+                                <th scope="col" className="sticky top-0 left-[460px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[100px] min-w-[100px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+                                    EoY Level
+                                </th>
+                                <th scope="col" className="sticky top-0 left-[560px] z-40 px-6 py-4 text-[#111418] dark:text-white text-xs font-bold uppercase tracking-wider bg-white dark:bg-[#1a222c] border-b border-[#e5e7eb] dark:border-[#2d3748] w-[100px] min-w-[100px] shadow-[1px_0_0_0_rgba(229,231,235,1)] dark:shadow-[1px_0_0_0_rgba(45,55,72,1)]">
+                                    Target
+                                </th>
                                 {/* CCG columns before SCG */}
                                 {commonGroupsBefore.map((g: any) => (
                                     <th key={g.id} scope="col" className="sticky top-0 z-30 px-6 py-4 text-green-700 dark:text-green-400 text-xs font-bold uppercase tracking-wider bg-green-50/50 dark:bg-green-900/10 border-b border-[#e5e7eb] dark:border-[#2d3748] min-w-[200px]">
@@ -295,6 +301,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                     classYear={cls.year}
                                     commonGroupsBefore={commonGroupsBefore}
                                     commonGroupsAfter={commonGroupsAfter}
+                                    allCommonGroups={commonGroups}
                                     formatTemplate={formatTemplate}
                                     subjectFormat={subjectFormat}
                                 />

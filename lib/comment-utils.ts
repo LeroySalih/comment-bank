@@ -1,6 +1,7 @@
 import { parseComment } from '@/lib/utils';
 
-// Define types needed for the generator
+// ─── Shared types ─────────────────────────────────────────────────────────────
+
 type MinimalOption = {
   id: string;
   code: string;
@@ -41,8 +42,8 @@ type MinimalSubject = {
 };
 
 type MinimalClass = {
-    year?: string | null;
-}
+  year?: string | null;
+};
 
 type MinimalCommonGroup = {
   id: string;
@@ -57,14 +58,130 @@ type MinimalCommonPupilCode = {
   code: string | null;
 };
 
+// ─── Core assembly options ────────────────────────────────────────────────────
+
+export interface CommentAssemblyOptions {
+  /** Returns the selected raw option text for a subject group id, or '' */
+  getSubjectText: (groupId: string) => string;
+  /** Returns the selected raw option text for a common group id, or '' */
+  getCommonText: (groupId: string) => string;
+  /** Subject groups — name used for format template matching */
+  subjectGroups: { id: string; name: string }[];
+  /** Common groups — name used for format template matching */
+  commonGroups: { id: string; name: string }[];
+  /** Subject-studied blurb prepended to the SCG block */
+  studiedComment?: string | null;
+  /** Global format template (e.g. "<Academic>\n<SCG>\n<Behaviour>") */
+  formatTemplate?: string;
+  /** Subject-specific SCG ordering (e.g. "<Communication>\n<Make Skills>") */
+  subjectFormat?: string | null;
+}
+
 /**
- * Generates the full comment string for an assignment using the format template system.
+ * Single canonical comment assembly function.
  *
- * The format template uses <GroupName> tags for CCG groups and <SCG> for subject comment groups.
- * For <SCG>, the subject's commentFormat defines the order of groups to include.
- * <Subject> remains a standard variable replaced with the subject title.
- *
- * When no format template is provided, falls back to joining all group texts.
+ * Resolves <GroupName> and <SCG> template tags using the provided getters,
+ * returning the assembled text with pupil variable tags (<Name>, <He>, etc.)
+ * still intact so the caller can substitute them with real or test values.
+ */
+export function assembleRawComment({
+  getSubjectText,
+  getCommonText,
+  subjectGroups,
+  commonGroups,
+  studiedComment,
+  formatTemplate,
+  subjectFormat,
+}: CommentAssemblyOptions): string {
+  // Subject groups whose name matches a CCG name override that CCG slot
+  const ccgNames = new Set(commonGroups.map(g => g.name));
+  const overrideByName = new Map(
+    subjectGroups.filter(g => ccgNames.has(g.name)).map(g => [g.name, g])
+  );
+
+  // Build the SCG block: pure subject groups (not CCG overrides), space-joined
+  const buildScgBlock = (): string => {
+    const parts: string[] = [];
+    if (studiedComment) parts.push(studiedComment);
+
+    const pureScg = subjectGroups.filter(g => !ccgNames.has(g.name));
+    let ordered: { id: string; name: string }[];
+
+    if (subjectFormat) {
+      const tagPattern = /<([^>]+)>/g;
+      ordered = [];
+      let m: RegExpExecArray | null;
+      while ((m = tagPattern.exec(subjectFormat)) !== null) {
+        const g = pureScg.find(sg => sg.name === m![1]);
+        if (g) ordered.push(g);
+      }
+    } else {
+      ordered = pureScg;
+    }
+
+    const groupTexts = ordered.map(g => getSubjectText(g.id)).filter(Boolean);
+    if (groupTexts.length > 0) parts.push(groupTexts.join(' '));
+    return parts.join(' ');
+  };
+
+  if (formatTemplate) {
+    let result = formatTemplate;
+
+    // Replace each <CCGName> tag — subject override wins over CCG option
+    for (const g of commonGroups) {
+      const override = overrideByName.get(g.name);
+      const text = override
+        ? getSubjectText(override.id) || getCommonText(g.id)
+        : getCommonText(g.id);
+      result = result.replaceAll(`<${g.name}>`, text);
+    }
+
+    // Replace <SCG> with the assembled subject block
+    result = result.replaceAll('<SCG>', buildScgBlock());
+
+    // Strip any remaining unresolved custom tags, preserve standard variable tags
+    const standardVars = new Set([
+      'Name', 'He', 'he', 'She', 'she', 'His', 'his',
+      'Her', 'her', 'Him', 'him', 'Subject', 'TargetLevel',
+      'EoYLevel', 'Year', 'SCG',
+      'he/she', 'his/her', 'him/her',
+    ]);
+    result = result.replace(/<([^>]+)>/g, (match, tag) =>
+      standardVars.has(tag) ? match : ''
+    );
+
+    return result
+      .split(/\n+/)
+      .map(p => p.replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .join('\n\n');
+  }
+
+  // No format template: SCG block then remaining CCG groups
+  const subjectGroupNames = new Set(subjectGroups.map(g => g.name));
+  const paragraphs: string[] = [];
+
+  const scgBlock = buildScgBlock();
+  if (scgBlock) paragraphs.push(scgBlock);
+
+  for (const g of commonGroups) {
+    if (subjectGroupNames.has(g.name)) continue; // overridden by subject group
+    const override = overrideByName.get(g.name);
+    const text = override
+      ? getSubjectText(override.id) || getCommonText(g.id)
+      : getCommonText(g.id);
+    if (text) paragraphs.push(text);
+  }
+
+  return paragraphs.join('\n\n');
+}
+
+// ─── Convenience wrapper for real assignment data ─────────────────────────────
+
+/**
+ * Generates the full comment string for an assignment.
+ * Adapts assignment/group data into assembleRawComment, then substitutes
+ * pupil variables via parseComment.
  */
 export function generateComment(
   assignment: MinimalAssignment,
@@ -76,157 +193,49 @@ export function generateComment(
   formatTemplate?: string,
   subjectFormat?: string | null
 ): string {
-    // Helper to get selected option text for a subject-specific group
-    const getOptionTextForGroup = (group: MinimalGroup): string => {
-        if (group.isLinked && group.linkedField) {
-            const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
-            const code = linkedData?.[group.linkedField];
-            if (!code) return "";
-            const option = group.CommentOption?.find(o => o.code === code);
-            return option?.text || "";
-        }
-        const pc = assignment.PupilCode?.find(c => c.groupId === group.id);
-        if (!pc || !pc.code) return "";
-        const option = group.CommentOption?.find(o => o.code === pc.code);
-        return option?.text || "";
-    };
-
-    // Helper to get selected option text for a common group
-    const getCommonOptionText = (group: MinimalCommonGroup): string => {
-        if (group.isLinked && group.linkedField) {
-            const linkedData = assignment.linkedData as Record<string, string> | null | undefined;
-            const code = linkedData?.[group.linkedField];
-            if (!code) return "";
-            const option = group.CommonCommentOption?.find(o => o.code === code);
-            return option?.text || "";
-        }
-        const pc = commonPupilCodes?.find(c => c.commonGroupId === group.id);
-        if (!pc || !pc.code) return "";
-        const option = group.CommonCommentOption?.find(o => o.code === pc.code);
-        return option?.text || "";
-    };
-
-    // Identify subject groups that override a CCG group (name matches a CCG group name)
-    const ccgGroupNames = new Set((commonGroups ?? []).map(g => g.name));
-    const overrideGroupsByName = new Map(
-        groups
-            .filter(g => ccgGroupNames.has(g.name))
-            .map(g => [g.name, g] as [string, MinimalGroup])
-    );
-
-    // Build the subject content
-    const buildSubjectContent = (): string => {
-        const parts: string[] = [];
-        if (subject.studiedComment) {
-            parts.push(subject.studiedComment);
-        }
-
-        // Pure SCG groups only — exclude any group that overrides a CCG variable
-        const pureScgGroups = groups.filter(g => !ccgGroupNames.has(g.name));
-
-        let orderedGroups: MinimalGroup[];
-        if (subjectFormat) {
-            // Use the subject's comment format to order groups
-            const codes = subjectFormat.split(/\s+/).filter(Boolean);
-            orderedGroups = [];
-            for (const code of codes) {
-                const group = pureScgGroups.find(g => g.name === code);
-                if (group) orderedGroups.push(group);
-            }
-        } else {
-            // Default: all groups in display order
-            orderedGroups = pureScgGroups;
-        }
-
-        const groupTexts: string[] = [];
-        for (const group of orderedGroups) {
-            const text = getOptionTextForGroup(group);
-            if (text) groupTexts.push(text);
-        }
-        if (groupTexts.length > 0) parts.push(groupTexts.join(" "));
-        return parts.join(" ");
-    };
-
-    // If we have a format template, use it
-    if (formatTemplate && commonGroups && commonGroups.length > 0) {
-        let result = formatTemplate;
-
-        // Replace each CCG group tag — use subject override if available, fall back to CCG
-        for (const group of commonGroups) {
-            const overrideGroup = overrideGroupsByName.get(group.name);
-            let text: string;
-            if (overrideGroup) {
-                text = getOptionTextForGroup(overrideGroup);
-                if (!text) text = getCommonOptionText(group); // fallback to CCG
-            } else {
-                text = getCommonOptionText(group);
-            }
-            result = result.replaceAll(`<${group.name}>`, text);
-        }
-
-        // Replace <SCG> tag with subject comment group content
-        const subjectContent = buildSubjectContent();
-        result = result.replaceAll('<SCG>', subjectContent);
-
-        // Clean up any unreplaced custom tags (but not standard variable tags)
-        // Only remove tags that are not standard variables
-        const standardVars = ['Name', 'He', 'he', 'She', 'she', 'His', 'his', 'Her', 'her', 'Him', 'him', 'Subject', 'TargetLevel', 'EoYLevel', 'Year', 'SCG'];
-        result = result.replace(/<([^>]+)>/g, (match, tagName) => {
-            if (standardVars.includes(tagName)) return match;
-            return '';
-        });
-        result = result.split(/\n+/).map(p => p.replace(/\s+/g, ' ').trim()).filter(p => p).join('\n\n');
-
-        return parseComment(
-            result,
-            assignment.Pupil.firstName,
-            assignment.Pupil.gender,
-            subject.title || '',
-            cls?.year,
-            assignment.eoyLevel,
-            assignment.targetLevel
-        );
+  const getSubjectText = (groupId: string): string => {
+    const group = groups.find(g => g.id === groupId);
+    if (!group) return '';
+    if (group.isLinked && group.linkedField) {
+      const code = assignment.linkedData?.[group.linkedField];
+      if (!code) return '';
+      return group.CommentOption.find(o => o.code === code)?.text || '';
     }
+    const pc = assignment.PupilCode.find(c => c.groupId === groupId);
+    if (!pc?.code) return '';
+    return group.CommentOption.find(o => o.code === pc.code)?.text || '';
+  };
 
-    // No format template: legacy behavior - just join all groups
-    if (!commonGroups || commonGroups.length === 0) {
-        const subjectContent = buildSubjectContent();
-        return parseComment(
-            subjectContent,
-            assignment.Pupil.firstName,
-            assignment.Pupil.gender,
-            subject.title || '',
-            cls?.year,
-            assignment.eoyLevel,
-            assignment.targetLevel
-        );
+  const getCommonText = (groupId: string): string => {
+    const group = commonGroups?.find(g => g.id === groupId);
+    if (!group) return '';
+    if (group.isLinked && group.linkedField) {
+      const code = assignment.linkedData?.[group.linkedField];
+      if (!code) return '';
+      return group.CommonCommentOption.find(o => o.code === code)?.text || '';
     }
+    const cpc = commonPupilCodes?.find(c => c.commonGroupId === groupId);
+    if (!cpc?.code) return '';
+    return group.CommonCommentOption.find(o => o.code === cpc.code)?.text || '';
+  };
 
-    // Has common groups but no template: join common groups then subject groups
-    const paragraphs: string[] = [];
+  const raw = assembleRawComment({
+    getSubjectText,
+    getCommonText,
+    subjectGroups: groups,
+    commonGroups: commonGroups ?? [],
+    studiedComment: subject.studiedComment,
+    formatTemplate,
+    subjectFormat,
+  });
 
-    const commonTexts = commonGroups.map(g => {
-        const overrideGroup = overrideGroupsByName.get(g.name);
-        if (overrideGroup) {
-            const text = getOptionTextForGroup(overrideGroup);
-            return text || getCommonOptionText(g);
-        }
-        return getCommonOptionText(g);
-    }).filter(Boolean);
-    if (commonTexts.length > 0) paragraphs.push(commonTexts.join(" "));
-
-    const subjectContent = buildSubjectContent();
-    if (subjectContent) paragraphs.push(subjectContent);
-
-    const combined = paragraphs.join("\n\n");
-
-    return parseComment(
-        combined,
-        assignment.Pupil.firstName,
-        assignment.Pupil.gender,
-        subject.title || '',
-        cls?.year,
-        assignment.eoyLevel,
-        assignment.targetLevel
-    );
+  return parseComment(
+    raw,
+    assignment.Pupil.firstName,
+    assignment.Pupil.gender,
+    subject.title || '',
+    cls?.year,
+    assignment.eoyLevel,
+    assignment.targetLevel
+  );
 }

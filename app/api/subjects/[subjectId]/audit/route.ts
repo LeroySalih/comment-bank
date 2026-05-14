@@ -54,7 +54,7 @@ export async function GET(
   );
 
   type GroupWithOptions = {
-    id: string; title: string; isLinked: boolean;
+    id: string; name: string; title: string; isLinked: boolean;
     options: { id: string; code: string; text: string; displayOrder: number }[];
   };
 
@@ -68,6 +68,7 @@ export async function GET(
     for (const g of groupRows) {
       subjectGroups.push({
         id: g.id,
+        name: g.name,
         title: g.title,
         isLinked: g.isLinked,
         options: optRows.filter(o => o.groupId === g.id),
@@ -76,19 +77,26 @@ export async function GET(
   }
 
   // ── Fetch common comment groups + options ─────────────────────────────────
+  // Fetch ALL CCGs (including linked ones) so that linked CCG slots in the
+  // format template can be detected and overridden by subject-specific groups
+  // with the same name (e.g. "Units Studied" per subject).
   const { rows: ccgRows } = await pool.query<DbCommonCommentGroup>(
-    `SELECT * FROM "CommonCommentGroup" WHERE "isLinked" = false ORDER BY "displayOrder" ASC`
+    `SELECT * FROM "CommonCommentGroup" ORDER BY "displayOrder" ASC`
   );
   const commonGroups: GroupWithOptions[] = [];
   if (ccgRows.length > 0) {
-    const ccgIds = ccgRows.map(g => g.id);
-    const { rows: ccoRows } = await pool.query<DbCommonCommentOption>(
-      `SELECT * FROM "CommonCommentOption" WHERE "groupId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
-      [ccgIds]
-    );
+    // Only fetch options for non-linked CCGs; linked CCGs have no options of their own
+    const nonLinkedCcgIds = ccgRows.filter(g => !g.isLinked).map(g => g.id);
+    const ccoRows = nonLinkedCcgIds.length > 0
+      ? (await pool.query<DbCommonCommentOption>(
+          `SELECT * FROM "CommonCommentOption" WHERE "groupId" = ANY($1::text[]) ORDER BY "displayOrder" ASC`,
+          [nonLinkedCcgIds]
+        )).rows
+      : [];
     for (const g of ccgRows) {
       commonGroups.push({
         id: g.id,
+        name: g.name,
         title: g.title,
         isLinked: g.isLinked,
         options: ccoRows.filter(o => o.groupId === g.id),
@@ -104,6 +112,14 @@ export async function GET(
   const ignoredWords = new Set(ignoredRows.map(r => r.word.toLowerCase()));
 
   // ── Collect all comment options for SPAG Phase 1 ─────────────────────────
+  // Subject groups whose name matches a CCG name override that CCG slot.
+  // We SPAG-check the subject group's options (the real content) and skip
+  // the CCG's placeholder options to avoid duplicates in Section 1.
+  const subjectGroupNames = new Set(subjectGroups.map(g => g.name));
+  const overriddenCcgNames = new Set(
+    commonGroups.filter(g => subjectGroupNames.has(g.name)).map(g => g.name)
+  );
+
   const allComments: { code: string; text: string; groupName: string }[] = [];
   for (const g of subjectGroups) {
     for (const opt of g.options) {
@@ -111,14 +127,22 @@ export async function GET(
     }
   }
   for (const g of commonGroups) {
+    if (overriddenCcgNames.has(g.name)) continue; // subject group handles this slot
     for (const opt of g.options) {
       allComments.push({ code: opt.code, text: opt.text, groupName: g.title });
     }
   }
 
-  // ── Build 50 sample reports ───────────────────────────────────────────────
+  // ── Fetch format template + subject format ────────────────────────────────
+  const { rows: settingRows } = await pool.query<{ value: string }>(
+    `SELECT value FROM "AppSetting" WHERE key = 'comment_format_template'`
+  );
+  const formatTemplate = settingRows[0]?.value || '';
+  const subjectFormat = subject.commentFormat || null;
+
+  // ── Build sample reports ──────────────────────────────────────────────────
   const { reports, untestedItems } = buildSampleReports(
-    subjectGroups, commonGroups, subject.title ?? subject.code
+    subjectGroups, commonGroups, subject.title ?? subject.code, formatTemplate, subjectFormat
   );
 
   // ── Stream ────────────────────────────────────────────────────────────────
@@ -132,61 +156,50 @@ export async function GET(
       };
 
       try {
-        // Init — DEBUG: only 1 standards report sent
-        send({ type: 'init', totalComments: allComments.length, totalReports: Math.min(reports.length, 1) });
+        send({ type: 'init', totalComments: allComments.length, totalReports: reports.length });
 
-        // ── Phase 1: SPAG ──────────────────────────────────────────────────
+        // ── Phase 1: SPAG — check every individual comment option ──────────
         const spagEntries: SpagAuditEntry[] = [];
 
         for (const comment of allComments) {
-          // Substitute variables before sending to SPAG — raw <Name> etc. would be flagged as errors
           const substituted = substituteVariables(comment.text, subject.title ?? subject.code);
           const { passed, errors } = await callSpagWebhook(substituted, ignoredWords);
-
           const entry: SpagAuditEntry = {
             code: comment.code,
             groupName: comment.groupName,
-            rawText: comment.text,
+            rawText: substituted,
             passed,
             errors,
           };
           spagEntries.push(entry);
-
-          send({
-            type: 'spag',
-            code: comment.code,
-            groupName: comment.groupName,
-            passed,
-            errors,
-          });
+          send({ type: 'spag', code: comment.code, groupName: comment.groupName, passed, errors });
         }
 
         send({ type: 'spag_done' });
 
-        // ── Phase 2: Standards ─────────────────────────────────────────────
-        // DEBUG: limit to 1 report to observe the raw service response
-        const standardsFailures: StandardsAuditEntry[] = [];
+        // ── Phase 2: Standards — check every sample report ─────────────────
+        const standardsReports: StandardsAuditEntry[] = [];
         let passedReports = 0;
 
-        for (const report of reports.slice(0, 1)) {
+        for (const report of reports) {
           const { passed, failures, failureDetails } = await callStandardsWebhook(report.assembledText);
           if (passed) passedReports++;
 
+          // Use groupTitle as key so the PDF can show human-readable "GroupTitle: Code" pairs
           const codes: Record<string, string> = {};
-          for (const [groupId, sel] of Object.entries(report.selections)) {
-            codes[groupId] = sel.code;
+          for (const [, sel] of Object.entries(report.selections)) {
+            codes[sel.groupTitle] = sel.code;
           }
 
-          if (!passed) {
-            standardsFailures.push({
-              reportIndex: report.reportIndex,
-              codes,
-              passed,
-              failures,
-              assembledText: report.assembledText,
-              failureDetails,
-            });
-          }
+          standardsReports.push({
+            reportIndex: report.reportIndex,
+            label: report.label,
+            codes,
+            passed,
+            failures,
+            assembledText: report.assembledText,
+            failureDetails,
+          });
 
           send({
             type: 'standards',
@@ -208,7 +221,7 @@ export async function GET(
           totalReports: reports.length,
           passedReports,
           spagEntries,
-          standardsFailures,
+          standardsReports,
           untestedItems,
         };
 

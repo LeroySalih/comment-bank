@@ -1,8 +1,9 @@
 import { substituteVariables } from './substitute-variables';
+import { assembleRawComment } from '@/lib/comment-utils';
 import type { SampledReport } from './types';
 
 type Option = { id: string; code: string; text: string; displayOrder: number };
-type Group = { id: string; title: string; isLinked: boolean; options: Option[] };
+type Group = { id: string; name: string; title: string; isLinked: boolean; options: Option[] };
 
 type BuildResult = {
   reports: SampledReport[];
@@ -21,32 +22,12 @@ function pickOption(options: Option[], tier: 'high' | 'medium' | 'low'): Option 
   return sorted[Math.round((sorted.length - 1) / 2)];
 }
 
-function assembleText(
-  subjectSelections: Record<string, Option>,
-  activeGroups: Group[],
-  commonSelections: Record<string, Option>,
-  commonGroups: Group[],
-  subjectTitle: string
-): string {
-  const parts: string[] = [];
-  // Iterate groups in their configured displayOrder so the assembled text
-  // matches what a real report would look like (important for standards check).
-  for (const g of activeGroups) {
-    const opt = subjectSelections[g.id];
-    if (opt) parts.push(substituteVariables(opt.text, subjectTitle));
-  }
-  for (const g of commonGroups) {
-    const opt = commonSelections[g.id];
-    if (opt) parts.push(substituteVariables(opt.text, subjectTitle));
-  }
-  return parts.join(' ');
-}
-
 export function buildSampleReports(
   subjectGroups: Group[],
   commonGroups: Group[],
   subjectTitle: string,
-  maxReports = 50
+  formatTemplate = '',
+  subjectFormat: string | null = null
 ): BuildResult {
   // Filter out linked groups; groups must have at least one option
   const activeGroups = subjectGroups.filter(g => !g.isLinked && g.options.length > 0);
@@ -55,92 +36,84 @@ export function buildSampleReports(
     return { reports: [], untestedItems: [] };
   }
 
-  // Fixed common selections: first option by displayOrder from each common group
-  const commonSelections: Record<string, Option> = {};
-  for (const cg of commonGroups) {
-    if (!cg.isLinked && cg.options.length > 0) {
-      commonSelections[cg.id] = sortedOptions(cg.options)[0];
-    }
-  }
-
   const reports: SampledReport[] = [];
-
-  // Track which (groupId, code) combos have been seen
   const seenCodes = new Set<string>(); // `${groupId}:${code}`
 
-  function addReport(subjectSelections: Record<string, Option>): void {
-    if (reports.length >= maxReports) return;
+  function addReport(
+    subjectSelections: Record<string, Option>,
+    commonSelectionsForReport: Record<string, Option>,
+    label: string,
+  ): void {
     const index = reports.length;
     const selectionsForReport: SampledReport['selections'] = {};
+
     for (const [groupId, opt] of Object.entries(subjectSelections)) {
       const group = activeGroups.find(g => g.id === groupId)!;
-      selectionsForReport[groupId] = {
-        code: opt.code,
-        text: opt.text,
-        groupTitle: group.title,
-      };
+      selectionsForReport[groupId] = { code: opt.code, text: opt.text, groupTitle: group.title };
       seenCodes.add(`${groupId}:${opt.code}`);
     }
-    // Also record common selections
-    for (const [groupId, opt] of Object.entries(commonSelections)) {
+    for (const [groupId, opt] of Object.entries(commonSelectionsForReport)) {
       const cg = commonGroups.find(g => g.id === groupId)!;
-      selectionsForReport[groupId] = {
-        code: opt.code,
-        text: opt.text,
-        groupTitle: cg.title,
-      };
+      selectionsForReport[groupId] = { code: opt.code, text: opt.text, groupTitle: cg.title };
     }
-    const assembledText = assembleText(subjectSelections, activeGroups, commonSelections, commonGroups, subjectTitle);
-    reports.push({ reportIndex: index, selections: selectionsForReport, assembledText });
+
+    // Use the single canonical assembly function, then substitute audit variables
+    const raw = assembleRawComment({
+      getSubjectText: (groupId) => {
+        const opt = subjectSelections[groupId];
+        return opt?.text ?? '';
+      },
+      getCommonText: (groupId) => {
+        const opt = commonSelectionsForReport[groupId];
+        return opt?.text ?? '';
+      },
+      subjectGroups: activeGroups,
+      commonGroups,
+      formatTemplate,
+      subjectFormat,
+    });
+
+    const assembledText = substituteVariables(raw, subjectTitle);
+    reports.push({ reportIndex: index, label, selections: selectionsForReport, assembledText });
+  }
+
+  // Build common selections for a given tier
+  function buildCommonSelections(tier: 'high' | 'medium' | 'low'): Record<string, Option> {
+    const sel: Record<string, Option> = {};
+    for (const cg of commonGroups) {
+      if (!cg.isLinked && cg.options.length > 0) {
+        sel[cg.id] = pickOption(cg.options, tier);
+      }
+    }
+    return sel;
   }
 
   // ── Strategy 1: All High ────────────────────────────────────────────────
   {
     const sel: Record<string, Option> = {};
     for (const g of activeGroups) sel[g.id] = pickOption(g.options, 'high');
-    addReport(sel);
+    addReport(sel, buildCommonSelections('high'), 'All High');
   }
 
   // ── Strategy 2: All Medium ──────────────────────────────────────────────
-  if (reports.length < maxReports) {
+  {
     const sel: Record<string, Option> = {};
     for (const g of activeGroups) sel[g.id] = pickOption(g.options, 'medium');
-    addReport(sel);
+    addReport(sel, buildCommonSelections('medium'), 'All Medium');
   }
 
   // ── Strategy 3: All Low ─────────────────────────────────────────────────
-  if (reports.length < maxReports) {
+  {
     const sel: Record<string, Option> = {};
     for (const g of activeGroups) sel[g.id] = pickOption(g.options, 'low');
-    addReport(sel);
+    addReport(sel, buildCommonSelections('low'), 'All Low');
   }
 
-  // ── Strategy 4: Mostly High (one group rotated to Medium) ───────────────
-  for (const rotateGroup of activeGroups) {
-    if (reports.length >= maxReports) break;
-    const sel: Record<string, Option> = {};
-    for (const g of activeGroups) {
-      sel[g.id] = g.id === rotateGroup.id
-        ? pickOption(g.options, 'medium')
-        : pickOption(g.options, 'high');
-    }
-    addReport(sel);
-  }
-
-  // ── Strategy 5: Mostly Low (one group rotated to High) ──────────────────
-  for (const rotateGroup of activeGroups) {
-    if (reports.length >= maxReports) break;
-    const sel: Record<string, Option> = {};
-    for (const g of activeGroups) {
-      sel[g.id] = g.id === rotateGroup.id
-        ? pickOption(g.options, 'high')
-        : pickOption(g.options, 'low');
-    }
-    addReport(sel);
-  }
-
-  // ── Strategy 6: Coverage fill ────────────────────────────────────────────
-  while (reports.length < maxReports) {
+  // ── Strategy 4: Coverage fill ─────────────────────────────────────────────
+  // Adds extra rows only when a group has 2 or 4 options, leaving some
+  // options uncovered by the three base rows above.
+  let coverageCount = 0;
+  while (true) {
     const unseenOptions: { groupId: string; opt: Option }[] = [];
     for (const g of activeGroups) {
       for (const opt of g.options) {
@@ -151,22 +124,19 @@ export function buildSampleReports(
     }
     if (unseenOptions.length === 0) break;
 
-    // Build one report that covers as many unseen options as possible
+    coverageCount++;
     const sel: Record<string, Option> = {};
     const coveredGroups = new Set<string>();
-
-    // First pass: pick unseen options
     for (const { groupId, opt } of unseenOptions) {
       if (!coveredGroups.has(groupId)) {
         sel[groupId] = opt;
         coveredGroups.add(groupId);
       }
     }
-    // Fill remaining groups with their "high" option
     for (const g of activeGroups) {
       if (!sel[g.id]) sel[g.id] = pickOption(g.options, 'high');
     }
-    addReport(sel);
+    addReport(sel, buildCommonSelections('high'), `Coverage Fill ${coverageCount}`);
   }
 
   // ── Untested codes ───────────────────────────────────────────────────────

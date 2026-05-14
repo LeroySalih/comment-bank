@@ -13,7 +13,8 @@ export const parseComment = (
     let comment = commentText;
     
     // Gender replacement logic
-    const isMale = gender.toLowerCase() === "male";
+    const g = gender.toLowerCase();
+    const isMale = g === "male" || g === "m";
     
     const replacements = isMale ? {
         "<He>": "He",

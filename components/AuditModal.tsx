@@ -184,6 +184,7 @@ export default function AuditModal({
 
         case 'error':
           closeStream();
+          console.error('[AuditModal] Audit error event:', event.message);
           setPhase({ name: 'error', message: event.message });
           break;
 
@@ -197,7 +198,8 @@ export default function AuditModal({
       try {
         const event = JSON.parse(e.data) as AuditEvent;
         handleEvent(event);
-      } catch {
+      } catch (err) {
+        console.error('[AuditModal] Malformed SSE data:', e.data, err);
         closeStream();
         setPhase({ name: 'error', message: 'Received malformed data from audit service.' });
       }

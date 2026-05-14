@@ -39,7 +39,6 @@ function classifyType(message: string): IssueType {
 const STANDARDS_RULES: { key: StandardsRuleKey; label: string }[] = [
   { key: 'UKSpelling',                label: 'UK Spelling' },
   { key: 'CourseOverviewIncluded',    label: 'Course Overview' },
-  { key: 'AcademicPerformanceIncluded', label: 'Academic Performance' },
   { key: 'TargetWordCountMet',        label: 'Word Count' },
   { key: 'TerminologyCorrect',        label: 'Terminology' },
   { key: 'JargonFree',                label: 'Jargon Free' },
@@ -329,19 +328,44 @@ export function InlineSpagEditor({
               />
             )}
           </div>
-          <div className="flex flex-wrap gap-1.5">
-            {failingRules.map((r) => (
-              <span
-                key={r.key}
-                className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700"
-              >
-                <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor">
-                  <circle cx="4.5" cy="4.5" r="4.5" opacity="0.2" />
-                  <circle cx="4.5" cy="4.5" r="2" />
-                </svg>
-                {r.label}
-              </span>
-            ))}
+          <div className="flex flex-col gap-2">
+            <div className="flex flex-wrap gap-1.5">
+              {failingRules.map((r) => (
+                <span
+                  key={r.key}
+                  className="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium bg-amber-50 dark:bg-amber-900/30 text-amber-700 dark:text-amber-400 border border-amber-200 dark:border-amber-700"
+                >
+                  <svg width="9" height="9" viewBox="0 0 9 9" fill="currentColor">
+                    <circle cx="4.5" cy="4.5" r="4.5" opacity="0.2" />
+                    <circle cx="4.5" cy="4.5" r="2" />
+                  </svg>
+                  {r.label}
+                </span>
+              ))}
+            </div>
+            {/* Feedback details for failing rules */}
+            {failingRules.map((r) => {
+              const entry = standardsResult?.[r.key]
+              if (!entry) return null
+              const hasWordCount = typeof entry.wordCount === 'number'
+              const hasInstances = entry.instances && entry.instances.length > 0
+              if (!hasWordCount && !hasInstances) return null
+              return (
+                <div key={r.key} className="rounded border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-900/20 px-2.5 py-2 text-[11px] text-amber-800 dark:text-amber-300">
+                  <p className="font-semibold mb-1">{r.label}</p>
+                  {hasWordCount && (
+                    <p>{entry.wordCount} words — target 200–300</p>
+                  )}
+                  {hasInstances && (
+                    <ul className="mt-1 space-y-0.5 list-disc list-inside">
+                      {entry.instances!.map((inst, i) => (
+                        <li key={i} className="font-mono truncate">{inst}</li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )
+            })}
           </div>
         </div>
       )}

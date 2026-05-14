@@ -71,6 +71,7 @@ export type AuditCommentEntry = {
 /** One sampled report — group selections + assembled text */
 export type SampledReport = {
   reportIndex: number;
+  label: string;
   /** groupId → { code, text, groupTitle } */
   selections: Record<string, { code: string; text: string; groupTitle: string }>;
   assembledText: string;
@@ -88,6 +89,8 @@ export type SpagAuditEntry = {
 /** Standards result accumulated during Phase 2 */
 export type StandardsAuditEntry = {
   reportIndex: number;
+  label: string;
+  /** groupTitle → selected comment code (for human-readable display) */
   codes: Record<string, string>;
   passed: boolean;
   failures: StandardsRuleKey[];
@@ -103,6 +106,6 @@ export type AuditPdfData = {
   totalReports: number;
   passedReports: number;
   spagEntries: SpagAuditEntry[];
-  standardsFailures: StandardsAuditEntry[];
+  standardsReports: StandardsAuditEntry[];
   untestedItems: { code: string; groupName: string }[];
 };

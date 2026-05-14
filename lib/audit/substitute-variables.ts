@@ -1,8 +1,16 @@
 const FIXED_VALUES: Record<string, string> = {
   '<Name>': 'Alex',
+  // Combined gender forms
   '<he/she>': 'they',
   '<his/her>': 'their',
   '<him/her>': 'them',
+  // Single gender forms
+  '<He>': 'He',
+  '<he>': 'he',
+  '<His>': 'His',
+  '<his>': 'his',
+  '<Him>': 'Him',
+  '<him>': 'him',
   '<Year>': 'Year 10',
   '<EoYLevel>': '6',
   '<TargetLevel>': '7',
