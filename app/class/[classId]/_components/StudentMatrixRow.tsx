@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import QuickGroupSelector from '@/components/QuickGroupSelector';
@@ -8,6 +8,7 @@ import CopyCommentButton from '@/components/CopyCommentButton';
 import CommentStatusBadge from '@/components/CommentStatusBadge';
 import ConfirmModal from '@/components/ConfirmModal';
 import { revertAssignmentComment, updateCommonAssignmentCode } from '@/app/actions';
+import { useClassMatrix } from './ClassMatrixContext';
 
 type Option = {
   id: string;
@@ -132,6 +133,22 @@ export default function StudentMatrixRow({ assignment, groups, subject, classYea
   // Modal state for revert confirmation
   const [showRevertModal, setShowRevertModal] = useState(false);
   const [isReverting, setIsReverting] = useState(false);
+
+  const { registerRow, unregisterRow } = useClassMatrix();
+
+  useEffect(() => {
+    registerRow(assignment.id, {
+      setCode: (groupId, code) => {
+        if (commentBanksDisabled) return;
+        setSelections(prev => ({ ...prev, [groupId]: code }));
+      },
+      setCommonCode: (groupId, code) => {
+        if (commentBanksDisabled) return;
+        setCommonSelections(prev => ({ ...prev, [groupId]: code }));
+      },
+    });
+    return () => unregisterRow(assignment.id);
+  }, [assignment.id, commentBanksDisabled, registerRow, unregisterRow]);
 
   const handleSelectionChange = (groupId: string, code: string | null) => {
     if (commentBanksDisabled) return;
