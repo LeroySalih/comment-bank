@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { updateAssignmentCode } from '@/app/actions';
 import Tooltip from './Tooltip';
 import { parseComment } from '@/lib/utils';
@@ -41,6 +41,11 @@ export default function QuickGroupSelector({
 }: QuickGroupSelectorProps) {
   const [val, setVal] = useState(currentCode || "");
   const [loading, setLoading] = useState(false);
+
+  // Sync val when currentCode is updated externally (e.g. bulk-set from column header)
+  useEffect(() => {
+    setVal(currentCode || "");
+  }, [currentCode]);
 
   const updateFn = onCodeUpdate || updateAssignmentCode;
 
