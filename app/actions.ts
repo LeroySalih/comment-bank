@@ -229,3 +229,69 @@ export async function revertAssignmentComment(assignmentId: string) {
     return { success: false, error: error instanceof Error ? error.message : 'Database error' }
   }
 }
+
+export async function bulkSetColumnCode(
+  classId: string,
+  groupId: string,
+  code: string,
+  groupType: 'subject' | 'common'
+): Promise<{ success: boolean; updatedAssignmentIds: string[]; error?: string }> {
+  try {
+    const { rows: assignmentRows } = await pool.query<{ id: string }>(
+      `SELECT a.id FROM "Assignment" a
+       JOIN "Pupil" p ON p."admissionNumber" = a."pupilId"
+       WHERE a."classId" = $1 AND p."isActive" = true`,
+      [classId]
+    )
+    const allIds = assignmentRows.map(r => r.id)
+    if (allIds.length === 0) return { success: true, updatedAssignmentIds: [] }
+
+    let alreadySetIds: string[] = []
+    if (groupType === 'subject') {
+      const { rows } = await pool.query<{ assignmentId: string }>(
+        `SELECT "assignmentId" FROM "PupilCode"
+         WHERE "assignmentId" = ANY($1::text[]) AND "groupId" = $2`,
+        [allIds, groupId]
+      )
+      alreadySetIds = rows.map(r => r.assignmentId)
+    } else {
+      const { rows } = await pool.query<{ assignmentId: string }>(
+        `SELECT "assignmentId" FROM "CommonPupilCode"
+         WHERE "assignmentId" = ANY($1::text[]) AND "commonGroupId" = $2`,
+        [allIds, groupId]
+      )
+      alreadySetIds = rows.map(r => r.assignmentId)
+    }
+
+    const alreadySetSet = new Set(alreadySetIds)
+    const toUpdate = allIds.filter(id => !alreadySetSet.has(id))
+    if (toUpdate.length === 0) return { success: true, updatedAssignmentIds: [] }
+
+    if (groupType === 'subject') {
+      for (const assignmentId of toUpdate) {
+        await pool.query(
+          `INSERT INTO "PupilCode" (id, "assignmentId", "groupId", code)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT ("assignmentId", "groupId") DO NOTHING`,
+          [createId(), assignmentId, groupId, code]
+        )
+      }
+    } else {
+      for (const assignmentId of toUpdate) {
+        await pool.query(
+          `INSERT INTO "CommonPupilCode" (id, "assignmentId", "commonGroupId", code)
+           VALUES ($1, $2, $3, $4)
+           ON CONFLICT ("assignmentId", "commonGroupId") DO NOTHING`,
+          [createId(), assignmentId, groupId, code]
+        )
+      }
+    }
+
+    revalidatePath(`/class/${classId}`)
+
+    return { success: true, updatedAssignmentIds: toUpdate }
+  } catch (error) {
+    console.error('Failed to bulk set column code:', error)
+    return { success: false, updatedAssignmentIds: [], error: 'Database error' }
+  }
+}
