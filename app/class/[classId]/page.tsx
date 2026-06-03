@@ -7,6 +7,8 @@ import { authOptions } from '../../api/auth/[...nextauth]/route';
 import { isAdmin, isHoD, isTeacher } from '@/lib/access-control';
 import { decrypt } from '@/lib/encryption';
 import StudentMatrixRow from './_components/StudentMatrixRow';
+import ClassMatrixClient from './_components/ClassMatrixClient';
+import BulkCodeButtonRow from './_components/BulkCodeButtonRow';
 
 export default async function ClassPage({ params }: { params: Promise<{ classId: string }> }) {
   const { classId } = await params;
@@ -241,6 +243,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
         </div>
 
         {/* Table Content Container */}
+        <ClassMatrixClient classId={classId}>
         <div className="flex-1 overflow-auto p-6">
             <div className="bg-white dark:bg-[#1a222c] rounded-xl border border-[#dbe0e6] dark:border-[#2d3748] shadow-sm overflow-hidden h-full flex flex-col">
                 <div className="overflow-auto relative h-full">
@@ -290,6 +293,11 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                                     Actions
                                 </th>
                             </tr>
+                            <BulkCodeButtonRow
+                                groups={groups}
+                                commonGroupsBefore={commonGroupsBefore}
+                                commonGroupsAfter={commonGroupsAfter}
+                            />
                         </thead>
                         <tbody className="divide-y divide-[#e5e7eb] dark:divide-[#2d3748]">
                             {assignments.map((assignment: any) => (
@@ -311,6 +319,7 @@ export default async function ClassPage({ params }: { params: Promise<{ classId:
                 </div>
             </div>
         </div>
+        </ClassMatrixClient>
     </main>
   );
 }
