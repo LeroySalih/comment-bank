@@ -3,7 +3,7 @@ import { getServerSession } from 'next-auth';
 import { authOptions } from '../app/api/auth/[...nextauth]/route';
 import { isAdmin, isHoD } from '../lib/access-control';
 import SignOutButton from './SignOutButton';
-import { LayoutDashboard, ShieldCheck, GraduationCap } from 'lucide-react';
+import { LayoutDashboard, ShieldCheck, GraduationCap, BookOpen } from 'lucide-react';
 
 export default async function Navbar() {
   const session = await getServerSession(authOptions);
@@ -41,6 +41,14 @@ export default async function Navbar() {
               >
                 <LayoutDashboard size={18} />
                 Pupil Comments
+              </Link>
+
+              <Link
+                href="/sow"
+                className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 hover:text-blue-600 hover:bg-blue-50 rounded-md transition-all gap-2"
+              >
+                <BookOpen size={18} />
+                SoW
               </Link>
 
               {showHoD && (

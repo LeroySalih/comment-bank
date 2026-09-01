@@ -42,6 +42,8 @@ model Class {
   Assignment Assignment[]
   Subject    Subject      @relation(fields: [subjectId], references: [id], onDelete: Cascade)
   User       User[]
+  SowUnit    SowUnit[]
+  Lesson     Lesson[]
 
   @@index([subjectId])
 }
@@ -170,6 +172,48 @@ model CommonPupilCode {
 model AppSetting {
   key   String @id
   value String
+}
+
+model HalfTerm {
+  id           String    @id
+  academicYear String
+  label        String    // H1 .. H6
+  startDate    DateTime  @db.Date
+  endDate      DateTime  @db.Date
+  SowUnit      SowUnit[]
+
+  @@unique([academicYear, label])
+}
+
+model SowUnit {
+  id         String    @id
+  classId    String
+  halfTermId String
+  title      String
+  comment    String?
+  isManual   Boolean   @default(false)
+  Class      Class     @relation(fields: [classId], references: [id], onDelete: Cascade)
+  HalfTerm   HalfTerm  @relation(fields: [halfTermId], references: [id], onDelete: Cascade)
+  Lesson     Lesson[]
+
+  @@unique([classId, halfTermId, title])
+  @@index([classId])
+  @@index([halfTermId])
+}
+
+model Lesson {
+  id                  String   @id
+  classId             String
+  sowUnitId           String?
+  date                DateTime @db.Date
+  title               String
+  score               String?
+  learningObjectives  String?
+  Class               Class    @relation(fields: [classId], references: [id], onDelete: Cascade)
+  SowUnit             SowUnit? @relation(fields: [sowUnitId], references: [id], onDelete: SetNull)
+
+  @@index([classId])
+  @@index([sowUnitId])
 }
 
 model AuditLog {
